@@ -216,17 +216,11 @@ const App = {
             
             let barColor = conf.colors[currIdx] ? conf.colors[currIdx] : 'var(--primary)';
             
-            let pctToNext = 100 - pct;
-            let subtitleText = pct === 100 ? "Max baseline achieved" : `${pctToNext}% to establishing ${nextGrade}`;
-
-            // THE FIXED NEON BAR RENDERING
+            // THE CLEAN, SUBTITLE-FREE NEON BAR RENDERING
             listHTML += `
             <div class="xp-wrapper">
                 <div class="xp-header">
-                    <div class="xp-title-cont">
-                        <span class="xp-title">Working Capacity</span>
-                        <span class="xp-subtitle">${subtitleText}</span>
-                    </div>
+                    <span class="xp-title">Working Capacity</span>
                     <span class="xp-pct" style="color: ${barColor};">${pct}%</span>
                 </div>
                 <div class="xp-bar-cont">
