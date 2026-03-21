@@ -191,12 +191,28 @@ const App = {
             displayLogs = [...viewLogs].sort((a,b) => b.id - a.id).slice(0, 15);
         }
         
-        let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
-            const d = l.cleanDate.split('-'); const isF = l.grade.includes('⚡') || l.grade.includes('👁️');
-            const badge = getBadge(l.type, l.grade);
-            const angleText = l.angle ? ` • ${l.angle.toUpperCase()}` : '';
-            const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
-            const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog(${l.id})">×</button>` : '';
+        let pctToNext = 100 - pct;
+            let subtitleText = pct === 100 ? "Max baseline achieved" : `${pctToNext}% to establishing ${nextGrade}`;
+
+            listHTML += `
+            <div class="xp-wrapper">
+                <div class="xp-header">
+                    <div class="xp-title-cont">
+                        <span class="xp-title">Working Capacity</span>
+                        <span class="xp-subtitle">${subtitleText}</span>
+                    </div>
+                    <span class="xp-pct" style="color: ${barColor};">${pct}%</span>
+                </div>
+                <div class="xp-bar-cont">
+                    <div class="xp-grade" style="color: ${barColor};">${conf.labels[currIdx]}</div>
+                    <div class="xp-track">
+                        <div class="xp-fill" style="width: ${pct}%; background: linear-gradient(90deg, ${barColor}20 0%, ${barColor} 100%); box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 0 15px ${barColor}50;">
+                            <div class="xp-fill-glow"></div>
+                        </div>
+                    </div>
+                    <div class="xp-grade next">${nextGrade}</div>
+                </div>
+            </div>`;
             
             return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><span class="log-name">${l.name}${syncWarning}</span><span class="log-disc">${l.type.replace(/Indoor |Outdoor | Climbing/g, '')}${angleText}</span></div><div class="log-grade ${isF ? 'fl' : 'rp'}">${badge}${l.grade}</div>${delBtn}</div>`;
         }).join('');
