@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Send Log</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230a0a0a%22/><text y=%2250%22 x=%2250%22 font-size=%2255%22 text-anchor=%22middle%22 dominant-baseline=%22central%22>⛰️</text></svg>">
+</head>
+<body>
+    <nav class="bottom-nav">
+        <button class="nav-btn active" id="nav-log" onclick="App.haptic(); State.view='log'">✍️ Log</button>
+        <button class="nav-btn" id="nav-dash" onclick="App.haptic(); State.view='dash'">📊 Dashboard</button>
+    </nav>
+
+    <div id="toast" class="toast">Action Successful</div>
+
+    <div class="container">
+        <div id="view-log" class="view active">
+            <h1>Send Log</h1>
+            <div class="card">
+                <div class="sync-badge"></div>
+                <div class="pill-row" id="typeSelector"></div>
+                <div id="climbForm">
+                    <label>Date</label>
+                    <div class="pill-row" id="datePicker">
+                        <div class="pill active" id="pill-today" onclick="App.setDate('today')">Today</div>
+                        <div class="pill" id="pill-yest" onclick="App.setDate('yesterday')">Yesterday</div>
+                        <div class="pill" id="pill-custom" onclick="document.getElementById('native-date').showPicker()">Custom Date</div>
+                    </div>
+                    <input type="date" id="native-date" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;" onchange="App.setDate('custom', this.value)">
+                    <div id="input-indoor">
+                        <label>Select Gym</label>
+                        <div id="gymPicker" class="pill-row"></div>
+                    </div>
+                    <div id="input-outdoor" class="hidden">
+                        <div class="flex">
+                            <div><label id="outdoor-name-lbl">Route Name</label><input type="text" id="input-name" placeholder="Silence"></div>
+                            <div><label>Crag</label><input type="text" id="input-crag" placeholder="Flatanger"></div>
+                        </div>
+                    </div>
+                    <label>Grade</label>
+                    <div id="gradePicker" class="pill-row"></div>
+                    
+                    <label>Angle / Style</label>
+                    <div class="pill-row" id="angleSelector"></div>
+
+                    <label>Style of Ascent</label>
+                    <div class="pill-row" id="styleSelector"></div>
+                    
+                    <button class="btn-main" onclick="App.logClimb()">Save to Cloud</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-dash" class="view">
+            <h1>Dashboard</h1>
+            <div class="card">
+                <div class="sync-badge"></div>
+                <div class="pill-row" id="dashSelector" style="margin-bottom: 25px;"></div>
+                <div class="chart-toggle-row" id="chartToggle"></div>
+                <div class="chart-container">
+                    <div id="noDataMsg" style="color: var(--text-muted); font-style: italic; text-align: center; padding-top: 40px;">Log climbs to view progression</div>
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h2>
+                    Logs
+                    <div class="chart-toggle-row" style="margin: 0;">
+                        <div class="chart-toggle-btn active" id="list-toggle-top" onclick="App.haptic(); State.listMode='top10';">Top 10</div>
+                        <div class="chart-toggle-btn" id="list-toggle-recent" onclick="App.haptic(); State.listMode='recent';">Recent</div>
+                    </div>
+                </h2>
+                <div id="logList" class="log-list"></div>
+            </div>
+            <div class="card">
+                <h2>60-Day Send Pyramid</h2>
+                <div id="pyramidCont" class="pyramid-cont"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
