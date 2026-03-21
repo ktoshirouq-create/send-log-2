@@ -5,8 +5,8 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// ⚠️ PASTE YOUR GOOGLE WEB APP URL HERE BETWEEN THE QUOTES ⚠️
-const API_URL = "https://script.google.com/macros/s/AKfycbw-4lwkPSlBubvvgvnBKmDBVzjy9s7kBRekCPOBVnm_6nsgVgNeL8Bdmi5JjJ1KAuVM/exec";
+// Hardcoded Master Google Script URL
+const API_URL = "https://script.google.com/macros/s/AKfycbyya7G3xh82DVIbI3X9PdE5smBqQn8mEQfoznhV92byhV9BvpoNmiFv-UeA--Bq5DPn/exec";
 
 const GRADES = {
     ropes: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"],
@@ -216,19 +216,19 @@ const App = {
             
             let barColor = conf.colors[currIdx] ? conf.colors[currIdx] : 'var(--primary)';
             
-            // THE CLEAN, SUBTITLE-FREE NEON BAR RENDERING
+            // BRUTE-FORCE INLINE STYLING - NO SUBTITLE, THICK GLOW
             listHTML += `
-            <div class="xp-wrapper">
-                <div class="xp-header">
-                    <span class="xp-title">Working Capacity</span>
-                    <span class="xp-pct" style="color: ${barColor};">${pct}%</span>
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
+                    <span style="font-size: 0.85rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Working Capacity</span>
+                    <span style="font-size: 1.15rem; font-weight: 800; letter-spacing: -0.5px; color: ${barColor};">${pct}%</span>
                 </div>
-                <div class="xp-bar-cont">
-                    <div class="xp-grade" style="color: ${barColor};">${conf.labels[currIdx]}</div>
-                    <div class="xp-track">
-                        <div class="xp-fill" style="width: ${pct}%; background: ${barColor}; box-shadow: 0 0 10px ${barColor}80, inset 0 2px 2px rgba(255,255,255,0.3);"></div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 1.15rem; font-weight: 800; color: ${barColor}; width: 42px; text-align: center; flex-shrink: 0;">${conf.labels[currIdx]}</span>
+                    <div style="flex: 1; height: 14px; background: #000; border-radius: 14px; box-shadow: inset 0 3px 6px rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.1); position: relative; overflow: hidden;">
+                        <div style="height: 100%; border-radius: 14px; transition: width 1s ease; width: ${pct}%; background: ${barColor}; box-shadow: 0 0 12px ${barColor}, inset 0 2px 3px rgba(255,255,255,0.4);"></div>
                     </div>
-                    <div class="xp-grade next">${nextGrade}</div>
+                    <span style="font-size: 1.15rem; font-weight: 800; color: #525252; width: 42px; text-align: center; flex-shrink: 0;">${nextGrade}</span>
                 </div>
             </div>`;
         }
