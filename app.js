@@ -5,8 +5,8 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// MAKE SURE TO PASTE YOUR NEW GOOGLE WEB APP URL HERE
-const API_URL = "https://script.google.com/macros/s/AKfycbyya7G3xh82DVIbI3X9PdE5smBqQn8mEQfoznhV92byhV9BvpoNmiFv-UeA--Bq5DPn/exec";
+// ⚠️ PASTE YOUR GOOGLE WEB APP URL HERE BETWEEN THE QUOTES ⚠️
+const API_URL = "https://script.google.com/macros/s/AKfycbz_-LZvWtypEz4JnNWCOCJuheXSM5gkeIm4o_MxCvrlH_CbLoO_juFuZ1QOGj2OKgk0/exec";
 
 const GRADES = {
     ropes: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"],
@@ -191,28 +191,12 @@ const App = {
             displayLogs = [...viewLogs].sort((a,b) => b.id - a.id).slice(0, 15);
         }
         
-        let pctToNext = 100 - pct;
-            let subtitleText = pct === 100 ? "Max baseline achieved" : `${pctToNext}% to establishing ${nextGrade}`;
-
-            listHTML += `
-            <div class="xp-wrapper">
-                <div class="xp-header">
-                    <div class="xp-title-cont">
-                        <span class="xp-title">Working Capacity</span>
-                        <span class="xp-subtitle">${subtitleText}</span>
-                    </div>
-                    <span class="xp-pct" style="color: ${barColor};">${pct}%</span>
-                </div>
-                <div class="xp-bar-cont">
-                    <div class="xp-grade" style="color: ${barColor};">${conf.labels[currIdx]}</div>
-                    <div class="xp-track">
-                        <div class="xp-fill" style="width: ${pct}%; background: linear-gradient(90deg, ${barColor}20 0%, ${barColor} 100%); box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 0 15px ${barColor}50;">
-                            <div class="xp-fill-glow"></div>
-                        </div>
-                    </div>
-                    <div class="xp-grade next">${nextGrade}</div>
-                </div>
-            </div>`;
+        let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
+            const d = l.cleanDate.split('-'); const isF = l.grade.includes('⚡') || l.grade.includes('👁️');
+            const badge = getBadge(l.type, l.grade);
+            const angleText = l.angle ? ` • ${l.angle.toUpperCase()}` : '';
+            const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
+            const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog(${l.id})">×</button>` : '';
             
             return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><span class="log-name">${l.name}${syncWarning}</span><span class="log-disc">${l.type.replace(/Indoor |Outdoor | Climbing/g, '')}${angleText}</span></div><div class="log-grade ${isF ? 'fl' : 'rp'}">${badge}${l.grade}</div>${delBtn}</div>`;
         }).join('');
@@ -232,12 +216,25 @@ const App = {
             
             let barColor = conf.colors[currIdx] ? conf.colors[currIdx] : 'var(--primary)';
             
+            let pctToNext = 100 - pct;
+            let subtitleText = pct === 100 ? "Max baseline achieved" : `${pctToNext}% to establishing ${nextGrade}`;
+
             listHTML += `
             <div class="xp-wrapper">
-                <div class="xp-header"><span>Working Capacity</span><span class="pct">${pct}%</span></div>
+                <div class="xp-header">
+                    <div class="xp-title-cont">
+                        <span class="xp-title">Working Capacity</span>
+                        <span class="xp-subtitle">${subtitleText}</span>
+                    </div>
+                    <span class="xp-pct" style="color: ${barColor};">${pct}%</span>
+                </div>
                 <div class="xp-bar-cont">
-                    <div class="xp-grade">${conf.labels[currIdx]}</div>
-                    <div class="xp-track"><div class="xp-fill" style="width: ${pct}%; background: ${barColor}; box-shadow: 0 0 10px ${barColor}80;"></div></div>
+                    <div class="xp-grade" style="color: ${barColor};">${conf.labels[currIdx]}</div>
+                    <div class="xp-track">
+                        <div class="xp-fill" style="width: ${pct}%; background: linear-gradient(90deg, ${barColor}20 0%, ${barColor} 100%); box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 0 15px ${barColor}50;">
+                            <div class="xp-fill-glow"></div>
+                        </div>
+                    </div>
                     <div class="xp-grade next">${nextGrade}</div>
                 </div>
             </div>`;
