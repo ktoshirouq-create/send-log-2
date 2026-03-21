@@ -219,6 +219,7 @@ const App = {
             let pctToNext = 100 - pct;
             let subtitleText = pct === 100 ? "Max baseline achieved" : `${pctToNext}% to establishing ${nextGrade}`;
 
+            // THE FIXED NEON BAR RENDERING
             listHTML += `
             <div class="xp-wrapper">
                 <div class="xp-header">
@@ -231,9 +232,7 @@ const App = {
                 <div class="xp-bar-cont">
                     <div class="xp-grade" style="color: ${barColor};">${conf.labels[currIdx]}</div>
                     <div class="xp-track">
-                        <div class="xp-fill" style="width: ${pct}%; background: linear-gradient(90deg, ${barColor}20 0%, ${barColor} 100%); box-shadow: inset 0 1px 1px rgba(255,255,255,0.4), 0 0 15px ${barColor}50;">
-                            <div class="xp-fill-glow"></div>
-                        </div>
+                        <div class="xp-fill" style="width: ${pct}%; background: ${barColor}; box-shadow: 0 0 10px ${barColor}80, inset 0 2px 2px rgba(255,255,255,0.3);"></div>
                     </div>
                     <div class="xp-grade next">${nextGrade}</div>
                 </div>
