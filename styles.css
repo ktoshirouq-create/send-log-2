@@ -66,6 +66,7 @@ input:focus { border-color: var(--primary); }
 .xp-track { flex: 1; height: 14px; background: #000; border-radius: 14px; box-shadow: inset 0 2px 6px rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.05); overflow: hidden; position: relative; }
 .xp-fill { height: 100%; border-radius: 14px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
 .xp-fill-glow { position: absolute; right: 0; top: 0; bottom: 0; width: 4px; background: #fff; border-radius: 2px; box-shadow: -3px 0 10px rgba(255,255,255,0.9); }
+
 .chart-toggle-row { display: flex; justify-content: center; gap: 6px; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 6px; border-radius: 12px; border: 1px solid var(--border); width: fit-content; margin: 0 auto; }
 .chart-toggle-btn { padding: 6px 14px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
 .chart-toggle-btn.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.4); border: 1px solid rgba(16,185,129,0.2); }
