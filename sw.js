@@ -4,7 +4,7 @@
 // RUTHLESS RULE: Every time you update your app.js, index.html, or 
 // styles.css on GitHub, you MUST change this version number (e.g., v2, v3).
 // If you do not change this, your phone will load the old cached version forever.
-const CACHE_NAME = 'sendlog-cache-v5'; 
+const CACHE_NAME = 'sendlog-cache-v6'; 
 
 const urlsToCache = [
   './',
