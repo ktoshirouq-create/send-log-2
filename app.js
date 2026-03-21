@@ -5,7 +5,7 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-const API_URL = "https://script.google.com/macros/s/AKfycbyya7G3xh82DVIbI3X9PdE5smBqQn8mEQfoznhV92byhV9BvpoNmiFv-UeA--Bq5DPn/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbz_-LZvWtypEz4JnNWCOCJuheXSM5gkeIm4o_MxCvrlH_CbLoO_juFuZ1QOGj2OKgk0/exec";
 
 const GRADES = {
     ropes: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"],
