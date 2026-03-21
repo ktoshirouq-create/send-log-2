@@ -53,15 +53,19 @@ input:focus { border-color: var(--primary); }
 .log-del { background: transparent; border: none; color: var(--danger); font-size: 1.5rem; line-height: 1; opacity: 0.3; cursor: pointer; transition: 0.2s; margin-left: 10px; padding: 0 5px; }
 .log-del:active { opacity: 1; transform: scale(0.8); }
 
-.xp-wrapper { margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); }
-.xp-header { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-.xp-header span.pct { color: #fff; font-size: 0.85rem; }
+/* --- Gamified XP Bar --- */
+.xp-wrapper { margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1); }
+.xp-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+.xp-title-cont { display: flex; flex-direction: column; gap: 2px; }
+.xp-title { font-size: 0.75rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.xp-subtitle { font-size: 0.65rem; color: #a3a3a3; font-weight: 600; }
+.xp-pct { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.5px; }
 .xp-bar-cont { display: flex; align-items: center; gap: 12px; }
-.xp-grade { font-size: 1.1rem; font-weight: 700; color: #fff; width: 40px; text-align: center; flex-shrink: 0; }
-.xp-grade.next { color: var(--text-muted); opacity: 0.7; }
-.xp-track { flex: 1; height: 10px; background: rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); position: relative; }
-.xp-fill { height: 100%; border-radius: 10px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
-
+.xp-grade { font-size: 1.15rem; font-weight: 800; color: #fff; width: 42px; text-align: center; flex-shrink: 0; }
+.xp-grade.next { color: #525252; }
+.xp-track { flex: 1; height: 14px; background: #000; border-radius: 14px; box-shadow: inset 0 2px 6px rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.05); overflow: hidden; position: relative; }
+.xp-fill { height: 100%; border-radius: 14px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
+.xp-fill-glow { position: absolute; right: 0; top: 0; bottom: 0; width: 4px; background: #fff; border-radius: 2px; box-shadow: -3px 0 10px rgba(255,255,255,0.9); }
 .chart-toggle-row { display: flex; justify-content: center; gap: 6px; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 6px; border-radius: 12px; border: 1px solid var(--border); width: fit-content; margin: 0 auto; }
 .chart-toggle-btn { padding: 6px 14px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
 .chart-toggle-btn.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.4); border: 1px solid rgba(16,185,129,0.2); }
