@@ -35,7 +35,7 @@ const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffs
 
 const getBadge = (type, gradeText) => {
     if (type !== 'Indoor Bouldering') return '';
-    const baseGrade = gradeText.replace(/[⚡👁️\s]/g, '');
+    const baseGrade = gradeText.replace(/[⚡👁️🚀🛠️\s]/g, '');
     const idx = GRADES.bouldsIn.indexOf(baseGrade);
     if (idx > -1) return `<span class="boulder-dot" style="background:${GRADES.bouldsInColors[idx]};"></span>`;
     return '';
@@ -43,7 +43,7 @@ const getBadge = (type, gradeText) => {
 
 const State = new Proxy({
     view: 'log', discipline: 'Indoor Rope Climbing', activeGrade: { text: '6b', score: 633 },
-    activeStyle: 'redpoint', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max',
+    activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max',
     activeAngle: 'Vert', listMode: 'top10',
     logs: JSON.parse(localStorage.getItem('climbLogs') || '[]')
 }, {
@@ -87,7 +87,6 @@ const SyncManager = {
         if (!navigator.onLine) return setTimeout(() => b.forEach(i => i.classList.remove('syncing')), 1000);
         
         fetch(API_URL).then(res => res.json()).then(data => {
-            // Force strict string conversion for all IDs
             const cloudIds = new Set(data.map(d => String(d.id)));
             const pendingLocals = State.logs.filter(l => !cloudIds.has(String(l.id)) || l._synced === false);
             
@@ -96,7 +95,6 @@ const SyncManager = {
             const cleanData = data.map(d => ({ ...d, id: String(d.id), _synced: true }));
             const localOnly = State.logs.filter(l => !cloudIds.has(String(l.id)));
             
-            // Ruthless deduplication: Merge and filter uniquely by string ID
             const combined = [...cleanData, ...localOnly];
             const uniqueLogs = Array.from(new Map(combined.map(item => [String(item.id), item])).values());
             
@@ -159,7 +157,7 @@ const App = {
         
         document.getElementById('outdoor-name-lbl').innerText = isBould ? 'Boulder Name' : 'Route Name';
         document.getElementById('input-name').placeholder = isBould ? 'La Marie Rose' : 'Silence';
-        document.getElementById('input-crag').placeholder = isBould ? 'Fontainebleau' : 'Flatanger';
+        document.getElementById('input-crag').placeholder = isBould ? 'Sector, Crag 🇬🇷' : 'Flatanger';
 
         document.getElementById('gymPicker').innerHTML = GYMS.map(gym => `<div class="pill ${gym === State.activeGym ? 'active' : ''}" onclick="App.haptic(); State.activeGym='${gym}';">${gym}</div>`).join('');
         
@@ -171,7 +169,10 @@ const App = {
         
         document.getElementById('angleSelector').innerHTML = conf.angles.map(a => `<div class="pill ${State.activeAngle === a ? 'active' : ''}" onclick="App.haptic(); State.activeAngle='${a}';">${a}</div>`).join('');
 
-        const styles = isRope ? [['redpoint', 'Redpoint'], ['flash', isOut ? 'Flash' : 'Flash/Onsight'], ...(isOut ? [['onsight', 'Onsight']] : [])] : [['send', 'Send'], ['flash', 'Flash']];
+        const styles = (isOut && isRope) 
+            ? [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash'], ['onsight', 'Onsight']] 
+            : [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash']];
+            
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = styles[0][0];
         document.getElementById('styleSelector').innerHTML = styles.map(s => `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="App.haptic(); State.activeStyle='${s[0]}';">${s[1]}</div>`).join('');
         
@@ -198,12 +199,18 @@ const App = {
         
         let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
             const d = l.cleanDate.split('-'); const isF = l.grade.includes('⚡') || l.grade.includes('👁️');
-            const badge = getBadge(l.type, l.grade);
+            
+            // Dynamically inject the emoji if it was logged recently before this update
+            let displayGrade = l.grade;
+            if (l.style === 'quick' && !displayGrade.includes('🚀')) displayGrade += ' 🚀';
+            if (l.style === 'project' && !displayGrade.includes('🛠️')) displayGrade += ' 🛠️';
+
+            const badge = getBadge(l.type, displayGrade);
             const angleText = l.angle ? ` • ${l.angle.toUpperCase()}` : '';
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
             const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>` : '';
             
-            return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><span class="log-name">${l.name}${syncWarning}</span><span class="log-disc">${l.type.replace(/Indoor |Outdoor | Climbing/g, '')}${angleText}</span></div><div class="log-grade ${isF ? 'fl' : 'rp'}">${badge}${l.grade}</div>${delBtn}</div>`;
+            return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><span class="log-name">${l.name}${syncWarning}</span><span class="log-disc">${l.type.replace(/Indoor |Outdoor | Climbing/g, '')}${angleText}</span></div><div class="log-grade ${isF ? 'fl' : 'rp'}">${badge}${displayGrade}</div>${delBtn}</div>`;
         }).join('');
         
         if (State.listMode === 'top10' && displayLogs.length > 0) {
@@ -297,7 +304,7 @@ const App = {
         const gG = {}; let mT = 0;
         const last60 = viewLogs.filter(l => new Date(l.cleanDate) >= sixtyDaysAgo);
         last60.forEach(l => {
-            const bG = l.grade.replace(/[⚡👁️\s]/g, ''); const isF = l.grade.includes('⚡') || l.grade.includes('👁️');
+            const bG = l.grade.replace(/[⚡👁️🚀🛠️\s]/g, ''); const isF = l.grade.includes('⚡') || l.grade.includes('👁️');
             if (!gG[bG]) gG[bG] = { rp: 0, fl: 0 };
             if (isF) gG[bG].fl++; else gG[bG].rp++;
             const t = gG[bG].rp + gG[bG].fl; if (t > mT) mT = t;
@@ -312,15 +319,19 @@ const App = {
     },
     logClimb: () => {
         App.haptic(); let s = State.activeGrade.score, g = State.activeGrade.text;
-        if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } else if (State.activeStyle === 'onsight') { s += 10; g += " 👁️"; }
+        
+        // Append emojis dynamically based on style
+        if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
+        else if (State.activeStyle === 'onsight') { s += 10; g += " 👁️"; }
+        else if (State.activeStyle === 'quick') { g += " 🚀"; }
+        else if (State.activeStyle === 'project') { g += " 🛠️"; }
         
         const outName = document.getElementById('input-name').value.trim();
         const outCrag = document.getElementById('input-crag').value.trim();
         const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
         if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
         
-        // Force the newly generated ID to be a String immediately
-        const l = { id: String(Date.now()), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, action: 'add', _synced: false };
+        const l = { id: String(Date.now()), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, style: State.activeStyle, action: 'add', _synced: false };
         State.logs = [...State.logs, l]; SyncManager.push(l); App.toast("Logged");
         if (State.discipline.includes('Outdoor')) { document.getElementById('input-name').value = ''; document.getElementById('input-crag').value = ''; }
     }
