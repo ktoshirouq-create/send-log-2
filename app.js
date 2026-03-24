@@ -87,15 +87,20 @@ const SyncManager = {
         if (!navigator.onLine) return setTimeout(() => b.forEach(i => i.classList.remove('syncing')), 1000);
         
         fetch(API_URL).then(res => res.json()).then(data => {
-            const cloudIds = new Set(data.map(d => d.id));
-            const pendingLocals = State.logs.filter(l => !cloudIds.has(l.id) || l._synced === false);
+            // Force strict string conversion for all IDs
+            const cloudIds = new Set(data.map(d => String(d.id)));
+            const pendingLocals = State.logs.filter(l => !cloudIds.has(String(l.id)) || l._synced === false);
             
             pendingLocals.forEach(localLog => SyncManager.push(localLog));
 
-            const cleanData = data.map(d => ({ ...d, _synced: true }));
-            const localOnly = State.logs.filter(l => !cloudIds.has(l.id));
+            const cleanData = data.map(d => ({ ...d, id: String(d.id), _synced: true }));
+            const localOnly = State.logs.filter(l => !cloudIds.has(String(l.id)));
             
-            State.logs = [...cleanData, ...localOnly].sort((a,b) => b.id - a.id);
+            // Ruthless deduplication: Merge and filter uniquely by string ID
+            const combined = [...cleanData, ...localOnly];
+            const uniqueLogs = Array.from(new Map(combined.map(item => [String(item.id), item])).values());
+            
+            State.logs = uniqueLogs.sort((a,b) => Number(b.id) - Number(a.id));
             b.forEach(i => i.classList.remove('syncing'));
         }).catch(() => b.forEach(i => i.classList.remove('syncing')));
     },
@@ -106,7 +111,7 @@ const SyncManager = {
             const result = await response.json();
             
             if (result.status === 'success' || result.status === 'deleted') {
-                State.logs = State.logs.map(l => l.id === payload.id ? { ...l, _synced: true } : l);
+                State.logs = State.logs.map(l => String(l.id) === String(payload.id) ? { ...l, _synced: true } : l);
             }
         } catch (error) { console.log("Sync delay:", error); }
     }
@@ -126,8 +131,8 @@ const App = {
     deleteLog: (id) => { 
         App.haptic(); 
         if(confirm('Delete this log?')) { 
-            State.logs = State.logs.filter(l => l.id !== id); 
-            SyncManager.push({ id, action: "delete" }); 
+            State.logs = State.logs.filter(l => String(l.id) !== String(id)); 
+            SyncManager.push({ id: String(id), action: "delete" }); 
             App.toast("Deleted"); 
         } 
     },
@@ -186,9 +191,9 @@ const App = {
         let displayLogs = [];
         if (State.listMode === 'top10') {
             const last60 = viewLogs.filter(l => new Date(l.cleanDate) >= sixtyDaysAgo);
-            displayLogs = [...last60].sort((a,b) => (b.score - a.score) || (b.id - a.id)).slice(0, 10);
+            displayLogs = [...last60].sort((a,b) => (b.score - a.score) || (Number(b.id) - Number(a.id))).slice(0, 10);
         } else {
-            displayLogs = [...viewLogs].sort((a,b) => b.id - a.id).slice(0, 15);
+            displayLogs = [...viewLogs].sort((a,b) => Number(b.id) - Number(a.id)).slice(0, 15);
         }
         
         let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
@@ -196,7 +201,7 @@ const App = {
             const badge = getBadge(l.type, l.grade);
             const angleText = l.angle ? ` • ${l.angle.toUpperCase()}` : '';
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
-            const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog(${l.id})">×</button>` : '';
+            const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>` : '';
             
             return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><span class="log-name">${l.name}${syncWarning}</span><span class="log-disc">${l.type.replace(/Indoor |Outdoor | Climbing/g, '')}${angleText}</span></div><div class="log-grade ${isF ? 'fl' : 'rp'}">${badge}${l.grade}</div>${delBtn}</div>`;
         }).join('');
@@ -216,7 +221,6 @@ const App = {
             
             let barColor = conf.colors[currIdx] ? conf.colors[currIdx] : 'var(--primary)';
             
-            // BRUTE-FORCE INLINE STYLING - NO SUBTITLE, THICK GLOW
             listHTML += `
             <div style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1);">
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
@@ -315,7 +319,8 @@ const App = {
         const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
         if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
         
-        const l = { id: Date.now(), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, action: 'add', _synced: false };
+        // Force the newly generated ID to be a String immediately
+        const l = { id: String(Date.now()), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, action: 'add', _synced: false };
         State.logs = [...State.logs, l]; SyncManager.push(l); App.toast("Logged");
         if (State.discipline.includes('Outdoor')) { document.getElementById('input-name').value = ''; document.getElementById('input-crag').value = ''; }
     }
