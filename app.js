@@ -5,8 +5,8 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Hardcoded Master Google Script URL - Pointing to the correct New Deployment
-const API_URL = "https://script.google.com/macros/s/AKfycbw-4lwkPSlBubvvgvnBKmDBVzjy9s7kBRekCPOBVnm_6nsgVgNeL8Bdmi5JjJ1KAuVM/exec";
+// Hardcoded Master Google Script URL
+const API_URL = "https://script.google.com/macros/s/AKfycbyya7G3xh82DVIbI3X9PdE5smBqQn8mEQfoznhV92byhV9BvpoNmiFv-UeA--Bq5DPn/exec";
 
 const GRADES = {
     ropes: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"],
@@ -41,17 +41,24 @@ const getBadge = (type, gradeText) => {
     return '';
 };
 
-// Bulletproof ID Generator (Crypto UUID with fallback)
-const generateId = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-    return String(Date.now()) + '-' + Math.random().toString(36).substring(2, 9);
-};
+// --- SELF-HEALING MEMORY ---
+// This prevents corrupted local data from crashing the app
+let safeLogs = [];
+try {
+    const rawLogs = localStorage.getItem('climbLogs');
+    if (rawLogs) safeLogs = JSON.parse(rawLogs);
+    if (!Array.isArray(safeLogs)) safeLogs = [];
+} catch (e) {
+    console.error("Corrupted local logs detected. Wiping clean.", e);
+    safeLogs = [];
+    localStorage.removeItem('climbLogs');
+}
 
 const State = new Proxy({
     view: 'log', discipline: 'Indoor Rope Climbing', activeGrade: { text: '6b', score: 633 },
     activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max',
     activeAngle: 'Vert', listMode: 'top10',
-    logs: JSON.parse(localStorage.getItem('climbLogs') || '[]')
+    logs: safeLogs
 }, {
     set(target, prop, value) {
         if (prop === 'discipline' && target.discipline !== value) {
@@ -104,12 +111,7 @@ const SyncManager = {
             const combined = [...cleanData, ...localOnly];
             const uniqueLogs = Array.from(new Map(combined.map(item => [String(item.id), item])).values());
             
-            // Sort by Date string first, then fallback to ID
-            State.logs = uniqueLogs.sort((a,b) => {
-                const dateA = new Date(a.date).getTime() || 0;
-                const dateB = new Date(b.date).getTime() || 0;
-                return dateB - dateA;
-            });
+            State.logs = uniqueLogs.sort((a,b) => Number(b.id) - Number(a.id));
             b.forEach(i => i.classList.remove('syncing'));
         }).catch(() => b.forEach(i => i.classList.remove('syncing')));
     },
@@ -129,8 +131,16 @@ const SyncManager = {
 const App = {
     chart: null,
     init: () => {
-        Chart.defaults.color = '#737373'; Chart.defaults.borderColor = '#262626';
-        App.renderUI(); SyncManager.trigger(); window.addEventListener('online', SyncManager.trigger);
+        // SAFEGUARD: Prevents crash if Chart.js CDN fails to load off-grid
+        if (window.Chart) {
+            Chart.defaults.color = '#737373'; 
+            Chart.defaults.borderColor = '#262626';
+        }
+        
+        try { App.renderUI(); } catch (e) { console.error("Render failed", e); }
+        
+        SyncManager.trigger(); 
+        window.addEventListener('online', SyncManager.trigger);
     },
     haptic: () => { if (navigator.vibrate) navigator.vibrate(40); },
     toast: (msg) => {
@@ -203,9 +213,9 @@ const App = {
         let displayLogs = [];
         if (State.listMode === 'top10') {
             const last60 = viewLogs.filter(l => new Date(l.cleanDate) >= sixtyDaysAgo);
-            displayLogs = [...last60].sort((a,b) => (b.score - a.score) || (new Date(b.date).getTime() - new Date(a.date).getTime())).slice(0, 10);
+            displayLogs = [...last60].sort((a,b) => (b.score - a.score) || (Number(b.id) - Number(a.id))).slice(0, 10);
         } else {
-            displayLogs = [...viewLogs].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 15);
+            displayLogs = [...viewLogs].sort((a,b) => Number(b.id) - Number(a.id)).slice(0, 15);
         }
         
         let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
@@ -255,10 +265,20 @@ const App = {
         }
         document.getElementById('logList').innerHTML = listHTML;
 
+        // SAFEGUARD: If Chart didn't load, abort chart drawing safely
+        const noD = document.getElementById('noDataMsg');
+        const ctxCanvas = document.getElementById('progressChart');
+        if (!window.Chart) { 
+            ctxCanvas.style.display = 'none'; 
+            noD.style.display = 'block'; 
+            noD.innerText = "Charts unavailable without connection.";
+            return; 
+        }
+
         if(App.chart) App.chart.destroy();
-        const ctx = document.getElementById('progressChart').getContext('2d'), noD = document.getElementById('noDataMsg');
-        if (viewLogs.length === 0) { document.getElementById('progressChart').style.display = 'none'; noD.style.display = 'block'; document.getElementById('pyramidCont').innerHTML = ''; return; }
-        document.getElementById('progressChart').style.display = 'block'; noD.style.display = 'none';
+        const ctx = ctxCanvas.getContext('2d');
+        if (viewLogs.length === 0) { ctxCanvas.style.display = 'none'; noD.style.display = 'block'; noD.innerText = "Log climbs to view progression"; document.getElementById('pyramidCont').innerHTML = ''; return; }
+        ctxCanvas.style.display = 'block'; noD.style.display = 'none';
 
         const allM = [...new Set(viewLogs.map(l => l.cleanDate.substring(0,7)))].sort();
         const cD = { rp: [], fl: [], rpG: [], flG: [], avg: [], avgG: [], lbl: [] };
@@ -340,8 +360,7 @@ const App = {
         const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
         if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
         
-        // Using the new bulletproof Crypto ID Generator
-        const l = { id: generateId(), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, style: State.activeStyle, action: 'add', _synced: false };
+        const l = { id: String(Date.now()), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, style: State.activeStyle, action: 'add', _synced: false };
         State.logs = [...State.logs, l]; SyncManager.push(l); App.toast("Logged");
         if (State.discipline.includes('Outdoor')) { document.getElementById('input-name').value = ''; document.getElementById('input-crag').value = ''; }
     }
