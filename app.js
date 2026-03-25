@@ -5,8 +5,8 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Hardcoded Master Google Script URL - LATEST VERSION
-const API_URL = "https://script.google.com/macros/s/AKfycbw-4lwkPSlBubvvgvnBKmDBVzjy9s7kBRekCPOBVnm_6nsgVgNeL8Bdmi5JjJ1KAuVM/exec";
+// Hardcoded Master Google Script URL - BRAND NEW DEPLOYMENT
+const API_URL = "https://script.google.com/macros/s/AKfycby0fW1C830QNXESDs6B1NFB9_gLRqOwOycCly63i4jDxlU7L8_W4Du4w-4hhGE4Pak2/exec";
 
 const GRADES = {
     ropes: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"],
@@ -42,7 +42,6 @@ const getBadge = (type, gradeText) => {
 };
 
 // --- SELF-HEALING MEMORY ---
-// This prevents corrupted local data from crashing the app
 let safeLogs = [];
 try {
     const rawLogs = localStorage.getItem('climbLogs');
@@ -131,7 +130,6 @@ const SyncManager = {
 const App = {
     chart: null,
     init: () => {
-        // SAFEGUARD: Prevents crash if Chart.js CDN fails to load off-grid
         if (window.Chart) {
             Chart.defaults.color = '#737373'; 
             Chart.defaults.borderColor = '#262626';
@@ -209,7 +207,6 @@ const App = {
         const conf = getScaleConfig(disciplineStr);
         const sixtyDaysAgo = new Date(); sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
         
-        // ARMOR: Gracefully handle missing dates
         const viewLogs = State.logs.filter(l => l && l.type === disciplineStr).map(l => ({
             ...l, 
             cleanDate: (l.date ? String(l.date).substring(0,10) : getLocalISO())
