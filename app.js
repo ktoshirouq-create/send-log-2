@@ -41,6 +41,12 @@ const getBadge = (type, gradeText) => {
     return '';
 };
 
+// Bulletproof ID Generator (Crypto UUID with fallback)
+const generateId = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return String(Date.now()) + '-' + Math.random().toString(36).substring(2, 9);
+};
+
 const State = new Proxy({
     view: 'log', discipline: 'Indoor Rope Climbing', activeGrade: { text: '6b', score: 633 },
     activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max',
@@ -98,7 +104,12 @@ const SyncManager = {
             const combined = [...cleanData, ...localOnly];
             const uniqueLogs = Array.from(new Map(combined.map(item => [String(item.id), item])).values());
             
-            State.logs = uniqueLogs.sort((a,b) => Number(b.id) - Number(a.id));
+            // Sort by Date string first, then fallback to ID
+            State.logs = uniqueLogs.sort((a,b) => {
+                const dateA = new Date(a.date).getTime() || 0;
+                const dateB = new Date(b.date).getTime() || 0;
+                return dateB - dateA;
+            });
             b.forEach(i => i.classList.remove('syncing'));
         }).catch(() => b.forEach(i => i.classList.remove('syncing')));
     },
@@ -138,4 +149,201 @@ const App = {
         App.haptic();
         document.querySelectorAll('#datePicker .pill').forEach(p => p.classList.remove('active'));
         if (type === 'today') { State.activeDate = getLocalISO(new Date()); document.getElementById('pill-today').classList.add('active'); }
-        else if (type === 'yesterday') { let yest = new Date(); yest.setDate(yest.getDate()-1
+        else if (type === 'yesterday') { let yest = new Date(); yest.setDate(yest.getDate()-1); State.activeDate = getLocalISO(yest); document.getElementById('pill-yest').classList.add('active'); }
+        else if (type === 'custom' && val) { 
+            State.activeDate = val; const [y, m, d] = val.split('-');
+            document.getElementById('pill-custom').classList.add('active');
+            document.getElementById('pill-custom').innerText = `${monthNames[parseInt(m)-1]} ${parseInt(d)}`;
+        }
+    },
+    renderUI: () => {
+        const isOut = State.discipline.includes('Outdoor'), isRope = State.discipline.includes('Rope'), isBould = State.discipline.includes('Boulder');
+        const conf = getScaleConfig(State.discipline);
+
+        document.getElementById('typeSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${State.discipline === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
+        document.getElementById('dashSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${State.discipline === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
+        
+        document.getElementById('input-outdoor').className = isOut ? '' : 'hidden';
+        document.getElementById('input-indoor').className = isOut ? 'hidden' : '';
+        
+        document.getElementById('outdoor-name-lbl').innerText = isBould ? 'Boulder Name' : 'Route Name';
+        document.getElementById('input-name').placeholder = isBould ? 'La Marie Rose' : 'Silence';
+        document.getElementById('input-crag').placeholder = isBould ? 'Sector, Crag 🇬🇷' : 'Flatanger';
+
+        document.getElementById('gymPicker').innerHTML = GYMS.map(gym => `<div class="pill ${gym === State.activeGym ? 'active' : ''}" onclick="App.haptic(); State.activeGym='${gym}';">${gym}</div>`).join('');
+        
+        document.getElementById('gradePicker').innerHTML = conf.labels.map((g, i) => {
+            const dot = conf.colors[i] ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
+            const isActive = g.toLowerCase() === State.activeGrade.text.toLowerCase();
+            return `<div class="pill ${isActive ? 'active' : ''}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
+        }).join('');
+        
+        document.getElementById('angleSelector').innerHTML = conf.angles.map(a => `<div class="pill ${State.activeAngle === a ? 'active' : ''}" onclick="App.haptic(); State.activeAngle='${a}';">${a}</div>`).join('');
+
+        const styles = (isOut && isRope) 
+            ? [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash'], ['onsight', 'Onsight']] 
+            : [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash']];
+            
+        if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = styles[0][0];
+        document.getElementById('styleSelector').innerHTML = styles.map(s => `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="App.haptic(); State.activeStyle='${s[0]}';">${s[1]}</div>`).join('');
+        
+        document.getElementById('chartToggle').innerHTML = `<div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='max';">Max Peak</div><div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='avg';">Avg (Top 10)</div>`;
+        
+        document.getElementById('list-toggle-top').className = `chart-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
+        document.getElementById('list-toggle-recent').className = `chart-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
+
+        if (State.view === 'dash') App.renderDashboard();
+    },
+    renderDashboard: () => {
+        const isRope = State.discipline.includes('Rope');
+        const conf = getScaleConfig(State.discipline);
+        const sixtyDaysAgo = new Date(); sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        const viewLogs = State.logs.filter(l => l.type === State.discipline).map(l => ({...l, cleanDate: l.date.substring(0,10) }));
+        
+        let displayLogs = [];
+        if (State.listMode === 'top10') {
+            const last60 = viewLogs.filter(l => new Date(l.cleanDate) >= sixtyDaysAgo);
+            displayLogs = [...last60].sort((a,b) => (b.score - a.score) || (new Date(b.date).getTime() - new Date(a.date).getTime())).slice(0, 10);
+        } else {
+            displayLogs = [...viewLogs].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 15);
+        }
+        
+        let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
+            const d = l.cleanDate.split('-'); const isF = l.grade.includes('⚡') || l.grade.includes('👁️');
+            
+            let displayGrade = l.grade;
+            if (l.style === 'quick' && !displayGrade.includes('🚀')) displayGrade += ' 🚀';
+            if (l.style === 'project' && !displayGrade.includes('🛠️')) displayGrade += ' 🛠️';
+
+            const badge = getBadge(l.type, displayGrade);
+            const angleText = l.angle ? ` • ${l.angle.toUpperCase()}` : '';
+            const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
+            const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>` : '';
+            
+            return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><span class="log-name">${l.name}${syncWarning}</span><span class="log-disc">${l.type.replace(/Indoor |Outdoor | Climbing/g, '')}${angleText}</span></div><div class="log-grade ${isF ? 'fl' : 'rp'}">${badge}${displayGrade}</div>${delBtn}</div>`;
+        }).join('');
+        
+        if (State.listMode === 'top10' && displayLogs.length > 0) {
+            let avgS = Math.round(displayLogs.reduce((s, l) => s + l.score, 0) / displayLogs.length);
+            avgS = Math.max(conf.scores[0], avgS);
+            let currIdx = 0;
+            for(let i = 0; i < conf.scores.length; i++) { if (avgS >= conf.scores[i]) currIdx = i; else break; }
+            
+            let pct = 0, nextGrade = "MAX";
+            if (currIdx < conf.scores.length - 1) {
+                const baseS = conf.scores[currIdx], nextS = conf.scores[currIdx + 1];
+                pct = Math.round(((avgS - baseS) / (nextS - baseS)) * 100);
+                nextGrade = conf.labels[currIdx + 1];
+            } else { pct = 100; }
+            
+            let barColor = conf.colors[currIdx] ? conf.colors[currIdx] : 'var(--primary)';
+            
+            listHTML += `
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
+                    <span style="font-size: 0.85rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Working Capacity</span>
+                    <span style="font-size: 1.15rem; font-weight: 800; letter-spacing: -0.5px; color: ${barColor};">${pct}%</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 1.15rem; font-weight: 800; color: ${barColor}; width: 42px; text-align: center; flex-shrink: 0;">${conf.labels[currIdx]}</span>
+                    <div style="flex: 1; height: 14px; background: #000; border-radius: 14px; box-shadow: inset 0 3px 6px rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.1); position: relative; overflow: hidden;">
+                        <div style="height: 100%; border-radius: 14px; transition: width 1s ease; width: ${pct}%; background: ${barColor}; box-shadow: 0 0 12px ${barColor}, inset 0 2px 3px rgba(255,255,255,0.4);"></div>
+                    </div>
+                    <span style="font-size: 1.15rem; font-weight: 800; color: #525252; width: 42px; text-align: center; flex-shrink: 0;">${nextGrade}</span>
+                </div>
+            </div>`;
+        }
+        document.getElementById('logList').innerHTML = listHTML;
+
+        if(App.chart) App.chart.destroy();
+        const ctx = document.getElementById('progressChart').getContext('2d'), noD = document.getElementById('noDataMsg');
+        if (viewLogs.length === 0) { document.getElementById('progressChart').style.display = 'none'; noD.style.display = 'block'; document.getElementById('pyramidCont').innerHTML = ''; return; }
+        document.getElementById('progressChart').style.display = 'block'; noD.style.display = 'none';
+
+        const allM = [...new Set(viewLogs.map(l => l.cleanDate.substring(0,7)))].sort();
+        const cD = { rp: [], fl: [], rpG: [], flG: [], avg: [], avgG: [], lbl: [] };
+        
+        const getScoreIndex = (s, isF) => { 
+            let b = s - (isF ? (isRope ? 10 : 17) : 0); 
+            return conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-b) < Math.abs(p-b) ? c : p)); 
+        };
+        
+        allM.forEach(m => {
+            const [y, mo] = m.split('-').map(Number);
+            if (State.chartMode === 'max') {
+                const mL = viewLogs.filter(l => l.cleanDate.substring(0,7) === m && l.score);
+                const rpL = mL.filter(l => !l.grade.includes('⚡') && !l.grade.includes('👁️'));
+                const flL = mL.filter(l => l.grade.includes('⚡') || l.grade.includes('👁️'));
+                
+                let maxRp = rpL.length ? rpL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
+                let maxFl = flL.length ? flL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
+
+                cD.rp.push(maxRp ? getScoreIndex(maxRp.score, false) : null);
+                cD.rpG.push(maxRp ? maxRp.grade : "None");
+                cD.fl.push(maxFl ? getScoreIndex(maxFl.score, true) : null);
+                cD.flG.push(maxFl ? maxFl.grade : "None");
+            } else {
+                let pM = mo-1, pY = y; if (pM === 0) { pM = 12; pY = y-1; }
+                const pMS = `${pY}-${pM.toString().padStart(2, '0')}`;
+                const wL = viewLogs.filter(l => (l.cleanDate.substring(0,7) === m || l.cleanDate.substring(0,7) === pMS) && l.score).sort((a,b) => b.score - a.score).slice(0, 10);
+                
+                if (wL.length > 0) { 
+                    const avS = Math.round(wL.reduce((s, l) => s + l.score, 0) / wL.length);
+                    const avI = conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-avS) < Math.abs(p-avS) ? c : p)); 
+                    cD.avg.push(avI); cD.avgG.push(conf.labels[avI]); 
+                } else { 
+                    cD.avg.push(null); cD.avgG.push("None"); 
+                }
+            }
+            cD.lbl.push(`${monthNames[mo-1]} '${y.toString().slice(-2)}`);
+        });
+
+        let dSet = [], toolC;
+        if (State.chartMode === 'max') {
+            let g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, 'rgba(16, 185, 129, 0.25)'); g.addColorStop(1, 'transparent');
+            dSet = [{ label: 'Max Redpoint', data: cD.rp, borderColor: '#10b981', backgroundColor: g, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#10b981', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }, { label: 'Flash/Onsight', data: cD.fl, borderColor: '#db2777', backgroundColor: '#db2777', borderDash: [5,5], tension: 0.4, fill: false, pointRadius: 5, pointBackgroundColor: '#db2777', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }];
+            toolC = ctx => ctx.datasetIndex === 0 ? ` Redpoint: ${cD.rpG[ctx.dataIndex]}` : ` Flash: ${cD.flG[ctx.dataIndex]}`;
+        } else {
+            let gA = ctx.createLinearGradient(0, 0, 0, 300); gA.addColorStop(0, 'rgba(59, 130, 246, 0.35)'); gA.addColorStop(1, 'transparent');
+            dSet = [{ label: 'Top 10 Average', data: cD.avg, borderColor: '#3b82f6', backgroundColor: gA, tension: 0.4, fill: true, pointRadius: 6, pointBackgroundColor: '#3b82f6', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }];
+            toolC = ctx => ` Power Avg: ${cD.avgG[ctx.dataIndex]}`;
+        }
+        const aI = [...cD.rp.filter(x=>x!==null), ...cD.fl.filter(x=>x!==null), ...cD.avg.filter(x=>x!==null)];
+        App.chart = new Chart(ctx, { type: 'line', data: { labels: cD.lbl, datasets: dSet }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 10, callbacks: { label: toolC } } }, scales: { y: { min: Math.max(0, Math.min(...aI)-1), max: Math.min(conf.labels.length-1, Math.max(...aI)+1), ticks: { stepSize: 1, callback: v => conf.labels[v] } }, x: { grid: { display: false } } } } });
+        
+        const gG = {}; let mT = 0;
+        const last60 = viewLogs.filter(l => new Date(l.cleanDate) >= sixtyDaysAgo);
+        last60.forEach(l => {
+            const bG = l.grade.replace(/[⚡👁️🚀🛠️\s]/g, ''); const isF = l.grade.includes('⚡') || l.grade.includes('👁️');
+            if (!gG[bG]) gG[bG] = { rp: 0, fl: 0 };
+            if (isF) gG[bG].fl++; else gG[bG].rp++;
+            const t = gG[bG].rp + gG[bG].fl; if (t > mT) mT = t;
+        });
+        
+        document.getElementById('pyramidCont').innerHTML = Object.keys(gG).sort((a,b) => conf.labels.indexOf(b) - conf.labels.indexOf(a)).map(b => {
+            const g = gG[b]; const fP = (g.fl/mT)*100, rP = (g.rp/mT)*100;
+            const badge = getBadge(State.discipline, b);
+            let seg = ''; if (g.fl > 0) seg += `<div class="pyramid-seg fl" style="width: ${fP}%;">⚡ ${g.fl}</div>`; if (g.rp > 0) seg += `<div class="pyramid-seg rp" style="width: ${rP}%;">${g.rp}</div>`;
+            return `<div class="pyramid-row"><div class="pyramid-grade">${badge}${b}</div><div class="pyramid-track">${seg}</div></div>`;
+        }).join('') || '<div style="color:var(--text-muted); text-align:center; padding:10px;">No sends in the last 60 days.</div>';
+    },
+    logClimb: () => {
+        App.haptic(); let s = State.activeGrade.score, g = State.activeGrade.text;
+        
+        if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
+        else if (State.activeStyle === 'onsight') { s += 10; g += " 👁️"; }
+        else if (State.activeStyle === 'quick') { g += " 🚀"; }
+        else if (State.activeStyle === 'project') { g += " 🛠️"; }
+        
+        const outName = document.getElementById('input-name').value.trim();
+        const outCrag = document.getElementById('input-crag').value.trim();
+        const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
+        if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
+        
+        // Using the new bulletproof Crypto ID Generator
+        const l = { id: generateId(), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, style: State.activeStyle, action: 'add', _synced: false };
+        State.logs = [...State.logs, l]; SyncManager.push(l); App.toast("Logged");
+        if (State.discipline.includes('Outdoor')) { document.getElementById('input-name').value = ''; document.getElementById('input-crag').value = ''; }
+    }
+};
+App.init();
