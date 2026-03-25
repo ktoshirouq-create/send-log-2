@@ -5,8 +5,8 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Hardcoded Master Google Script URL
-const API_URL = "https://script.google.com/macros/s/AKfycbyya7G3xh82DVIbI3X9PdE5smBqQn8mEQfoznhV92byhV9BvpoNmiFv-UeA--Bq5DPn/exec";
+// Hardcoded Master Google Script URL - LATEST VERSION
+const API_URL = "https://script.google.com/macros/s/AKfycbw-4lwkPSlBubvvgvnBKmDBVzjy9s7kBRekCPOBVnm_6nsgVgNeL8Bdmi5JjJ1KAuVM/exec";
 
 const GRADES = {
     ropes: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"],
@@ -24,7 +24,7 @@ const DISCIPLINES = ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope 
 const DISC_LABELS = ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder'];
 
 const getScaleConfig = (disc) => {
-    const isRope = disc.includes('Rope');
+    const isRope = String(disc || "").includes('Rope');
     const angles = isRope ? ['Slab', 'Vert', 'Overhang', 'Tech', 'Endurance'] : ['Slab', 'Vert', 'Overhang', 'Roof', 'Dynamic'];
     if (disc === 'Indoor Bouldering') return { labels: GRADES.bouldsIn, scores: GRADES.bouldsInScores, colors: GRADES.bouldsInColors, angles };
     if (disc === 'Outdoor Bouldering') return { labels: GRADES.bouldsOut, scores: GRADES.bouldsOutScores, colors: [], angles };
@@ -35,7 +35,7 @@ const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffs
 
 const getBadge = (type, gradeText) => {
     if (type !== 'Indoor Bouldering') return '';
-    const baseGrade = gradeText.replace(/[⚡👁️🚀🛠️\s]/g, '');
+    const baseGrade = String(gradeText || "").replace(/[⚡👁️🚀🛠️\s]/g, '');
     const idx = GRADES.bouldsIn.indexOf(baseGrade);
     if (idx > -1) return `<span class="boulder-dot" style="background:${GRADES.bouldsInColors[idx]};"></span>`;
     return '';
@@ -64,7 +64,7 @@ const State = new Proxy({
         if (prop === 'discipline' && target.discipline !== value) {
             target.discipline = value;
             const conf = getScaleConfig(value);
-            if (!conf.labels.some(g => g.toLowerCase() === target.activeGrade.text.toLowerCase())) {
+            if (!conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
                 target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
             }
             if (!conf.angles.includes(target.activeAngle)) {
@@ -101,12 +101,12 @@ const SyncManager = {
         
         fetch(API_URL).then(res => res.json()).then(data => {
             const cloudIds = new Set(data.map(d => String(d.id)));
-            const pendingLocals = State.logs.filter(l => !cloudIds.has(String(l.id)) || l._synced === false);
+            const pendingLocals = State.logs.filter(l => l && (!cloudIds.has(String(l.id)) || l._synced === false));
             
             pendingLocals.forEach(localLog => SyncManager.push(localLog));
 
             const cleanData = data.map(d => ({ ...d, id: String(d.id), _synced: true }));
-            const localOnly = State.logs.filter(l => !cloudIds.has(String(l.id)));
+            const localOnly = State.logs.filter(l => l && !cloudIds.has(String(l.id)));
             
             const combined = [...cleanData, ...localOnly];
             const uniqueLogs = Array.from(new Map(combined.map(item => [String(item.id), item])).values());
@@ -136,16 +136,14 @@ const App = {
             Chart.defaults.color = '#737373'; 
             Chart.defaults.borderColor = '#262626';
         }
-        
         try { App.renderUI(); } catch (e) { console.error("Render failed", e); }
-        
         SyncManager.trigger(); 
         window.addEventListener('online', SyncManager.trigger);
     },
     haptic: () => { if (navigator.vibrate) navigator.vibrate(40); },
     toast: (msg) => {
         const t = document.getElementById('toast');
-        t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500);
+        if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
     },
     deleteLog: (id) => { 
         App.haptic(); 
@@ -167,11 +165,12 @@ const App = {
         }
     },
     renderUI: () => {
-        const isOut = State.discipline.includes('Outdoor'), isRope = State.discipline.includes('Rope'), isBould = State.discipline.includes('Boulder');
-        const conf = getScaleConfig(State.discipline);
+        const disciplineStr = String(State.discipline || "");
+        const isOut = disciplineStr.includes('Outdoor'), isRope = disciplineStr.includes('Rope'), isBould = disciplineStr.includes('Boulder');
+        const conf = getScaleConfig(disciplineStr);
 
-        document.getElementById('typeSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${State.discipline === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
-        document.getElementById('dashSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${State.discipline === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
+        document.getElementById('typeSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${disciplineStr === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
+        document.getElementById('dashSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${disciplineStr === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
         
         document.getElementById('input-outdoor').className = isOut ? '' : 'hidden';
         document.getElementById('input-indoor').className = isOut ? 'hidden' : '';
@@ -184,7 +183,7 @@ const App = {
         
         document.getElementById('gradePicker').innerHTML = conf.labels.map((g, i) => {
             const dot = conf.colors[i] ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
-            const isActive = g.toLowerCase() === State.activeGrade.text.toLowerCase();
+            const isActive = String(g).toLowerCase() === String(State.activeGrade.text).toLowerCase();
             return `<div class="pill ${isActive ? 'active' : ''}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
         }).join('');
         
@@ -205,10 +204,16 @@ const App = {
         if (State.view === 'dash') App.renderDashboard();
     },
     renderDashboard: () => {
-        const isRope = State.discipline.includes('Rope');
-        const conf = getScaleConfig(State.discipline);
+        const disciplineStr = String(State.discipline || "");
+        const isRope = disciplineStr.includes('Rope');
+        const conf = getScaleConfig(disciplineStr);
         const sixtyDaysAgo = new Date(); sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-        const viewLogs = State.logs.filter(l => l.type === State.discipline).map(l => ({...l, cleanDate: l.date.substring(0,10) }));
+        
+        // ARMOR: Gracefully handle missing dates
+        const viewLogs = State.logs.filter(l => l && l.type === disciplineStr).map(l => ({
+            ...l, 
+            cleanDate: (l.date ? String(l.date).substring(0,10) : getLocalISO())
+        }));
         
         let displayLogs = [];
         if (State.listMode === 'top10') {
@@ -219,22 +224,24 @@ const App = {
         }
         
         let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
-            const d = l.cleanDate.split('-'); const isF = l.grade.includes('⚡') || l.grade.includes('👁️');
+            const d = l.cleanDate.split('-'); 
+            let displayGrade = String(l.grade || "");
+            const isF = displayGrade.includes('⚡') || displayGrade.includes('👁️');
             
-            let displayGrade = l.grade;
             if (l.style === 'quick' && !displayGrade.includes('🚀')) displayGrade += ' 🚀';
             if (l.style === 'project' && !displayGrade.includes('🛠️')) displayGrade += ' 🛠️';
 
             const badge = getBadge(l.type, displayGrade);
-            const angleText = l.angle ? ` • ${l.angle.toUpperCase()}` : '';
+            const angleText = l.angle ? ` • ${String(l.angle).toUpperCase()}` : '';
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
             const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>` : '';
+            const cleanType = String(l.type || "").replace(/Indoor |Outdoor | Climbing/g, '');
             
-            return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><span class="log-name">${l.name}${syncWarning}</span><span class="log-disc">${l.type.replace(/Indoor |Outdoor | Climbing/g, '')}${angleText}</span></div><div class="log-grade ${isF ? 'fl' : 'rp'}">${badge}${displayGrade}</div>${delBtn}</div>`;
+            return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><span class="log-name">${l.name||"Log"}${syncWarning}</span><span class="log-disc">${cleanType}${angleText}</span></div><div class="log-grade ${isF ? 'fl' : 'rp'}">${badge}${displayGrade}</div>${delBtn}</div>`;
         }).join('');
         
         if (State.listMode === 'top10' && displayLogs.length > 0) {
-            let avgS = Math.round(displayLogs.reduce((s, l) => s + l.score, 0) / displayLogs.length);
+            let avgS = Math.round(displayLogs.reduce((s, l) => s + Number(l.score||0), 0) / displayLogs.length);
             avgS = Math.max(conf.scores[0], avgS);
             let currIdx = 0;
             for(let i = 0; i < conf.scores.length; i++) { if (avgS >= conf.scores[i]) currIdx = i; else break; }
@@ -265,7 +272,6 @@ const App = {
         }
         document.getElementById('logList').innerHTML = listHTML;
 
-        // SAFEGUARD: If Chart didn't load, abort chart drawing safely
         const noD = document.getElementById('noDataMsg');
         const ctxCanvas = document.getElementById('progressChart');
         if (!window.Chart) { 
@@ -292,8 +298,8 @@ const App = {
             const [y, mo] = m.split('-').map(Number);
             if (State.chartMode === 'max') {
                 const mL = viewLogs.filter(l => l.cleanDate.substring(0,7) === m && l.score);
-                const rpL = mL.filter(l => !l.grade.includes('⚡') && !l.grade.includes('👁️'));
-                const flL = mL.filter(l => l.grade.includes('⚡') || l.grade.includes('👁️'));
+                const rpL = mL.filter(l => !String(l.grade||"").includes('⚡') && !String(l.grade||"").includes('👁️'));
+                const flL = mL.filter(l => String(l.grade||"").includes('⚡') || String(l.grade||"").includes('👁️'));
                 
                 let maxRp = rpL.length ? rpL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
                 let maxFl = flL.length ? flL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
@@ -334,7 +340,8 @@ const App = {
         const gG = {}; let mT = 0;
         const last60 = viewLogs.filter(l => new Date(l.cleanDate) >= sixtyDaysAgo);
         last60.forEach(l => {
-            const bG = l.grade.replace(/[⚡👁️🚀🛠️\s]/g, ''); const isF = l.grade.includes('⚡') || l.grade.includes('👁️');
+            const bG = String(l.grade||"").replace(/[⚡👁️🚀🛠️\s]/g, ''); 
+            const isF = String(l.grade||"").includes('⚡') || String(l.grade||"").includes('👁️');
             if (!gG[bG]) gG[bG] = { rp: 0, fl: 0 };
             if (isF) gG[bG].fl++; else gG[bG].rp++;
             const t = gG[bG].rp + gG[bG].fl; if (t > mT) mT = t;
@@ -342,7 +349,7 @@ const App = {
         
         document.getElementById('pyramidCont').innerHTML = Object.keys(gG).sort((a,b) => conf.labels.indexOf(b) - conf.labels.indexOf(a)).map(b => {
             const g = gG[b]; const fP = (g.fl/mT)*100, rP = (g.rp/mT)*100;
-            const badge = getBadge(State.discipline, b);
+            const badge = getBadge(disciplineStr, b);
             let seg = ''; if (g.fl > 0) seg += `<div class="pyramid-seg fl" style="width: ${fP}%;">⚡ ${g.fl}</div>`; if (g.rp > 0) seg += `<div class="pyramid-seg rp" style="width: ${rP}%;">${g.rp}</div>`;
             return `<div class="pyramid-row"><div class="pyramid-grade">${badge}${b}</div><div class="pyramid-track">${seg}</div></div>`;
         }).join('') || '<div style="color:var(--text-muted); text-align:center; padding:10px;">No sends in the last 60 days.</div>';
