@@ -5,7 +5,7 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Hardcoded Master Google Script URL - SECURE DEPLOYMENT
+// Hardcoded Master Google Script URL - BRAND NEW DEPLOYMENT
 const API_URL = "https://script.google.com/macros/s/AKfycby0fW1C830QNXESDs6B1NFB9_gLRqOwOycCly63i4jDxlU7L8_W4Du4w-4hhGE4Pak2/exec";
 
 const GRADES = {
@@ -226,7 +226,6 @@ const App = {
             const last60 = viewLogs.filter(l => new Date(l.cleanDate) >= sixtyDaysAgo);
             displayLogs = [...last60].sort((a,b) => (b.score - a.score) || (Number(b.id) - Number(a.id))).slice(0, 10);
         } else {
-            // Trimmed recent logs down to 10
             displayLogs = [...viewLogs].sort((a,b) => Number(b.id) - Number(a.id)).slice(0, 10);
         }
         
