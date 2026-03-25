@@ -2,7 +2,7 @@
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err));
-    });
+    }); 
 }
 
 // Hardcoded Master Google Script URL - BRAND NEW DEPLOYMENT
