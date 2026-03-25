@@ -2,7 +2,7 @@
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err));
-    }); 
+    });
 }
 
 // Hardcoded Master Google Script URL - BRAND NEW DEPLOYMENT
@@ -68,6 +68,10 @@ const State = new Proxy({
             }
             if (!conf.angles.includes(target.activeAngle)) {
                 target.activeAngle = 'Vert';
+            }
+            // Failsafe: Prevent bouldering gyms from staying active on Rope tab
+            if (value === 'Indoor Rope Climbing' && (target.activeGym === 'Løkka' || target.activeGym === 'Bryn')) {
+                target.activeGym = 'OKS';
             }
         } else {
             target[prop] = value;
@@ -177,7 +181,13 @@ const App = {
         document.getElementById('input-name').placeholder = isBould ? 'La Marie Rose' : 'Silence';
         document.getElementById('input-crag').placeholder = isBould ? 'Sector, Crag 🇬🇷' : 'Flatanger';
 
-        document.getElementById('gymPicker').innerHTML = GYMS.map(gym => `<div class="pill ${gym === State.activeGym ? 'active' : ''}" onclick="App.haptic(); State.activeGym='${gym}';">${gym}</div>`).join('');
+        // Filter the Gyms dynamically based on Discipline
+        let currentGyms = GYMS;
+        if (disciplineStr === 'Indoor Rope Climbing') {
+            currentGyms = GYMS.filter(g => g !== 'Løkka' && g !== 'Bryn');
+        }
+
+        document.getElementById('gymPicker').innerHTML = currentGyms.map(gym => `<div class="pill ${gym === State.activeGym ? 'active' : ''}" onclick="App.haptic(); State.activeGym='${gym}';">${gym}</div>`).join('');
         
         document.getElementById('gradePicker').innerHTML = conf.labels.map((g, i) => {
             const dot = conf.colors[i] ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
