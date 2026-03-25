@@ -1,66 +1,69 @@
-// =====================================================================
-// THE MASTER VAULT (sw.js)
-// =====================================================================
-// RUTHLESS RULE: Every time you update your app.js, index.html, or 
-// styles.css on GitHub, you MUST change this version number (e.g., v2, v3).
-// If you do not change this, your phone will load the old cached version forever.
-const CACHE_NAME = 'sendlog-cache-v15';  
+const CACHE_NAME = 'climb-log-v16'; // Leapfrogging your old version!
 
-const urlsToCache = [
-  './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js'
+// The essential files we know we need
+const ASSETS_TO_CACHE = [
+    './',
+    './index.html',
+    './style.css',   
+    './app.js',
+    './manifest.json'
 ];
 
-// 1. Install Event: Lock the files in the vault
-self.addEventListener('install', event => {
-  // Force the new service worker to take over immediately
-  self.skipWaiting(); 
-  
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache:', CACHE_NAME);
-        return cache.addAll(urlsToCache);
-      })
-  );
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            console.log('Opened cache and saving local assets');
+            return cache.addAll(ASSETS_TO_CACHE);
+        }).catch(err => console.error('Cache addAll failed:', err))
+    );
+    self.skipWaiting();
 });
 
-// 2. Fetch Event: Intercept network requests
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // If it's in the vault, return it instantly
-        if (response) {
-          return response;
-        }
-        // If not, fetch it from the internet
-        return fetch(event.request);
-      })
-  );
-});
-
-// 3. Activate Event: The Clean-Up Crew
-self.addEventListener('activate', event => {
-  // Take control of all open pages immediately
-  event.waitUntil(clients.claim());
-
-  const cacheWhitelist = [CACHE_NAME];
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          // If a cache exists that doesn't match our new version number, burn it.
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('Deleting old cache:', cacheName);
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
         })
-      );
-    })
-  );
+    );
+    self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+    // Ignore the Google Apps Script database so we don't accidentally cache old logs
+    if (event.request.method !== 'GET' || event.request.url.includes('script.google.com')) {
+        return;
+    }
+
+    event.respondWith(
+        caches.match(event.request).then((cachedResponse) => {
+            // 1. If we already saved it in the vault, use it!
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+            
+            // 2. If it's not in the vault, fetch it from the internet...
+            return fetch(event.request).then((networkResponse) => {
+                // 3. ...and if it's a Google Font or a CSS file we missed, save it to the vault automatically for next time!
+                if (event.request.url.includes('fonts.googleapis.com') || 
+                    event.request.url.includes('fonts.gstatic.com') ||
+                    event.request.url.includes('.css')) {
+                    
+                    const responseToCache = networkResponse.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, responseToCache);
+                    });
+                }
+                return networkResponse;
+            }).catch(() => {
+                console.log('Offline and asset not cached:', event.request.url);
+            });
+        })
+    );
 });
