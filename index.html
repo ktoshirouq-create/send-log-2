@@ -17,74 +17,77 @@
             --surface: #171717;
             --surface-light: #262626;
             --primary: #10b981;
-            --primary-hover: #059669;
             --text-main: #f5f5f5;
             --text-muted: #737373;
-            --border: #333;
+            --border: #262626;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            line-height: 1.5;
-            padding-bottom: 80px;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        .container { padding: 20px; max-width: 600px; margin: 0 auto; }
-        .section { margin-bottom: 24px; background: var(--surface); padding: 16px; border-radius: 16px; border: 1px solid var(--border); }
-        .section-title { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        body { background-color: var(--bg-color); color: var(--text-main); padding-bottom: 120px; }
+        
+        .container { padding: 24px 20px; max-width: 600px; margin: 0 auto; }
+        h2 { font-size: 1.6rem; font-weight: 800; margin-bottom: 24px; letter-spacing: 0.5px; }
+        
+        /* Clean sections without bulky backgrounds */
+        .section { margin-bottom: 28px; }
+        .section-title { font-size: 0.75rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-left: 4px; }
         .hidden { display: none !important; }
 
-        .pill-group { display: flex; flex-wrap: wrap; gap: 8px; }
-        .pill { background: var(--surface-light); color: var(--text-main); padding: 10px 16px; border-radius: 20px; font-size: 0.95rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; transition: all 0.2s ease; display: flex; align-items: center; gap: 6px; user-select: none; -webkit-tap-highlight-color: transparent; }
-        .pill.active { background: var(--primary); color: #000; font-weight: 700; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+        /* The Custom Pills */
+        .pill-group { display: flex; flex-wrap: wrap; gap: 10px; }
+        .pill { background: var(--surface); color: var(--text-main); padding: 12px 20px; border-radius: 24px; font-size: 0.95rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); transition: 0.2s; display: flex; align-items: center; gap: 6px; }
+        .pill.active { background: var(--primary); color: #000; border-color: var(--primary); font-weight: 700; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); }
 
-        .btn-submit { width: 100%; background: var(--primary); color: #000; border: none; padding: 16px; border-radius: 12px; font-size: 1.1rem; font-weight: 800; cursor: pointer; transition: transform 0.1s; }
-        .btn-submit:active { transform: scale(0.98); }
-
+        /* Inputs */
         .input-group { display: flex; flex-direction: column; gap: 12px; }
-        input { width: 100%; background: var(--surface-light); border: 1px solid var(--border); color: var(--text-main); padding: 14px; border-radius: 10px; font-size: 16px; outline: none; transition: border 0.2s; }
+        input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text-main); padding: 16px; border-radius: 16px; font-size: 16px; outline: none; transition: 0.2s; }
         input:focus { border-color: var(--primary); }
 
-        .log-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--surface-light); }
+        /* Submit Button */
+        .btn-submit { width: 100%; background: var(--primary); color: #000; border: none; padding: 18px; border-radius: 16px; font-size: 1.1rem; font-weight: 800; margin-top: 10px; cursor: pointer; }
+        .btn-submit:active { opacity: 0.8; }
+
+        /* 🚀 The Restored Floating Bottom Navigation */
+        .bottom-nav { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--surface); border-radius: 40px; display: flex; padding: 8px; gap: 8px; z-index: 100; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .nav-item { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border-radius: 30px; color: var(--text-muted); font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: 0.2s; }
+        .nav-item.active { background: var(--primary); color: #000; }
+        .nav-icon { font-size: 1.2rem; }
+
+        /* Dashboard Layouts */
+        .chart-toggles { display: flex; background: var(--surface); border-radius: 12px; padding: 6px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .chart-toggle-btn { flex: 1; text-align: center; padding: 10px; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        .chart-toggle-btn.active { background: var(--surface-light); color: var(--text-main); }
+
+        /* The Restored Dark Log Panel */
+        #logList { background: var(--surface); border-radius: 20px; padding: 8px 16px; border: 1px solid var(--border); }
+        .log-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px dashed var(--border); }
         .log-item:last-child { border-bottom: none; }
-        .log-date { font-size: 0.85rem; color: var(--text-muted); width: 50px; flex-shrink: 0; font-weight: 600; }
+        .log-date { font-size: 0.85rem; color: var(--text-muted); width: 45px; flex-shrink: 0; font-weight: 600; }
         .log-info { flex: 1; display: flex; flex-direction: column; }
-        .log-name { font-weight: 700; font-size: 1rem; }
-        .log-disc { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
-        .log-grade { font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: 6px; }
-        .log-del { background: #ef4444; color: #fff; border: none; border-radius: 6px; width: 28px; height: 28px; margin-left: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .log-name { font-weight: 800; font-size: 1.05rem; }
+        .log-disc { font-size: 0.75rem; color: var(--text-muted); font-weight: 700; margin-top: 4px; letter-spacing: 0.5px; }
+        .log-grade { font-size: 1.2rem; font-weight: 900; display: flex; align-items: center; gap: 6px; }
+        .log-del { background: #ef4444; color: #fff; border: none; border-radius: 8px; width: 30px; height: 30px; margin-left: 12px; font-weight: bold; cursor: pointer; }
 
-        .boulder-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .boulder-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
         .chart-container { width: 100%; height: 220px; position: relative; margin-top: 10px; }
-        .chart-toggles { display: flex; background: var(--surface-light); border-radius: 8px; padding: 4px; margin-bottom: 16px; }
-        .chart-toggle-btn { flex: 1; text-align: center; padding: 8px; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); cursor: pointer; border-radius: 6px; transition: 0.2s; }
-        .chart-toggle-btn.active { background: var(--surface); color: var(--text-main); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-
-        .pyramid-row { display: flex; align-items: center; margin-bottom: 8px; gap: 12px; }
-        .pyramid-grade { width: 60px; font-weight: 800; display: flex; align-items: center; gap: 6px; font-size: 0.95rem; }
-        .pyramid-track { flex: 1; display: flex; background: var(--surface-light); height: 24px; border-radius: 4px; overflow: hidden; }
-        .pyramid-seg { display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: #000; transition: width 0.5s ease; }
+        
+        .pyramid-row { display: flex; align-items: center; margin-bottom: 10px; gap: 12px; }
+        .pyramid-grade { width: 65px; font-weight: 800; display: flex; align-items: center; gap: 8px; font-size: 1rem; }
+        .pyramid-track { flex: 1; display: flex; background: var(--surface); height: 28px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+        .pyramid-seg { display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800; color: #000; transition: width 0.5s ease; }
         .pyramid-seg.fl { background: #db2777; color: white; }
         .pyramid-seg.rp { background: #10b981; }
 
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10, 10, 10, 0.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 12px 0 24px 0; z-index: 100; }
-        .nav-item { color: var(--text-muted); text-align: center; font-size: 0.75rem; font-weight: 700; display: flex; flex-direction: column; gap: 4px; padding: 8px 24px; border-radius: 12px; cursor: pointer; transition: 0.2s; }
-        .nav-item.active { color: var(--primary); background: rgba(16, 185, 129, 0.1); }
-        .nav-icon { font-size: 1.4rem; }
-
-        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: var(--primary); color: #000; font-weight: 800; padding: 12px 24px; border-radius: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 1000; opacity: 0; }
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: var(--primary); color: #000; font-weight: 800; padding: 14px 28px; border-radius: 30px; box-shadow: 0 10px 20px rgba(0,0,0,0.4); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 1000; opacity: 0; }
         .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     </style>
 </head>
 <body>
 
     <div id="view-log" class="container">
-        <h2 style="margin-bottom: 20px; font-size: 1.8rem; letter-spacing: -0.5px;">Log Ascent</h2>
+        <h2>Log Ascent</h2>
         
         <div class="section" id="datePicker">
             <div class="section-title">Date</div>
@@ -129,7 +132,7 @@
     </div>
 
     <div id="view-dash" class="container hidden">
-        <h2 style="margin-bottom: 20px; font-size: 1.8rem; letter-spacing: -0.5px;">Dashboard <span class="sync-badge">☁️</span></h2>
+        <h2>Dashboard <span class="sync-badge" style="font-size:1rem;">☁️</span></h2>
         
         <div class="section">
             <div class="pill-group" id="dashSelector"></div>
@@ -148,12 +151,12 @@
             <div id="pyramidCont"></div>
         </div>
 
-        <div class="section" style="border: none; background: transparent; padding: 0;">
-            <div class="chart-toggles" style="margin-bottom: 8px;">
-                <div id="list-toggle-top" class="chart-toggle-btn active" onclick="App.haptic(); State.listMode='top10';">Top 10</div>
-                <div id="list-toggle-recent" class="chart-toggle-btn" onclick="App.haptic(); State.listMode='recent';">Recent</div>
+        <div class="section">
+            <div class="chart-toggles" style="margin-bottom: 12px; background: transparent; border: none; padding: 0;">
+                <div id="list-toggle-top" class="chart-toggle-btn active" style="background: var(--surface); border: 1px solid var(--border);" onclick="App.haptic(); State.listMode='top10';">Top 10</div>
+                <div id="list-toggle-recent" class="chart-toggle-btn" style="background: var(--surface); border: 1px solid var(--border); margin-left: 8px;" onclick="App.haptic(); State.listMode='recent';">Recent</div>
             </div>
-            <div id="logList" style="background: var(--surface); padding: 16px; border-radius: 16px; border: 1px solid var(--border);"></div>
+            <div id="logList"></div>
         </div>
     </div>
 
@@ -164,7 +167,7 @@
         </div>
         <div class="nav-item" id="nav-dash" onclick="App.haptic(); State.view='dash';">
             <div class="nav-icon">📊</div>
-            <span>Stats</span>
+            <span>Dashboard</span>
         </div>
     </div>
 
