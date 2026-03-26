@@ -1,4 +1,4 @@
-const CACHE_NAME = 'climb-log-v17'; 
+const CACHE_NAME = 'climb-log-v18'; 
 
 const ASSETS = [
     './',
