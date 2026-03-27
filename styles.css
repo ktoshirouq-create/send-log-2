@@ -53,14 +53,14 @@ input:focus { border-color: var(--primary); }
 .log-del { background: transparent; border: none; color: var(--danger); font-size: 1.5rem; line-height: 1; opacity: 0.3; cursor: pointer; transition: 0.2s; margin-left: 10px; padding: 0 5px; }
 .log-del:active { opacity: 1; transform: scale(0.8); }
 
-/* --- Fixed Gamified XP Bar (No subtitle) --- */
+/* --- Fixed Gamified XP Bar --- */
 .xp-wrapper { margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1); }
 .xp-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
 .xp-title { font-size: 0.85rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
 .xp-pct { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.5px; }
 .xp-bar-cont { display: flex; align-items: center; gap: 12px; }
 .xp-grade { font-size: 1.15rem; font-weight: 800; color: #fff; width: 42px; text-align: center; flex-shrink: 0; }
-.xp-grade.next { color: #525252; }
+.xp-grade.next { color: #525252; transition: 0.3s; }
 .xp-track { flex: 1; height: 12px; background: rgba(0,0,0,0.5); border-radius: 12px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.05); position: relative; overflow: hidden; }
 .xp-fill { height: 100%; border-radius: 12px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
 
