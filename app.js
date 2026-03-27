@@ -3,7 +3,7 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err)));
 }
 
-// Hardcoded Master Google Script URL
+// Hardcoded Master Google Script URL - BRAND NEW DEPLOYMENT
 const API_URL = "https://script.google.com/macros/s/AKfycby0fW1C830QNXESDs6B1NFB9_gLRqOwOycCly63i4jDxlU7L8_W4Du4w-4hhGE4Pak2/exec";
 
 const GRADES = {
@@ -67,6 +67,7 @@ const State = new Proxy({
             }
             if (!conf.angles.includes(target.activeAngle)) target.activeAngle = 'Vert';
             
+            // Failsafe: Prevent bouldering gyms from staying active on Rope tab
             if (value === 'Indoor Rope Climbing' && (target.activeGym === 'Løkka' || target.activeGym === 'Bryn')) {
                 target.activeGym = 'OKS';
             }
@@ -177,12 +178,9 @@ const App = {
         document.getElementById('input-name').placeholder = isBould ? 'La Marie Rose' : 'Silence';
         document.getElementById('input-crag').placeholder = isBould ? 'Sector, Crag 🇬🇷' : 'Flatanger';
 
-        // Sticky Crag Logic: Pull from memory if outdoors
-        if (isOut) {
-            const savedCrag = localStorage.getItem('lastCrag');
-            if (savedCrag && !document.getElementById('input-crag').value) {
-                document.getElementById('input-crag').value = savedCrag;
-            }
+        // Sticky Crag Memory Execution
+        if (isOut && !document.getElementById('input-crag').value) {
+            document.getElementById('input-crag').value = localStorage.getItem('lastCrag') || '';
         }
 
         const currentGyms = (dStr === 'Indoor Rope Climbing') ? GYMS.filter(g => g !== 'Løkka' && g !== 'Bryn') : GYMS;
@@ -221,16 +219,24 @@ const App = {
         
         let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
             const d = l.cleanDate.split('-'); 
-            
             const formattedDate = `${d[2]} ${monthNames[parseInt(d[1], 10) - 1]}`;
             
+            // Render-Time Parsing for Name and Crag
+            let displayName = l.name || "Log";
+            let displayLoc = "";
+            if (displayName.includes(' @ ')) {
+                const parts = displayName.split(' @ ');
+                displayName = parts[0];
+                displayLoc = `<div class="log-loc">📍 ${parts[1]}</div>`;
+            }
+
             let dGrade = String(l.grade || "");
             const isF = dGrade.includes('⚡') || dGrade.includes('👁️');
             
-            if (l.style === 'quick' && !dGrade.includes('🚀')) dGrade += ' 🚀';
-            if (l.style === 'project' && !dGrade.includes('🛠️')) dGrade += ' 🛠️';
+            // Clean Typography logic: Strip the emojis out of the display string entirely
+            let cleanGrade = getBaseGrade(dGrade);
 
-            const badge = getBadge(l.type, dGrade);
+            const badge = getBadge(l.type, dGrade); // Send the raw string for the dot calculator
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
             const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>` : '';
             
@@ -243,11 +249,11 @@ const App = {
             
             let inlineColor = '';
             if (l.type === 'Indoor Bouldering') {
-                const idx = GRADES.bouldsIn.indexOf(getBaseGrade(dGrade));
+                const idx = GRADES.bouldsIn.indexOf(cleanGrade);
                 if (idx > -1 && GRADES.bouldsInColors[idx]) inlineColor = `color: ${GRADES.bouldsInColors[idx]} !important;`;
             }
             
-            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${l.name||"Log"}${syncWarning}</div>${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${dGrade}</div>${delBtn}</div>`;
+            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${displayName}${syncWarning}</div>${displayLoc}${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${cleanGrade}</div>${delBtn}</div>`;
         }).join('');
         
         if (State.listMode === 'top10' && displayLogs.length > 0) {
@@ -312,9 +318,9 @@ const App = {
                 let maxFl = flL.length ? flL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
 
                 cD.rp.push(maxRp ? getScoreIndex(maxRp.score, false) : null);
-                cD.rpG.push(maxRp ? maxRp.grade : "None");
+                cD.rpG.push(maxRp ? getBaseGrade(maxRp.grade) : "None");
                 cD.fl.push(maxFl ? getScoreIndex(maxFl.score, true) : null);
-                cD.flG.push(maxFl ? maxFl.grade : "None");
+                cD.flG.push(maxFl ? getBaseGrade(maxFl.grade) : "None");
             } else {
                 let pM = mo-1, pY = y; if (pM === 0) { pM = 12; pY = y-1; }
                 const pMS = `${pY}-${pM.toString().padStart(2, '0')}`;
@@ -357,6 +363,9 @@ const App = {
         document.getElementById('pyramidCont').innerHTML = Object.keys(gG).sort((a,b) => conf.labels.indexOf(b) - conf.labels.indexOf(a)).map(b => {
             const g = gG[b]; const fP = (g.fl/mT)*100, rP = (g.rp/mT)*100;
             const badge = getBadge(dStr, b);
+            
+            // Clean Typography: Flash counts remain logically intact, but visual emojis in the bar can stay or go.
+            // Keeping the small subtle lightning bolt purely for bar differentiation.
             let seg = ''; if (g.fl > 0) seg += `<div class="pyramid-seg fl" style="width: ${fP}%;">⚡ ${g.fl}</div>`; if (g.rp > 0) seg += `<div class="pyramid-seg rp" style="width: ${rP}%;">${g.rp}</div>`;
             return `<div class="pyramid-row"><div class="pyramid-grade">${badge}${b}</div><div class="pyramid-track">${seg}</div></div>`;
         }).join('') || '<div style="color:var(--text-muted); text-align:center; padding:10px;">No sends in the last 60 days.</div>';
@@ -373,14 +382,14 @@ const App = {
         
         const outName = document.getElementById('input-name').value.trim();
         const outCrag = document.getElementById('input-crag').value.trim();
+        const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
         
-        if (State.discipline.includes('Outdoor')) { 
-            if (!outName || !outCrag) { App.toast("Fill info"); return; }
-            // Save Crag to local storage
+        if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
+        
+        // Sticky Crag Logic: Store to local storage on save
+        if (State.discipline.includes('Outdoor')) {
             localStorage.setItem('lastCrag', outCrag);
         }
-
-        const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
         
         const btn = document.querySelector('.btn-main');
         btn.disabled = true;
@@ -391,9 +400,9 @@ const App = {
         State.logs = [...State.logs, l]; 
         SyncManager.push(l); 
         
+        // Clear Route Name only, leave the Crag intact for the next send
         if (State.discipline.includes('Outdoor')) { 
             document.getElementById('input-name').value = ''; 
-            // Crag value is NOT cleared so it stays sticky
         }
         
         setTimeout(() => {
