@@ -3,7 +3,7 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err)));
 }
 
-// Hardcoded Master Google Script URL - BRAND NEW DEPLOYMENT
+// Hardcoded Master Google Script URL
 const API_URL = "https://script.google.com/macros/s/AKfycby0fW1C830QNXESDs6B1NFB9_gLRqOwOycCly63i4jDxlU7L8_W4Du4w-4hhGE4Pak2/exec";
 
 const GRADES = {
@@ -47,7 +47,6 @@ try {
     if (rawLogs) safeLogs = JSON.parse(rawLogs);
     if (!Array.isArray(safeLogs)) safeLogs = [];
 } catch (e) {
-    console.error("Corrupted local logs detected. Wiping clean.", e);
     safeLogs = [];
     localStorage.removeItem('climbLogs');
 }
@@ -67,7 +66,6 @@ const State = new Proxy({
             }
             if (!conf.angles.includes(target.activeAngle)) target.activeAngle = 'Vert';
             
-            // Failsafe: Prevent bouldering gyms from staying active on Rope tab
             if (value === 'Indoor Rope Climbing' && (target.activeGym === 'Løkka' || target.activeGym === 'Bryn')) {
                 target.activeGym = 'OKS';
             }
@@ -81,6 +79,7 @@ const State = new Proxy({
                 document.getElementById(`view-${v}`).classList.toggle('active', isActive);
                 document.getElementById(`nav-${v}`).classList.toggle('active', isActive);
             });
+            setTimeout(() => App.centerActivePills(), 50); // Auto-center when changing views
         }
         
         if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeAngle', 'activeGrade', 'listMode'].includes(prop)) {
@@ -124,7 +123,7 @@ const SyncManager = {
             if (result.status === 'success' || result.status === 'deleted') {
                 State.logs = State.logs.map(l => String(l.id) === String(payload.id) ? { ...l, _synced: true } : l);
             }
-        } catch (error) { console.log("Sync delay:", error); }
+        } catch (error) {}
     }
 };
 
@@ -161,6 +160,18 @@ const App = {
             customPill.innerText = `${monthNames[parseInt(m)-1]} ${parseInt(d)}`;
         }
     },
+    
+    // Smooth horizontal scrolling math to center the active pill
+    centerActivePills: () => {
+        document.querySelectorAll('.pill-row').forEach(row => {
+            const active = row.querySelector('.pill.active');
+            if (active) {
+                const scrollPos = active.offsetLeft - (row.offsetWidth / 2) + (active.offsetWidth / 2);
+                row.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
+            }
+        });
+    },
+
     renderUI: () => {
         const dStr = String(State.discipline || "");
         const isOut = dStr.includes('Outdoor'), isRope = dStr.includes('Rope'), isBould = dStr.includes('Boulder');
@@ -178,9 +189,10 @@ const App = {
         document.getElementById('input-name').placeholder = isBould ? 'La Marie Rose' : 'Silence';
         document.getElementById('input-crag').placeholder = isBould ? 'Sector, Crag 🇬🇷' : 'Flatanger';
 
-        // Sticky Crag Memory Execution
-        if (isOut && !document.getElementById('input-crag').value) {
-            document.getElementById('input-crag').value = localStorage.getItem('lastCrag') || '';
+        // Load the Sticky Crag from memory if the input is currently empty
+        const cragInput = document.getElementById('input-crag');
+        if (!cragInput.value && localStorage.getItem('lastCrag')) {
+            cragInput.value = localStorage.getItem('lastCrag');
         }
 
         const currentGyms = (dStr === 'Indoor Rope Climbing') ? GYMS.filter(g => g !== 'Løkka' && g !== 'Bryn') : GYMS;
@@ -204,7 +216,11 @@ const App = {
         document.getElementById('list-toggle-recent').className = `chart-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
 
         if (State.view === 'dash') App.renderDashboard();
+        
+        // Execute smooth centering immediately after UI updates
+        setTimeout(() => App.centerActivePills(), 10);
     },
+    
     renderDashboard: () => {
         const dStr = String(State.discipline || "");
         const isRope = dStr.includes('Rope');
@@ -221,24 +237,24 @@ const App = {
             const d = l.cleanDate.split('-'); 
             const formattedDate = `${d[2]} ${monthNames[parseInt(d[1], 10) - 1]}`;
             
-            // Render-Time Parsing for Name and Crag
-            let displayName = l.name || "Log";
-            let displayLoc = "";
-            if (displayName.includes(' @ ')) {
-                const parts = displayName.split(' @ ');
-                displayName = parts[0];
-                displayLoc = `<div class="log-loc">📍 ${parts[1]}</div>`;
-            }
-
-            let dGrade = String(l.grade || "");
-            const isF = dGrade.includes('⚡') || dGrade.includes('👁️');
+            let rawGrade = String(l.grade || "");
+            const isF = rawGrade.includes('⚡') || rawGrade.includes('👁️');
             
-            // Clean Typography logic: Strip the emojis out of the display string entirely
-            let cleanGrade = getBaseGrade(dGrade);
-
-            const badge = getBadge(l.type, dGrade); // Send the raw string for the dot calculator
+            // Render-Time UI upgrade: Stripping emojis for clean typography
+            const cleanDisplayGrade = getBaseGrade(rawGrade); 
+            const badge = getBadge(l.type, rawGrade);
+            
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
             const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>` : '';
+            
+            // Render-Time String Parsing: Split Route @ Crag into Title and Location Subtitle
+            let logName = l.name || "Log";
+            let cragHTML = '';
+            if (logName.includes(' @ ')) {
+                const parts = logName.split(' @ ');
+                logName = parts[0];
+                cragHTML = `<div class="log-crag">📍 ${parts[1]}</div>`;
+            }
             
             const subItems = [];
             if (l.angle) subItems.push(String(l.angle));
@@ -249,11 +265,11 @@ const App = {
             
             let inlineColor = '';
             if (l.type === 'Indoor Bouldering') {
-                const idx = GRADES.bouldsIn.indexOf(cleanGrade);
+                const idx = GRADES.bouldsIn.indexOf(getBaseGrade(rawGrade));
                 if (idx > -1 && GRADES.bouldsInColors[idx]) inlineColor = `color: ${GRADES.bouldsInColors[idx]} !important;`;
             }
             
-            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${displayName}${syncWarning}</div>${displayLoc}${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${cleanGrade}</div>${delBtn}</div>`;
+            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${logName}${syncWarning}</div>${cragHTML}${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${cleanDisplayGrade}</div>${delBtn}</div>`;
         }).join('');
         
         if (State.listMode === 'top10' && displayLogs.length > 0) {
@@ -318,9 +334,9 @@ const App = {
                 let maxFl = flL.length ? flL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
 
                 cD.rp.push(maxRp ? getScoreIndex(maxRp.score, false) : null);
-                cD.rpG.push(maxRp ? getBaseGrade(maxRp.grade) : "None");
+                cD.rpG.push(maxRp ? maxRp.grade : "None");
                 cD.fl.push(maxFl ? getScoreIndex(maxFl.score, true) : null);
-                cD.flG.push(maxFl ? getBaseGrade(maxFl.grade) : "None");
+                cD.flG.push(maxFl ? maxFl.grade : "None");
             } else {
                 let pM = mo-1, pY = y; if (pM === 0) { pM = 12; pY = y-1; }
                 const pMS = `${pY}-${pM.toString().padStart(2, '0')}`;
@@ -363,9 +379,6 @@ const App = {
         document.getElementById('pyramidCont').innerHTML = Object.keys(gG).sort((a,b) => conf.labels.indexOf(b) - conf.labels.indexOf(a)).map(b => {
             const g = gG[b]; const fP = (g.fl/mT)*100, rP = (g.rp/mT)*100;
             const badge = getBadge(dStr, b);
-            
-            // Clean Typography: Flash counts remain logically intact, but visual emojis in the bar can stay or go.
-            // Keeping the small subtle lightning bolt purely for bar differentiation.
             let seg = ''; if (g.fl > 0) seg += `<div class="pyramid-seg fl" style="width: ${fP}%;">⚡ ${g.fl}</div>`; if (g.rp > 0) seg += `<div class="pyramid-seg rp" style="width: ${rP}%;">${g.rp}</div>`;
             return `<div class="pyramid-row"><div class="pyramid-grade">${badge}${b}</div><div class="pyramid-track">${seg}</div></div>`;
         }).join('') || '<div style="color:var(--text-muted); text-align:center; padding:10px;">No sends in the last 60 days.</div>';
@@ -382,14 +395,14 @@ const App = {
         
         const outName = document.getElementById('input-name').value.trim();
         const outCrag = document.getElementById('input-crag').value.trim();
-        const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
         
-        if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
-        
-        // Sticky Crag Logic: Store to local storage on save
-        if (State.discipline.includes('Outdoor')) {
+        // Save the Crag string to local memory to power the sticky input feature
+        if (State.discipline.includes('Outdoor') && outCrag) {
             localStorage.setItem('lastCrag', outCrag);
         }
+
+        const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
+        if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
         
         const btn = document.querySelector('.btn-main');
         btn.disabled = true;
@@ -400,9 +413,9 @@ const App = {
         State.logs = [...State.logs, l]; 
         SyncManager.push(l); 
         
-        // Clear Route Name only, leave the Crag intact for the next send
         if (State.discipline.includes('Outdoor')) { 
             document.getElementById('input-name').value = ''; 
+            // We intentionally do NOT clear the input-crag value here anymore, so it stays sticky!
         }
         
         setTimeout(() => {
