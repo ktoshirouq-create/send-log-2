@@ -214,6 +214,10 @@ const App = {
         
         let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
             const d = l.cleanDate.split('-'); 
+            
+            // Format updated to Alphanumeric (e.g., "24 Mar")
+            const formattedDate = `${d[2]} ${monthNames[parseInt(d[1], 10) - 1]}`;
+            
             let dGrade = String(l.grade || "");
             const isF = dGrade.includes('⚡') || dGrade.includes('👁️');
             
@@ -237,7 +241,7 @@ const App = {
                 if (idx > -1 && GRADES.bouldsInColors[idx]) inlineColor = `color: ${GRADES.bouldsInColors[idx]} !important;`;
             }
             
-            return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><div class="log-name">${l.name||"Log"}${syncWarning}</div>${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${dGrade}</div>${delBtn}</div>`;
+            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${l.name||"Log"}${syncWarning}</div>${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${dGrade}</div>${delBtn}</div>`;
         }).join('');
         
         if (State.listMode === 'top10' && displayLogs.length > 0) {
@@ -352,7 +356,7 @@ const App = {
         }).join('') || '<div style="color:var(--text-muted); text-align:center; padding:10px;">No sends in the last 60 days.</div>';
     },
     
-    // UI Upgrade: Stateful "Save to Cloud" CTA with SVG animation and specific haptic success triggers.
+    // UI Upgrade: Stateful "Save to Cloud" CTA with SVG implementation
     logClimb: () => {
         App.haptic(); 
         let s = State.activeGrade.score, g = State.activeGrade.text;
@@ -378,12 +382,10 @@ const App = {
         
         if (State.discipline.includes('Outdoor')) { document.getElementById('input-name').value = ''; document.getElementById('input-crag').value = ''; }
         
-        // Artificial delay for perceived effort, resolving to success UI
         setTimeout(() => {
             btn.classList.remove('loading');
             btn.classList.add('success');
             
-            // Injected SVG checkmark replacing the OS emoji
             btn.innerHTML = `<svg class="checkmark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Saved!`;
             
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
