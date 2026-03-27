@@ -22,16 +22,20 @@ const DISCIPLINES = ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope 
 const DISC_LABELS = ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder'];
 const STYLE_MAP = { 'project': 'Project', 'quick': 'Quick Send', 'flash': 'Flash', 'onsight': 'Onsight' };
 
+// V13 PRO BLUEPRINT CONSTANTS
+const STEEPNESS = ['Slab', 'Vertical', 'Overhang', 'Roof'];
+const CLIMB_STYLES = ['Endurance', 'Cruxy', 'Technical', 'Athletic'];
+const HOLDS = ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs'];
+const RPES = ['Breezy', 'Solid', 'Limit'];
+
 // --- HELPER FUNCTIONS ---
 const getBaseGrade = (g) => String(g || "").replace(/[⚡👁️🚀🛠️\s]/g, '');
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 
 const getScaleConfig = (disc) => {
-    const isRope = String(disc || "").includes('Rope');
-    const angles = isRope ? ['Slab', 'Vert', 'Overhang', 'Tech', 'Endurance'] : ['Slab', 'Vert', 'Overhang', 'Roof', 'Dynamic'];
-    if (disc === 'Indoor Bouldering') return { labels: GRADES.bouldsIn, scores: GRADES.bouldsInScores, colors: GRADES.bouldsInColors, angles };
-    if (disc === 'Outdoor Bouldering') return { labels: GRADES.bouldsOut, scores: GRADES.bouldsOutScores, colors: [], angles };
-    return { labels: GRADES.ropes, scores: GRADES.ropeScores, colors: [], angles };
+    if (disc === 'Indoor Bouldering') return { labels: GRADES.bouldsIn, scores: GRADES.bouldsInScores, colors: GRADES.bouldsInColors };
+    if (disc === 'Outdoor Bouldering') return { labels: GRADES.bouldsOut, scores: GRADES.bouldsOutScores, colors: [] };
+    return { labels: GRADES.ropes, scores: GRADES.ropeScores, colors: [] };
 };
 
 const getBadge = (type, gradeText) => {
@@ -53,9 +57,9 @@ try {
 
 const State = new Proxy({
     view: 'log', discipline: 'Indoor Rope Climbing', activeGrade: { text: '6b', score: 633 },
-    activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max',
-    activeAngle: 'Vert', listMode: 'top10',
-    activeHolds: [], activeRPE: 'Solid', // V13 Advanced Metrics
+    activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
+    // V13 Pro Blueprint States
+    activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: 'Vertical', activeClimbStyles: [], activeHolds: [],
     logs: safeLogs
 }, {
     set(target, prop, value) {
@@ -65,8 +69,6 @@ const State = new Proxy({
             if (!conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
                 target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
             }
-            if (!conf.angles.includes(target.activeAngle)) target.activeAngle = 'Vert';
-            
             if (value === 'Indoor Rope Climbing' && (target.activeGym === 'Løkka' || target.activeGym === 'Bryn')) {
                 target.activeGym = 'OKS';
             }
@@ -83,13 +85,13 @@ const State = new Proxy({
             setTimeout(() => App.centerActivePills(), 50); 
         }
         
-        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeAngle', 'activeGrade', 'listMode', 'activeRPE'].includes(prop)) {
+        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeGrade', 'listMode', 'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 'activeClimbStyles', 'activeHolds'].includes(prop)) {
             App.renderUI();
         }
         
         if (prop === 'logs') {
             localStorage.setItem('climbLogs', JSON.stringify(value));
-            localStorage.setItem('climbingLogs', JSON.stringify(value)); // V13 DATA BRIDGE
+            localStorage.setItem('climbingLogs', JSON.stringify(value)); // Syncs to Nerd Dashboard
             if (target.view === 'dash') App.renderDashboard();
         }
         return true;
@@ -172,14 +174,21 @@ const App = {
         });
     },
     
-    // V13 Multi-Select Toggle Function
-    toggleHold: (h) => {
-        if (State.activeHolds.includes(h)) {
-            State.activeHolds = State.activeHolds.filter(x => x !== h);
-        } else {
-            State.activeHolds.push(h);
+    // V13 State Handlers
+    setRating: (num) => {
+        App.haptic();
+        State.activeRating = State.activeRating === num ? 0 : num; // Toggle off if tapped again
+    },
+    toggleGradeFeel: (feel) => {
+        App.haptic();
+        State.activeGradeFeel = State.activeGradeFeel === feel ? '' : feel;
+    },
+    toggleMulti: (category, val) => {
+        if (category === 'style') {
+            State.activeClimbStyles = State.activeClimbStyles.includes(val) ? State.activeClimbStyles.filter(x => x !== val) : [...State.activeClimbStyles, val];
+        } else if (category === 'hold') {
+            State.activeHolds = State.activeHolds.includes(val) ? State.activeHolds.filter(x => x !== val) : [...State.activeHolds, val];
         }
-        App.renderUI();
     },
 
     renderUI: () => {
@@ -212,18 +221,24 @@ const App = {
             const isActive = String(g).toLowerCase() === String(State.activeGrade.text).toLowerCase();
             return `<div class="pill ${isActive ? 'active' : ''}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
         }).join('');
-        
-        document.getElementById('angleSelector').innerHTML = buildPills(conf.angles, State.activeAngle, "State.activeAngle");
 
         const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash'], ['onsight', 'Onsight']] : [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash']];
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = styles[0][0];
         document.getElementById('styleSelector').innerHTML = styles.map(s => `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="App.haptic(); State.activeStyle='${s[0]}';">${s[1]}</div>`).join('');
         
-        // V13 Advanced Tag Rendering
-        const HOLDS = ['Crimps', 'Slopers', 'Pockets', 'Jugs', 'Tufas'];
-        const RPES = ['Breezy', 'Solid', 'Pumped', 'Limit'];
-        document.getElementById('holdsSelector').innerHTML = HOLDS.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" onclick="App.haptic(); App.toggleHold('${h}')">${h}</div>`).join('');
+        // V13 PRO BLUEPRINT RENDERING
         document.getElementById('rpeSelector').innerHTML = buildPills(RPES, State.activeRPE, "State.activeRPE");
+        document.getElementById('steepnessSelector').innerHTML = buildPills(STEEPNESS, State.activeSteepness, "State.activeSteepness");
+        document.getElementById('climbStyleSelector').innerHTML = CLIMB_STYLES.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('style', '${s}')">${s}</div>`).join('');
+        document.getElementById('holdsSelector').innerHTML = HOLDS.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('hold', '${h}')">${h}</div>`).join('');
+        
+        document.getElementById('feel-soft').className = `pill ${State.activeGradeFeel === 'Soft' ? 'active' : ''}`;
+        document.getElementById('feel-hard').className = `pill ${State.activeGradeFeel === 'Hard' ? 'active' : ''}`;
+        
+        const stars = document.getElementById('starRating').children;
+        for(let i=0; i<stars.length; i++) {
+            stars[i].className = i < State.activeRating ? 'active' : '';
+        }
 
         document.getElementById('chartToggle').innerHTML = `<div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='max';">Max Peak</div><div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='avg';">Avg (Top 10)</div>`;
         
@@ -419,18 +434,39 @@ const App = {
         btn.classList.add('loading');
         btn.innerText = 'Saving...';
         
-        // V13 Tagging Engine
-        let angleTag = State.activeAngle === 'Vert' ? 'Vertical' : State.activeAngle; 
-        const tagsArr = [angleTag, State.activeStyle, State.activeRPE, ...State.activeHolds];
+        // V13 Tagging Engine - Compiles all the new tags beautifully
+        const tagsArr = [
+            State.activeSteepness,
+            State.activeStyle,
+            State.activeRPE,
+            State.activeGradeFeel,
+            State.activeRating > 0 ? `${State.activeRating} Star` : '',
+            ...State.activeClimbStyles,
+            ...State.activeHolds
+        ].filter(Boolean); // This removes any empty tags
+        
         const compiledTags = tagsArr.join(', ');
+        const notesData = document.getElementById('input-notes').value.trim();
 
-        const l = { id: String(Date.now()), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, style: State.activeStyle, tags: compiledTags, action: 'add', _synced: false };
+        const l = { 
+            id: String(Date.now()), date: State.activeDate, type: State.discipline, 
+            grade: g, score: s, name: n, angle: State.activeSteepness, style: State.activeStyle, 
+            tags: compiledTags, notes: notesData, action: 'add', _synced: false 
+        };
+        
         State.logs = [...State.logs, l]; 
         SyncManager.push(l); 
         
         if (State.discipline.includes('Outdoor')) { 
             document.getElementById('input-name').value = ''; 
         }
+        
+        // Reset the advanced inputs after a successful log
+        document.getElementById('input-notes').value = '';
+        State.activeRating = 0;
+        State.activeGradeFeel = '';
+        State.activeClimbStyles = [];
+        State.activeHolds = [];
         
         setTimeout(() => {
             btn.classList.remove('loading');
