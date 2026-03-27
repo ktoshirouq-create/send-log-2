@@ -229,7 +229,7 @@ const App = {
             if (l.style && STYLE_MAP[l.style]) subItems.push(STYLE_MAP[l.style]);
             
             const subText = subItems.join(' • ').toUpperCase();
-            const discSpan = subText ? `<span class="log-disc">${subText}</span>` : '';
+            const discSpan = subText ? `<div class="log-disc">${subText}</div>` : '';
             
             let inlineColor = '';
             if (l.type === 'Indoor Bouldering') {
@@ -237,7 +237,7 @@ const App = {
                 if (idx > -1 && GRADES.bouldsInColors[idx]) inlineColor = `color: ${GRADES.bouldsInColors[idx]} !important;`;
             }
             
-            return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><span class="log-name">${l.name||"Log"}${syncWarning}</span>${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${dGrade}</div>${delBtn}</div>`;
+            return `<div class="log-item"><div class="log-date">${d[1]}/${d[2]}</div><div class="log-info"><div class="log-name">${l.name||"Log"}${syncWarning}</div>${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${dGrade}</div>${delBtn}</div>`;
         }).join('');
         
         if (State.listMode === 'top10' && displayLogs.length > 0) {
@@ -257,18 +257,19 @@ const App = {
             
             let barColor = conf.colors[currIdx] || 'var(--primary)';
             
+            // Restored the exact class names your styles.css expects for the Working Capacity bar
             listHTML += `
-            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1);">
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
-                    <span style="font-size: 0.85rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Working Capacity</span>
-                    <span style="font-size: 1.15rem; font-weight: 800; letter-spacing: -0.5px; color: ${barColor};">${pct}%</span>
+            <div class="xp-wrapper">
+                <div class="xp-header">
+                    <span class="xp-title">Working Capacity</span>
+                    <span class="xp-pct" style="color: ${barColor};">${pct}%</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 1.15rem; font-weight: 800; color: ${barColor}; width: 42px; text-align: center; flex-shrink: 0;">${conf.labels[currIdx]}</span>
-                    <div style="flex: 1; height: 14px; background: #000; border-radius: 14px; box-shadow: inset 0 3px 6px rgba(0,0,0,0.9); border: 1px solid rgba(255,255,255,0.1); position: relative; overflow: hidden;">
-                        <div style="height: 100%; border-radius: 14px; transition: width 1s ease; width: ${pct}%; background: ${barColor}; box-shadow: 0 0 12px ${barColor}, inset 0 2px 3px rgba(255,255,255,0.4);"></div>
+                <div class="xp-bar-cont">
+                    <span class="xp-grade" style="color: ${barColor};">${conf.labels[currIdx]}</span>
+                    <div class="xp-track">
+                        <div class="xp-fill" style="width: ${pct}%; background: ${barColor}; box-shadow: 0 0 12px ${barColor};"></div>
                     </div>
-                    <span style="font-size: 1.15rem; font-weight: 800; color: ${nextColor}; width: 42px; text-align: center; flex-shrink: 0; text-shadow: 0 0 10px ${nextColor}30;">${nextGrade}</span>
+                    <span class="xp-grade next" style="color: ${nextColor}; text-shadow: 0 0 10px ${nextColor}40;">${nextGrade}</span>
                 </div>
             </div>`;
         }
