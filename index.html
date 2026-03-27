@@ -3,176 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0a0a0a">
+    <title>Send Log</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css?v=5">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Climb Log</title>
-    
-    <link rel="manifest" href="./manifest.json">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <style>
-        :root {
-            --bg-color: #0a0a0a;
-            --surface: #171717;
-            --surface-light: #262626;
-            --primary: #10b981;
-            --text-main: #f5f5f5;
-            --text-muted: #737373;
-            --border: #262626;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        
-        body { background-color: var(--bg-color); color: var(--text-main); padding-bottom: 120px; }
-        
-        .container { padding: 24px 20px; max-width: 600px; margin: 0 auto; }
-        h2 { font-size: 1.6rem; font-weight: 800; margin-bottom: 24px; letter-spacing: 0.5px; }
-        
-        /* Clean sections without bulky backgrounds */
-        .section { margin-bottom: 28px; }
-        .section-title { font-size: 0.75rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; margin-left: 4px; }
-        .hidden { display: none !important; }
-
-        /* The Custom Pills */
-        .pill-group { display: flex; flex-wrap: wrap; gap: 10px; }
-        .pill { background: var(--surface); color: var(--text-main); padding: 12px 20px; border-radius: 24px; font-size: 0.95rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); transition: 0.2s; display: flex; align-items: center; gap: 6px; }
-        .pill.active { background: var(--primary); color: #000; border-color: var(--primary); font-weight: 700; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); }
-
-        /* Inputs */
-        .input-group { display: flex; flex-direction: column; gap: 12px; }
-        input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text-main); padding: 16px; border-radius: 16px; font-size: 16px; outline: none; transition: 0.2s; }
-        input:focus { border-color: var(--primary); }
-
-        /* Submit Button */
-        .btn-submit { width: 100%; background: var(--primary); color: #000; border: none; padding: 18px; border-radius: 16px; font-size: 1.1rem; font-weight: 800; margin-top: 10px; cursor: pointer; }
-        .btn-submit:active { opacity: 0.8; }
-
-        /* 🚀 The Restored Floating Bottom Navigation */
-        .bottom-nav { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--surface); border-radius: 40px; display: flex; padding: 8px; gap: 8px; z-index: 100; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
-        .nav-item { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border-radius: 30px; color: var(--text-muted); font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: 0.2s; }
-        .nav-item.active { background: var(--primary); color: #000; }
-        .nav-icon { font-size: 1.2rem; }
-
-        /* Dashboard Layouts */
-        .chart-toggles { display: flex; background: var(--surface); border-radius: 12px; padding: 6px; margin-bottom: 20px; border: 1px solid var(--border); }
-        .chart-toggle-btn { flex: 1; text-align: center; padding: 10px; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); cursor: pointer; border-radius: 8px; transition: 0.2s; }
-        .chart-toggle-btn.active { background: var(--surface-light); color: var(--text-main); }
-
-        /* The Restored Dark Log Panel */
-        #logList { background: var(--surface); border-radius: 20px; padding: 8px 16px; border: 1px solid var(--border); }
-        .log-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px dashed var(--border); }
-        .log-item:last-child { border-bottom: none; }
-        .log-date { font-size: 0.85rem; color: var(--text-muted); width: 45px; flex-shrink: 0; font-weight: 600; }
-        .log-info { flex: 1; display: flex; flex-direction: column; }
-        .log-name { font-weight: 800; font-size: 1.05rem; }
-        .log-disc { font-size: 0.75rem; color: var(--text-muted); font-weight: 700; margin-top: 4px; letter-spacing: 0.5px; }
-        .log-grade { font-size: 1.2rem; font-weight: 900; display: flex; align-items: center; gap: 6px; }
-        .log-del { background: #ef4444; color: #fff; border: none; border-radius: 8px; width: 30px; height: 30px; margin-left: 12px; font-weight: bold; cursor: pointer; }
-
-        .boulder-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-        .chart-container { width: 100%; height: 220px; position: relative; margin-top: 10px; }
-        
-        .pyramid-row { display: flex; align-items: center; margin-bottom: 10px; gap: 12px; }
-        .pyramid-grade { width: 65px; font-weight: 800; display: flex; align-items: center; gap: 8px; font-size: 1rem; }
-        .pyramid-track { flex: 1; display: flex; background: var(--surface); height: 28px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
-        .pyramid-seg { display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 800; color: #000; transition: width 0.5s ease; }
-        .pyramid-seg.fl { background: #db2777; color: white; }
-        .pyramid-seg.rp { background: #10b981; }
-
-        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px); background: var(--primary); color: #000; font-weight: 800; padding: 14px 28px; border-radius: 30px; box-shadow: 0 10px 20px rgba(0,0,0,0.4); transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 1000; opacity: 0; }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-    </style>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230a0a0a%22/><text y=%2250%22 x=%2250%22 font-size=%2255%22 text-anchor=%22middle%22 dominant-baseline=%22central%22>⛰️</text></svg>">
 </head>
 <body>
-
-    <div id="view-log" class="container">
-        <h2>Log Ascent</h2>
-        
-        <div class="section" id="datePicker">
-            <div class="section-title">Date</div>
-            <div class="pill-group">
-                <div class="pill active" id="pill-today" onclick="App.setDate('today')">Today</div>
-                <div class="pill" id="pill-yest" onclick="App.setDate('yesterday')">Yesterday</div>
-                <div class="pill" id="pill-custom" onclick="document.getElementById('dateInput').click()">Custom</div>
-                <input type="date" id="dateInput" class="hidden" onchange="App.setDate('custom', this.value)">
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">Discipline</div>
-            <div class="pill-group" id="typeSelector"></div>
-        </div>
-
-        <div class="section hidden" id="input-outdoor">
-            <div class="section-title" id="outdoor-name-lbl">Route Name</div>
-            <div class="input-group">
-                <input type="text" id="input-name" placeholder="Name">
-                <input type="text" id="input-crag" placeholder="Crag / Sector">
-            </div>
-        </div>
-
-        <div class="section" id="input-indoor">
-            <div class="section-title">Gym</div>
-            <div class="pill-group" id="gymPicker"></div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">Grade</div>
-            <div class="pill-group" id="gradePicker"></div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">Angle & Style</div>
-            <div class="pill-group" id="angleSelector" style="margin-bottom: 12px;"></div>
-            <div class="pill-group" id="styleSelector"></div>
-        </div>
-
-        <button class="btn-submit" onclick="App.logClimb()">Save to Cloud</button>
-    </div>
-
-    <div id="view-dash" class="container hidden">
-        <h2>Dashboard <span class="sync-badge" style="font-size:1rem;">☁️</span></h2>
-        
-        <div class="section">
-            <div class="pill-group" id="dashSelector"></div>
-        </div>
-
-        <div class="section">
-            <div class="chart-toggles" id="chartToggle"></div>
-            <div id="noDataMsg" style="text-align:center; padding: 40px 0; color: var(--text-muted); font-style: italic; display:none;">No data yet.</div>
-            <div class="chart-container">
-                <canvas id="progressChart"></canvas>
-            </div>
-        </div>
-
-        <div class="section">
-            <div class="section-title">60-Day Send Pyramid</div>
-            <div id="pyramidCont"></div>
-        </div>
-
-        <div class="section">
-            <div class="chart-toggles" style="margin-bottom: 12px; background: transparent; border: none; padding: 0;">
-                <div id="list-toggle-top" class="chart-toggle-btn active" style="background: var(--surface); border: 1px solid var(--border);" onclick="App.haptic(); State.listMode='top10';">Top 10</div>
-                <div id="list-toggle-recent" class="chart-toggle-btn" style="background: var(--surface); border: 1px solid var(--border); margin-left: 8px;" onclick="App.haptic(); State.listMode='recent';">Recent</div>
-            </div>
-            <div id="logList"></div>
-        </div>
-    </div>
-
-    <div class="bottom-nav">
-        <div class="nav-item active" id="nav-log" onclick="App.haptic(); State.view='log';">
-            <div class="nav-icon">✍️</div>
-            <span>Log</span>
-        </div>
-        <div class="nav-item" id="nav-dash" onclick="App.haptic(); State.view='dash';">
-            <div class="nav-icon">📊</div>
-            <span>Dashboard</span>
-        </div>
-    </div>
+    <nav class="bottom-nav">
+        <button class="nav-btn active" id="nav-log" onclick="App.haptic(); State.view='log'">✍️ Log</button>
+        <button class="nav-btn" id="nav-dash" onclick="App.haptic(); State.view='dash'">📊 Dashboard</button>
+    </nav>
 
     <div id="toast" class="toast">Action Successful</div>
 
-    <script src="./app.js"></script>
+    <div class="container">
+        <div id="view-log" class="view active">
+            <h1>Send Log</h1>
+            <div class="card">
+                <div class="sync-badge"></div>
+                <div class="pill-row" id="typeSelector"></div>
+                <div id="climbForm">
+                    <label>Date</label>
+                    <div class="pill-row" id="datePicker">
+                        <div class="pill active" id="pill-today" onclick="App.setDate('today')">Today</div>
+                        <div class="pill" id="pill-yest" onclick="App.setDate('yesterday')">Yesterday</div>
+                        <div class="pill" id="pill-custom" onclick="document.getElementById('native-date').showPicker()">Custom Date</div>
+                    </div>
+                    <input type="date" id="native-date" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;" onchange="App.setDate('custom', this.value)">
+                    <div id="input-indoor">
+                        <label>Select Gym</label>
+                        <div id="gymPicker" class="pill-row"></div>
+                    </div>
+                    <div id="input-outdoor" class="hidden">
+                        <div class="flex">
+                            <div><label id="outdoor-name-lbl">Route Name</label><input type="text" id="input-name" placeholder="Silence"></div>
+                            <div><label>Crag</label><input type="text" id="input-crag" placeholder="Flatanger"></div>
+                        </div>
+                    </div>
+                    <label>Grade</label>
+                    <div id="gradePicker" class="pill-row"></div>
+                    
+                    <label>Angle / Style</label>
+                    <div class="pill-row" id="angleSelector"></div>
+
+                    <label>Style of Ascent</label>
+                    <div class="pill-row" id="styleSelector"></div>
+                    
+                    <button class="btn-main" onclick="App.logClimb()">Save to Cloud</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-dash" class="view">
+            <h1>Dashboard</h1>
+            <div class="card">
+                <div class="sync-badge"></div>
+                <div class="pill-row" id="dashSelector" style="margin-bottom: 25px;"></div>
+                <div class="chart-toggle-row" id="chartToggle"></div>
+                <div class="chart-container">
+                    <div id="noDataMsg" style="color: var(--text-muted); font-style: italic; text-align: center; padding-top: 40px;">Log climbs to view progression</div>
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h2>
+                    Logs
+                    <div class="chart-toggle-row" style="margin: 0;">
+                        <div class="chart-toggle-btn active" id="list-toggle-top" onclick="App.haptic(); State.listMode='top10';">Top 10</div>
+                        <div class="chart-toggle-btn" id="list-toggle-recent" onclick="App.haptic(); State.listMode='recent';">Recent</div>
+                    </div>
+                </h2>
+                <div id="logList" class="log-list"></div>
+            </div>
+            <div class="card">
+                <h2>60-Day Send Pyramid</h2>
+                <div id="pyramidCont" class="pyramid-cont"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js?v=5"></script>
 </body>
 </html>
