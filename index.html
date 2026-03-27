@@ -38,8 +38,15 @@
         label { font-weight: 600; font-size: 0.75rem; color: var(--text-muted); display: block; margin: 15px 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; }
         input[type="text"], input[type="date"] { width: 100%; padding: 14px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: var(--dark); color: var(--text); outline: none; transition: 0.2s; }
         input:focus { border-color: var(--primary); }
-        .btn-main { background: var(--primary); color: #000; border: none; padding: 16px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.05rem; cursor: pointer; margin-top: 25px; transition: 0.2s; }
+        
+        /* Stateful Button UI */
+        .btn-main { background: var(--primary); color: #000; border: none; padding: 16px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.05rem; cursor: pointer; margin-top: 25px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }
         .btn-main:active { transform: scale(0.97); }
+        .btn-main:disabled { cursor: not-allowed; transform: none; }
+        .btn-main.loading { background: var(--border); color: var(--text-muted); }
+        .btn-main.loading::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); animation: sweep 1.2s infinite; }
+        .btn-main.success { background: #059669; color: #fff; box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+        @keyframes sweep { to { left: 200%; } }
 
         .pill-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; scroll-snap-type: x mandatory; scrollbar-width: none; }
         .pill-row::-webkit-scrollbar { display: none; }
@@ -168,6 +175,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
 </body>
 </html>
