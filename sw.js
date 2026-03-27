@@ -1,10 +1,11 @@
-const CACHE_NAME = 'climb-log-v18'; 
+const CACHE_NAME = 'climb-log-v6';
 
 const ASSETS = [
     './',
     './index.html',
-    './style.css',
-    './app.js'
+    './styles.css?v=6',
+    './app.js?v=6',
+    './manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -35,12 +36,13 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+    // Skip database API calls so we don't break syncing
     if (event.request.url.includes('script.google.com')) return;
 
     event.respondWith(
-        caches.match(event.request).then((cachedResponse) => {
+        caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
             if (cachedResponse) {
-                return cachedResponse; 
+                return cachedResponse;
             }
             
             return fetch(event.request).then((networkResponse) => {
