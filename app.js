@@ -351,8 +351,11 @@ const App = {
             return `<div class="pyramid-row"><div class="pyramid-grade">${badge}${b}</div><div class="pyramid-track">${seg}</div></div>`;
         }).join('') || '<div style="color:var(--text-muted); text-align:center; padding:10px;">No sends in the last 60 days.</div>';
     },
+    
+    // UI Upgrade: Stateful "Save to Cloud" CTA with specific haptic success triggers.
     logClimb: () => {
-        App.haptic(); let s = State.activeGrade.score, g = State.activeGrade.text;
+        App.haptic(); 
+        let s = State.activeGrade.score, g = State.activeGrade.text;
         
         if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
         else if (State.activeStyle === 'onsight') { s += 10; g += " 👁️"; }
@@ -364,9 +367,30 @@ const App = {
         const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
         if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
         
+        const btn = document.querySelector('.btn-main');
+        btn.disabled = true;
+        btn.classList.add('loading');
+        btn.innerText = 'Saving...';
+        
         const l = { id: String(Date.now()), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, style: State.activeStyle, action: 'add', _synced: false };
-        State.logs = [...State.logs, l]; SyncManager.push(l); App.toast("Logged");
+        State.logs = [...State.logs, l]; 
+        SyncManager.push(l); 
+        
         if (State.discipline.includes('Outdoor')) { document.getElementById('input-name').value = ''; document.getElementById('input-crag').value = ''; }
+        
+        // Artificial delay for perceived effort, resolving to success UI
+        setTimeout(() => {
+            btn.classList.remove('loading');
+            btn.classList.add('success');
+            btn.innerText = '✅ Saved!';
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); // Unique success haptic
+            
+            setTimeout(() => {
+                btn.classList.remove('success');
+                btn.innerText = 'Save to Cloud';
+                btn.disabled = false;
+            }, 2000);
+        }, 400); 
     }
 };
 App.init();
