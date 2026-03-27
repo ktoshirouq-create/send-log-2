@@ -1,9 +1,9 @@
-const CACHE_NAME = 'climb-log-v8';
+const CACHE_NAME = 'climb-log-v9';
 
 const ASSETS = [
     './',
     './index.html',
-    './app.js?v=8',
+    './app.js?v=9',
     './manifest.json'
 ];
 
