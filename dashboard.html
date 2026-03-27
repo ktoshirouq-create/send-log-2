@@ -1,1 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nerd Dashboard</title>
+    <link rel="stylesheet" href="style.css?v=13"> 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { background-color: #121212; color: #ffffff; font-family: sans-serif; margin: 0; padding: 20px; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
+        .back-btn { background: #333; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .archetype-container { text-align: center; background: #1e1e1e; padding: 25px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #333; }
+        .archetype-title { font-size: 26px; font-weight: bold; margin: 10px 0 5px 0; color: #4CAF50; }
+        .archetype-roast { font-style: italic; color: #aaa; margin-bottom: 0; font-size: 16px; }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .chart-card { background: #1e1e1e; padding: 15px; border-radius: 12px; border: 1px solid #333; }
+        @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="header-bar">
+        <h2>📊 Nerd Dashboard</h2>
+        <button class="back-btn" onclick="window.location.href='index.html'">← Back to Crag</button>
+    </div>
 
+    <div class="archetype-container" id="archetype-card">
+        <h3 id="arch-title">Analyzing Data...</h3>
+        <p id="arch-roast">Log more routes with tags to generate your archetype.</p>
+    </div>
+
+    <div class="chart-grid">
+        <div class="chart-card"><canvas id="pyramidChart"></canvas></div>
+        <div class="chart-card"><canvas id="energyPieChart"></canvas></div>
+        <div class="chart-card"><canvas id="gripRadarChart"></canvas></div>
+        <div class="chart-card"><canvas id="cnsLineChart"></canvas></div>
+    </div>
+
+    <script src="dashboard.js?v=13"></script> 
+</body>
+</html>
