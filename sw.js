@@ -3,7 +3,7 @@ const CACHE_NAME = 'climb-log-v10';
 const ASSETS = [
     './',
     './index.html',
-    './app.js?v=9',
+    './app.js?v=10',
     './manifest.json'
 ];
 
