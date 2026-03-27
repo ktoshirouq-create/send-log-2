@@ -352,7 +352,7 @@ const App = {
         }).join('') || '<div style="color:var(--text-muted); text-align:center; padding:10px;">No sends in the last 60 days.</div>';
     },
     
-    // UI Upgrade: Stateful "Save to Cloud" CTA with specific haptic success triggers.
+    // UI Upgrade: Stateful "Save to Cloud" CTA with SVG animation and specific haptic success triggers.
     logClimb: () => {
         App.haptic(); 
         let s = State.activeGrade.score, g = State.activeGrade.text;
@@ -382,12 +382,15 @@ const App = {
         setTimeout(() => {
             btn.classList.remove('loading');
             btn.classList.add('success');
-            btn.innerText = '✅ Saved!';
-            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); // Unique success haptic
+            
+            // Injected SVG checkmark replacing the OS emoji
+            btn.innerHTML = `<svg class="checkmark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Saved!`;
+            
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
             
             setTimeout(() => {
                 btn.classList.remove('success');
-                btn.innerText = 'Save to Cloud';
+                btn.innerHTML = 'Save to Cloud';
                 btn.disabled = false;
             }, 2000);
         }, 400); 
