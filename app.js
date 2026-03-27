@@ -3,7 +3,7 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err)));
 }
 
-// Hardcoded Master Google Script URL - BRAND NEW DEPLOYMENT
+// Hardcoded Master Google Script URL
 const API_URL = "https://script.google.com/macros/s/AKfycby0fW1C830QNXESDs6B1NFB9_gLRqOwOycCly63i4jDxlU7L8_W4Du4w-4hhGE4Pak2/exec";
 
 const GRADES = {
@@ -67,7 +67,6 @@ const State = new Proxy({
             }
             if (!conf.angles.includes(target.activeAngle)) target.activeAngle = 'Vert';
             
-            // Failsafe: Prevent bouldering gyms from staying active on Rope tab
             if (value === 'Indoor Rope Climbing' && (target.activeGym === 'Løkka' || target.activeGym === 'Bryn')) {
                 target.activeGym = 'OKS';
             }
@@ -178,6 +177,14 @@ const App = {
         document.getElementById('input-name').placeholder = isBould ? 'La Marie Rose' : 'Silence';
         document.getElementById('input-crag').placeholder = isBould ? 'Sector, Crag 🇬🇷' : 'Flatanger';
 
+        // Sticky Crag Logic: Pull from memory if outdoors
+        if (isOut) {
+            const savedCrag = localStorage.getItem('lastCrag');
+            if (savedCrag && !document.getElementById('input-crag').value) {
+                document.getElementById('input-crag').value = savedCrag;
+            }
+        }
+
         const currentGyms = (dStr === 'Indoor Rope Climbing') ? GYMS.filter(g => g !== 'Løkka' && g !== 'Bryn') : GYMS;
         document.getElementById('gymPicker').innerHTML = buildPills(currentGyms, State.activeGym, "State.activeGym");
         
@@ -215,7 +222,6 @@ const App = {
         let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
             const d = l.cleanDate.split('-'); 
             
-            // Format updated to Alphanumeric (e.g., "24 Mar")
             const formattedDate = `${d[2]} ${monthNames[parseInt(d[1], 10) - 1]}`;
             
             let dGrade = String(l.grade || "");
@@ -356,7 +362,6 @@ const App = {
         }).join('') || '<div style="color:var(--text-muted); text-align:center; padding:10px;">No sends in the last 60 days.</div>';
     },
     
-    // UI Upgrade: Stateful "Save to Cloud" CTA with SVG implementation
     logClimb: () => {
         App.haptic(); 
         let s = State.activeGrade.score, g = State.activeGrade.text;
@@ -368,8 +373,14 @@ const App = {
         
         const outName = document.getElementById('input-name').value.trim();
         const outCrag = document.getElementById('input-crag').value.trim();
+        
+        if (State.discipline.includes('Outdoor')) { 
+            if (!outName || !outCrag) { App.toast("Fill info"); return; }
+            // Save Crag to local storage
+            localStorage.setItem('lastCrag', outCrag);
+        }
+
         const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
-        if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
         
         const btn = document.querySelector('.btn-main');
         btn.disabled = true;
@@ -380,7 +391,10 @@ const App = {
         State.logs = [...State.logs, l]; 
         SyncManager.push(l); 
         
-        if (State.discipline.includes('Outdoor')) { document.getElementById('input-name').value = ''; document.getElementById('input-crag').value = ''; }
+        if (State.discipline.includes('Outdoor')) { 
+            document.getElementById('input-name').value = ''; 
+            // Crag value is NOT cleared so it stays sticky
+        }
         
         setTimeout(() => {
             btn.classList.remove('loading');
