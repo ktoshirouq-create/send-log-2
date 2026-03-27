@@ -36,8 +36,11 @@
         .nav-btn.active { background: var(--primary); color: #000; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
 
         label { font-weight: 600; font-size: 0.75rem; color: var(--text-muted); display: block; margin: 15px 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; }
-        input[type="text"], input[type="date"] { width: 100%; padding: 14px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: var(--dark); color: var(--text); outline: none; transition: 0.2s; }
-        input:focus { border-color: var(--primary); }
+        .sub-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; margin-top: 12px; }
+        
+        input[type="text"], input[type="date"], textarea { width: 100%; padding: 14px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: var(--dark); color: var(--text); outline: none; transition: 0.2s; font-family: 'Inter', sans-serif; }
+        input:focus, textarea:focus { border-color: var(--primary); }
+        textarea { resize: vertical; min-height: 80px; }
         
         .btn-main { background: var(--primary); color: #000; border: none; padding: 16px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.05rem; cursor: pointer; margin-top: 25px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-main:active { transform: scale(0.97); }
@@ -52,13 +55,17 @@
         .checkmark-icon { width: 22px; height: 22px; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         @keyframes popIn { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
-        .pill-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; }
+        .pill-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; margin-bottom: 15px; }
         .pill-row::-webkit-scrollbar { display: none; }
         .pill { flex: 0 0 auto; padding: 12px 20px; background: var(--dark); border: 1px solid var(--border); border-radius: 12px; font-weight: 700; font-size: 0.95rem; color: var(--text-muted); scroll-snap-align: center; cursor: pointer; transition: 0.2s; user-select: none; position: relative; }
         .pill.active { background: var(--primary-fade); color: var(--primary); border-color: var(--primary); }
 
-        .advanced-toggle { color: var(--primary); font-size: 0.85rem; font-weight: 700; text-align: center; margin: 25px 0 10px 0; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; padding: 10px; border: 1px dashed var(--border); border-radius: 10px; transition: 0.2s; }
+        .advanced-toggle { color: var(--primary); font-size: 0.85rem; font-weight: 700; text-align: center; margin: 25px 0 15px 0; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; transition: 0.2s; }
         .advanced-toggle:active { background: rgba(255,255,255,0.05); }
+
+        .star-rating { display: flex; gap: 8px; font-size: 2.2rem; color: var(--border); cursor: pointer; justify-content: flex-start; margin-bottom: 15px; }
+        .star-rating span { transition: color 0.2s; user-select: none; }
+        .star-rating span.active { color: #eab308; text-shadow: 0 0 10px rgba(234, 179, 8, 0.4); }
 
         .boulder-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; border: 1px solid rgba(255,255,255,0.2); vertical-align: middle; position: relative; top: -1px; }
 
@@ -112,7 +119,7 @@
 <body>
     <nav class="bottom-nav">
         <button class="nav-btn active" id="nav-log" onclick="App.haptic(); State.view='log'">✍️ Log</button>
-        <button class="nav-btn" id="nav-dash" onclick="App.haptic(); State.view='dash'">📊 Logs & Charts</button>
+        <button class="nav-btn" id="nav-dash" onclick="App.haptic(); State.view='dash'">📊 Dashboard</button>
     </nav>
 
     <div id="toast" class="toast">Action Successful</div>
@@ -141,21 +148,48 @@
                             <div><label>Crag</label><input type="text" id="input-crag" placeholder="Flatanger"></div>
                         </div>
                     </div>
+                    
                     <label>Grade</label>
                     <div id="gradePicker" class="pill-row"></div>
-                    
-                    <label>Angle</label>
-                    <div class="pill-row" id="angleSelector"></div>
 
                     <label>Style of Ascent</label>
                     <div class="pill-row" id="styleSelector"></div>
                     
-                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? '- Hide Advanced Details' : '+ Advanced Details (For Dashboard)'; App.haptic();">+ Advanced Details (For Dashboard)</div>
+                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? '- Hide Details' : '+ Add Details (Optional)'; App.haptic();">+ Add Details (Optional)</div>
+                    
                     <div id="advanced-content" class="hidden">
-                        <label>Hold Types (Multi-Select)</label>
-                        <div class="pill-row" id="holdsSelector"></div>
-                        <label>RPE (Effort Level)</label>
+                        
+                        <label>1. Experience</label>
+                        <div class="sub-label">My Effort</div>
                         <div class="pill-row" id="rpeSelector"></div>
+                        
+                        <div class="sub-label">The Grade</div>
+                        <div class="pill-row" id="gradeFeelSelector">
+                            <div class="pill" id="feel-soft" onclick="App.toggleGradeFeel('Soft')">Soft</div>
+                            <div class="pill" id="feel-hard" onclick="App.toggleGradeFeel('Hard')">Hard</div>
+                        </div>
+                        
+                        <div class="sub-label">Route Rating</div>
+                        <div class="star-rating" id="starRating">
+                            <span onclick="App.setRating(1)">★</span>
+                            <span onclick="App.setRating(2)">★</span>
+                            <span onclick="App.setRating(3)">★</span>
+                            <span onclick="App.setRating(4)">★</span>
+                            <span onclick="App.setRating(5)">★</span>
+                        </div>
+
+                        <label>2. Steepness (Single Select)</label>
+                        <div class="pill-row" id="steepnessSelector"></div>
+
+                        <label>3. Climbing Style (Multi-Select)</label>
+                        <div class="pill-row" id="climbStyleSelector"></div>
+
+                        <label>4. Hold Types (Multi-Select)</label>
+                        <div class="pill-row" id="holdsSelector"></div>
+
+                        <label>5. Notes</label>
+                        <textarea id="input-notes" placeholder="beta and headspace..."></textarea>
+
                     </div>
                     
                     <button class="btn-main" onclick="App.logClimb()">Save to Cloud</button>
@@ -193,6 +227,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=13"></script>
+    <script src="app.js?v=14"></script>
 </body>
 </html>
