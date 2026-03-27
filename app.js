@@ -252,12 +252,12 @@ const App = {
                 const baseS = conf.scores[currIdx], nextS = conf.scores[currIdx + 1];
                 pct = Math.round(((avgS - baseS) / (nextS - baseS)) * 100);
                 nextGrade = conf.labels[currIdx + 1];
-                nextColor = conf.colors[currIdx + 1] || '#fff';
+                // THIS LINE RIGHT HERE FIXES THE WHITE TEXT ISSUE
+                nextColor = conf.colors[currIdx + 1] || 'var(--text-muted)';
             }
             
             let barColor = conf.colors[currIdx] || 'var(--primary)';
             
-            // Restored the exact class names your styles.css expects for the Working Capacity bar
             listHTML += `
             <div class="xp-wrapper">
                 <div class="xp-header">
