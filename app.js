@@ -55,6 +55,7 @@ const State = new Proxy({
     view: 'log', discipline: 'Indoor Rope Climbing', activeGrade: { text: '6b', score: 633 },
     activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max',
     activeAngle: 'Vert', listMode: 'top10',
+    activeHolds: [], activeRPE: 'Solid', // V13 Advanced Metrics
     logs: safeLogs
 }, {
     set(target, prop, value) {
@@ -79,15 +80,16 @@ const State = new Proxy({
                 document.getElementById(`view-${v}`).classList.toggle('active', isActive);
                 document.getElementById(`nav-${v}`).classList.toggle('active', isActive);
             });
-            setTimeout(() => App.centerActivePills(), 50); // Auto-center when changing views
+            setTimeout(() => App.centerActivePills(), 50); 
         }
         
-        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeAngle', 'activeGrade', 'listMode'].includes(prop)) {
+        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeAngle', 'activeGrade', 'listMode', 'activeRPE'].includes(prop)) {
             App.renderUI();
         }
         
         if (prop === 'logs') {
             localStorage.setItem('climbLogs', JSON.stringify(value));
+            localStorage.setItem('climbingLogs', JSON.stringify(value)); // V13 DATA BRIDGE
             if (target.view === 'dash') App.renderDashboard();
         }
         return true;
@@ -160,8 +162,6 @@ const App = {
             customPill.innerText = `${monthNames[parseInt(m)-1]} ${parseInt(d)}`;
         }
     },
-    
-    // Smooth horizontal scrolling math to center the active pill
     centerActivePills: () => {
         document.querySelectorAll('.pill-row').forEach(row => {
             const active = row.querySelector('.pill.active');
@@ -170,6 +170,16 @@ const App = {
                 row.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
             }
         });
+    },
+    
+    // V13 Multi-Select Toggle Function
+    toggleHold: (h) => {
+        if (State.activeHolds.includes(h)) {
+            State.activeHolds = State.activeHolds.filter(x => x !== h);
+        } else {
+            State.activeHolds.push(h);
+        }
+        App.renderUI();
     },
 
     renderUI: () => {
@@ -189,7 +199,6 @@ const App = {
         document.getElementById('input-name').placeholder = isBould ? 'La Marie Rose' : 'Silence';
         document.getElementById('input-crag').placeholder = isBould ? 'Sector, Crag 🇬🇷' : 'Flatanger';
 
-        // Load the Sticky Crag from memory if the input is currently empty
         const cragInput = document.getElementById('input-crag');
         if (!cragInput.value && localStorage.getItem('lastCrag')) {
             cragInput.value = localStorage.getItem('lastCrag');
@@ -210,14 +219,18 @@ const App = {
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = styles[0][0];
         document.getElementById('styleSelector').innerHTML = styles.map(s => `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="App.haptic(); State.activeStyle='${s[0]}';">${s[1]}</div>`).join('');
         
+        // V13 Advanced Tag Rendering
+        const HOLDS = ['Crimps', 'Slopers', 'Pockets', 'Jugs', 'Tufas'];
+        const RPES = ['Breezy', 'Solid', 'Pumped', 'Limit'];
+        document.getElementById('holdsSelector').innerHTML = HOLDS.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" onclick="App.haptic(); App.toggleHold('${h}')">${h}</div>`).join('');
+        document.getElementById('rpeSelector').innerHTML = buildPills(RPES, State.activeRPE, "State.activeRPE");
+
         document.getElementById('chartToggle').innerHTML = `<div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='max';">Max Peak</div><div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='avg';">Avg (Top 10)</div>`;
         
         document.getElementById('list-toggle-top').className = `chart-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
         document.getElementById('list-toggle-recent').className = `chart-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
 
         if (State.view === 'dash') App.renderDashboard();
-        
-        // Execute smooth centering immediately after UI updates
         setTimeout(() => App.centerActivePills(), 10);
     },
     
@@ -240,14 +253,12 @@ const App = {
             let rawGrade = String(l.grade || "");
             const isF = rawGrade.includes('⚡') || rawGrade.includes('👁️');
             
-            // Render-Time UI upgrade: Stripping emojis for clean typography
             const cleanDisplayGrade = getBaseGrade(rawGrade); 
             const badge = getBadge(l.type, rawGrade);
             
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
             const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>` : '';
             
-            // Render-Time String Parsing: Split Route @ Crag into Title and Location Subtitle
             let logName = l.name || "Log";
             let cragHTML = '';
             if (logName.includes(' @ ')) {
@@ -396,7 +407,6 @@ const App = {
         const outName = document.getElementById('input-name').value.trim();
         const outCrag = document.getElementById('input-crag').value.trim();
         
-        // Save the Crag string to local memory to power the sticky input feature
         if (State.discipline.includes('Outdoor') && outCrag) {
             localStorage.setItem('lastCrag', outCrag);
         }
@@ -409,13 +419,17 @@ const App = {
         btn.classList.add('loading');
         btn.innerText = 'Saving...';
         
-        const l = { id: String(Date.now()), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, style: State.activeStyle, action: 'add', _synced: false };
+        // V13 Tagging Engine
+        let angleTag = State.activeAngle === 'Vert' ? 'Vertical' : State.activeAngle; 
+        const tagsArr = [angleTag, State.activeStyle, State.activeRPE, ...State.activeHolds];
+        const compiledTags = tagsArr.join(', ');
+
+        const l = { id: String(Date.now()), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, style: State.activeStyle, tags: compiledTags, action: 'add', _synced: false };
         State.logs = [...State.logs, l]; 
         SyncManager.push(l); 
         
         if (State.discipline.includes('Outdoor')) { 
             document.getElementById('input-name').value = ''; 
-            // We intentionally do NOT clear the input-crag value here anymore, so it stays sticky!
         }
         
         setTimeout(() => {
