@@ -333,4 +333,49 @@ const App = {
         let dSet = [], toolC;
         if (State.chartMode === 'max') {
             let g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, 'rgba(16, 185, 129, 0.25)'); g.addColorStop(1, 'transparent');
-            dSet = [{ label: 'Max Redpoint', data: cD.rp, borderColor: '#10b981', backgroundColor: g, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#10b981', pointBorderC
+            dSet = [{ label: 'Max Redpoint', data: cD.rp, borderColor: '#10b981', backgroundColor: g, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#10b981', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }, { label: 'Flash/Onsight', data: cD.fl, borderColor: '#db2777', backgroundColor: '#db2777', borderDash: [5,5], tension: 0.4, fill: false, pointRadius: 5, pointBackgroundColor: '#db2777', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }];
+            toolC = ctx => ctx.datasetIndex === 0 ? ` Redpoint: ${cD.rpG[ctx.dataIndex]}` : ` Flash: ${cD.flG[ctx.dataIndex]}`;
+        } else {
+            let gA = ctx.createLinearGradient(0, 0, 0, 300); gA.addColorStop(0, 'rgba(59, 130, 246, 0.35)'); gA.addColorStop(1, 'transparent');
+            dSet = [{ label: 'Top 10 Average', data: cD.avg, borderColor: '#3b82f6', backgroundColor: gA, tension: 0.4, fill: true, pointRadius: 6, pointBackgroundColor: '#3b82f6', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }];
+            toolC = ctx => ` Power Avg: ${cD.avgG[ctx.dataIndex]}`;
+        }
+        const aI = [...cD.rp.filter(x=>x!==null), ...cD.fl.filter(x=>x!==null), ...cD.avg.filter(x=>x!==null)];
+        App.chart = new Chart(ctx, { type: 'line', data: { labels: cD.lbl, datasets: dSet }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 10, callbacks: { label: toolC } } }, scales: { y: { min: Math.max(0, Math.min(...aI)-1), max: Math.min(conf.labels.length-1, Math.max(...aI)+1), ticks: { stepSize: 1, callback: v => conf.labels[v] } }, x: { grid: { display: false } } } } });
+        
+        const gG = {}; let mT = 0;
+        const last60 = viewLogs.filter(l => new Date(l.cleanDate) >= sixtyDaysAgo);
+        last60.forEach(l => {
+            const bG = String(l.grade||"").replace(/[⚡👁️🚀🛠️\s]/g, ''); 
+            const isF = String(l.grade||"").includes('⚡') || String(l.grade||"").includes('👁️');
+            if (!gG[bG]) gG[bG] = { rp: 0, fl: 0 };
+            if (isF) gG[bG].fl++; else gG[bG].rp++;
+            const t = gG[bG].rp + gG[bG].fl; if (t > mT) mT = t;
+        });
+        
+        document.getElementById('pyramidCont').innerHTML = Object.keys(gG).sort((a,b) => conf.labels.indexOf(b) - conf.labels.indexOf(a)).map(b => {
+            const g = gG[b]; const fP = (g.fl/mT)*100, rP = (g.rp/mT)*100;
+            const badge = getBadge(disciplineStr, b);
+            let seg = ''; if (g.fl > 0) seg += `<div class="pyramid-seg fl" style="width: ${fP}%;">⚡ ${g.fl}</div>`; if (g.rp > 0) seg += `<div class="pyramid-seg rp" style="width: ${rP}%;">${g.rp}</div>`;
+            return `<div class="pyramid-row"><div class="pyramid-grade">${badge}${b}</div><div class="pyramid-track">${seg}</div></div>`;
+        }).join('') || '<div style="color:var(--text-muted); text-align:center; padding:10px;">No sends in the last 60 days.</div>';
+    },
+    logClimb: () => {
+        App.haptic(); let s = State.activeGrade.score, g = State.activeGrade.text;
+        
+        if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
+        else if (State.activeStyle === 'onsight') { s += 10; g += " 👁️"; }
+        else if (State.activeStyle === 'quick') { g += " 🚀"; }
+        else if (State.activeStyle === 'project') { g += " 🛠️"; }
+        
+        const outName = document.getElementById('input-name').value.trim();
+        const outCrag = document.getElementById('input-crag').value.trim();
+        const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
+        if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
+        
+        const l = { id: String(Date.now()), date: State.activeDate, type: State.discipline, grade: g, score: s, name: n, angle: State.activeAngle, style: State.activeStyle, action: 'add', _synced: false };
+        State.logs = [...State.logs, l]; SyncManager.push(l); App.toast("Logged");
+        if (State.discipline.includes('Outdoor')) { document.getElementById('input-name').value = ''; document.getElementById('input-crag').value = ''; }
+    }
+};
+App.init();
