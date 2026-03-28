@@ -1,27 +1,23 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Pull Data from Master Save File
     const rawData = localStorage.getItem('climbingLogs') || localStorage.getItem('climbLogs');
     const allLogs = rawData ? JSON.parse(rawData) : [];
     let activeFilter = 'All';
 
-    // 2. Filter Event Listeners
     const filterPills = document.querySelectorAll('.filter-pill');
     filterPills.forEach(pill => {
         pill.addEventListener('click', (e) => {
             filterPills.forEach(p => p.classList.remove('active'));
             e.target.classList.add('active');
             activeFilter = e.target.getAttribute('data-filter');
-            renderDashboard(); // Re-trigger the whole page
+            renderDashboard(); 
         });
     });
 
-    // 3. Global Chart Instances (Stored here so we can destroy them on filter change)
     let charts = { pie: null, radar: null, line: null };
     Chart.defaults.color = '#aaa';
     Chart.defaults.borderColor = '#333';
 
     function renderDashboard() {
-        // Filter the dataset based on the active pill
         const filteredLogs = activeFilter === 'All' ? allLogs : allLogs.filter(l => l.type === activeFilter);
         
         // --- UPDATE QUICK STATS ---
@@ -30,11 +26,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const outdoorDays = new Set(outdoorLogs.map(l => (l.date || '').substring(0,10))).size;
         document.getElementById('stat-outdoor').innerText = activeFilter.includes('Indoor') ? 'N/A' : outdoorDays;
         
+        // PEAK GRADE FIX: No comparing apples to oranges
         let maxScore = 0; let peakG = '-';
         filteredLogs.forEach(l => {
             if (l.score && l.score > maxScore) { maxScore = l.score; peakG = l.grade; }
         });
-        document.getElementById('stat-peak').innerText = peakG.replace(/[⚡👁️🚀🛠️\s]/g, '');
+        
+        if (filteredLogs.length === 0) {
+            document.getElementById('stat-peak').innerText = '-';
+        } else if (activeFilter === 'All') {
+            document.getElementById('stat-peak').innerText = 'Mix';
+        } else {
+            document.getElementById('stat-peak').innerText = peakG.replace(/[⚡👁️🚀🛠️\s]/g, '');
+        }
 
         // --- UPDATE ARCHETYPE ---
         let scores = { balletDancer: 0, caveDweller: 0, hangdog: 0, masochist: 0, longDistance: 0 };
@@ -66,9 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // --- UPDATE CHARTS ---
-        Object.values(charts).forEach(c => { if(c) c.destroy(); }); // Nuke old charts before redrawing
+        Object.values(charts).forEach(c => { if(c) c.destroy(); }); 
 
-        // 1. Energy System Pie
         let aero = 0, ancap = 0, power = 0;
         filteredLogs.forEach(l => {
             const t = (l.tags || "").toLowerCase();
@@ -84,7 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
             options: { responsive: true, plugins: { legend: { display: false } } }
         });
 
-        // 2. Grip Radar (Double rendering & numbers fixed)
         let grips = { 'Crimps':0, 'Slopers':0, 'Pockets':0, 'Pinches':0, 'Tufas':0, 'Jugs':0 };
         filteredLogs.forEach(l => {
             const t = (l.tags || "");
@@ -96,9 +98,9 @@ document.addEventListener('DOMContentLoaded', () => {
             options: { responsive: true, plugins: { legend: { display: false } }, scales: { r: { ticks: { display: false }, grid: { color: '#333' }, angleLines: { color: '#333' } } } }
         });
 
-        // 3. CNS Line Chart
+        // CNS CHART FIX: Using "null" to create clean breaks instead of dropping to zero.
         const sortedLogs = [...filteredLogs].filter(l=>l.score).sort((a,b) => new Date(a.date) - new Date(b.date));
-        const cnsData = { labels: ['W1', 'W2', 'W3', 'W4'], data: [0,0,0,0], grades: ['-','-','-','-'] };
+        const cnsData = { labels: ['W1', 'W2', 'W3', 'W4'], data: [null, null, null, null], grades: ['-','-','-','-'] };
         
         const now = new Date();
         const weekBins = [[],[],[],[]];
@@ -119,8 +121,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        let minS = Math.min(...cnsData.data.filter(v=>v>0)) || 0;
+        let validScores = cnsData.data.filter(v => v !== null && v > 0);
+        let minS = validScores.length > 0 ? Math.min(...validScores) : 0;
         if(minS > 100) minS -= 50;
+        
         let gradient = charts.pie.ctx.createLinearGradient(0, 0, 0, 300); 
         gradient.addColorStop(0, 'rgba(0, 188, 212, 0.4)');
         gradient.addColorStop(1, 'transparent');
@@ -137,15 +141,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- UPDATE MEANINGFUL LISTS ---
         const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No logs fit this criteria yet.</div>'; };
         
-        // 1. Hall of Fame (4-5 stars)
         const hof = [...filteredLogs].filter(l => String(l.tags).includes('4 Star') || String(l.tags).includes('5 Star')).sort((a,b)=>b.score-a.score).slice(0,5);
         renderList('list-fame', hof.map(l => `<div class="list-item"><div><div class="list-main">${l.name}</div><div class="list-sub">${String(l.tags).match(/[45] Star/)?.[0] || '★'}</div></div><div class="list-badge">${l.grade.replace(/[⚡👁️🚀🛠️\s]/g, '')}</div></div>`).join(''));
 
-        // 2. Limit Log
         const limit = [...filteredLogs].filter(l => String(l.tags).includes('Limit') || String(l.tags).includes('Hard')).sort((a,b)=>b.score-a.score).slice(0,5);
         renderList('list-limit', limit.map(l => `<div class="list-item"><div><div class="list-main">${l.name}</div><div class="list-sub">${(l.date || '').substring(5)}</div></div><div class="list-badge" style="background:rgba(239, 68, 68, 0.15); color:#ef4444;">${l.grade.replace(/[⚡👁️🚀🛠️\s]/g, '')}</div></div>`).join(''));
 
-        // 3. Peak by Steepness
         const steepTypes = ['Slab', 'Vertical', 'Overhang', 'Roof'];
         let steepHTML = '';
         steepTypes.forEach(st => {
@@ -159,7 +160,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         renderList('list-steepness', steepHTML);
 
-        // 4. Top Locations
         const locCounts = {};
         filteredLogs.forEach(l => {
             let loc = l.name;
@@ -171,5 +171,5 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList('list-locations', topLocs.map(loc => `<div class="list-item"><div><div class="list-main">${loc}</div></div><div class="list-badge" style="background:#333; color:#fff;">${locCounts[loc]} Sessions</div></div>`).join(''));
     }
 
-    renderDashboard(); // Trigger initial build
+    renderDashboard(); 
 });
