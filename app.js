@@ -22,7 +22,7 @@ const DISCIPLINES = ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope 
 const DISC_LABELS = ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder'];
 const STYLE_MAP = { 'project': 'Project', 'quick': 'Quick Send', 'flash': 'Flash', 'onsight': 'Onsight' };
 
-// V13 PRO BLUEPRINT CONSTANTS
+// V15 PRO BLUEPRINT CONSTANTS
 const STEEPNESS = ['Slab', 'Vertical', 'Overhang', 'Roof'];
 const CLIMB_STYLES = ['Endurance', 'Cruxy', 'Technical', 'Athletic'];
 const HOLDS = ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs'];
@@ -58,7 +58,7 @@ try {
 const State = new Proxy({
     view: 'log', discipline: 'Indoor Rope Climbing', activeGrade: { text: '6b', score: 633 },
     activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
-    // V13 Pro Blueprint States (Steepness is now an array)
+    // V15 Pro Blueprint States (Steepness is now an array)
     activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
     logs: safeLogs
 }, {
@@ -174,7 +174,7 @@ const App = {
         });
     },
     
-    // V13 State Handlers
+    // V15 State Handlers
     setRating: (num) => {
         App.haptic();
         State.activeRating = State.activeRating === num ? 0 : num; // Toggle off if tapped again
@@ -228,8 +228,9 @@ const App = {
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = styles[0][0];
         document.getElementById('styleSelector').innerHTML = styles.map(s => `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="App.haptic(); State.activeStyle='${s[0]}';">${s[1]}</div>`).join('');
         
-        // V13 PRO BLUEPRINT RENDERING
+        // V15 PRO BLUEPRINT RENDERING
         document.getElementById('rpeSelector').innerHTML = buildPills(RPES, State.activeRPE, "State.activeRPE");
+        // Steepness is now rendered as a multi-select array
         document.getElementById('steepnessSelector').innerHTML = STEEPNESS.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('steepness', '${s}')">${s}</div>`).join('');
         document.getElementById('climbStyleSelector').innerHTML = CLIMB_STYLES.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('style', '${s}')">${s}</div>`).join('');
         document.getElementById('holdsSelector').innerHTML = HOLDS.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('hold', '${h}')">${h}</div>`).join('');
@@ -436,26 +437,25 @@ const App = {
         btn.classList.add('loading');
         btn.innerText = 'Saving...';
         
-        // V13 Tagging Engine - Compiles all tags cleanly
+        // V15 Tagging Engine - Compiles all tags cleanly (Steepness is now pulled from the array)
         const tagsArr = [
-            ...State.activeSteepness, // Steepness is now spread out as an array!
+            ...State.activeSteepness,
             State.activeStyle,
             State.activeRPE,
             State.activeGradeFeel,
             State.activeRating > 0 ? `${State.activeRating} Star` : '',
             ...State.activeClimbStyles,
             ...State.activeHolds
-        ].filter(Boolean);
+        ].filter(Boolean); 
         
         const compiledTags = tagsArr.join(', ');
+        // We save steepness as a comma-separated string for backward compatibility
+        const steepnessData = State.activeSteepness.join(', ');
         const notesData = document.getElementById('input-notes').value.trim();
-
-        // Pass the array representation of angle too, joined by slash if multiple
-        const angleString = State.activeSteepness.join(' / '); 
 
         const l = { 
             id: String(Date.now()), date: State.activeDate, type: State.discipline, 
-            grade: g, score: s, name: n, angle: angleString, style: State.activeStyle, 
+            grade: g, score: s, name: n, angle: steepnessData, style: State.activeStyle, 
             tags: compiledTags, notes: notesData, action: 'add', _synced: false 
         };
         
@@ -470,9 +470,9 @@ const App = {
         document.getElementById('input-notes').value = '';
         State.activeRating = 0;
         State.activeGradeFeel = '';
-        State.activeSteepness = [];
         State.activeClimbStyles = [];
         State.activeHolds = [];
+        State.activeSteepness = [];
         
         setTimeout(() => {
             btn.classList.remove('loading');
