@@ -105,14 +105,6 @@
         .chart-toggle-btn.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.4); border: 1px solid rgba(16,185,129,0.2); }
         .chart-container { position: relative; height: 300px; width: 100%; }
 
-        .pyramid-cont { display: flex; flex-direction: column; gap: 8px; }
-        .pyramid-row { display: flex; align-items: center; justify-content: flex-end; width: 100%; height: 32px; }
-        .pyramid-grade { font-weight: 700; color: var(--text); font-size: 0.95rem; width: 55px; text-align: right; padding-right: 10px; flex-shrink: 0; }
-        .pyramid-track { flex: 1; display: flex; height: 100%; align-items: stretch; background: rgba(255,255,255,0.03); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); }
-        .pyramid-seg { display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; font-size: 0.75rem; font-weight: 700; color: #000; overflow: hidden; white-space: nowrap; transition: 0.3s; }
-        .pyramid-seg.fl { background: var(--flash); color: #fff; border-right: 1px solid rgba(0,0,0,0.2); }
-        .pyramid-seg.rp { background: var(--primary); }
-
         .flex { display: flex; gap: 10px; } .flex > div { flex: 1; } .hidden { display: none !important; }
     </style>
 </head>
@@ -220,13 +212,9 @@
                 </h2>
                 <div id="logList" class="log-list"></div>
             </div>
-            <div class="card">
-                <h2>60-Day Send Pyramid</h2>
-                <div id="pyramidCont" class="pyramid-cont"></div>
-            </div>
         </div>
     </div>
     
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=16"></script>
 </body>
 </html>
