@@ -7,70 +7,45 @@
     <link rel="manifest" href="manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230a0a0a%22/><text y=%2250%22 x=%2250%22 font-size=%2255%22 text-anchor=%22middle%22 dominant-baseline=%22central%22>⛰️</text></svg>">
-    
     <style>
-        :root { 
-            --primary: #10b981; --primary-fade: rgba(16,185,129,0.15); 
-            --flash: #db2777; --flash-fade: rgba(219,39,119,0.15);
-            --dark: #0a0a0a; --card-bg: #171717; --border: #262626; 
-            --text: #f3f4f6; --text-muted: #737373; --danger: #ef4444;
-            --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --radius: 16px;
-        }
-
+        :root { --primary: #10b981; --primary-fade: rgba(16,185,129,0.15); --flash: #db2777; --dark: #0a0a0a; --card-bg: #171717; --border: #262626; --text: #f3f4f6; --text-muted: #737373; --danger: #ef4444; --radius: 16px; }
         body { font-family: 'Inter', sans-serif; background: var(--dark); color: var(--text); margin: 0; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
-        .container { max-width: 850px; margin: 0 auto; padding: var(--space-lg) var(--space-lg) 120px var(--space-lg); }
-        .card { background: var(--card-bg); padding: var(--space-lg); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: var(--space-lg); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
-        h1 { text-align: center; font-weight: 700; font-size: 1.5rem; margin: 10px 0 var(--space-lg) 0; letter-spacing: -0.5px; }
-        h2 { font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 var(--space-md) 0; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
-
+        .container { max-width: 850px; margin: 0 auto; padding: 24px 24px 120px 24px; }
+        .card { background: var(--card-bg); padding: 24px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
+        h1 { text-align: center; font-weight: 700; font-size: 1.5rem; margin-bottom: 24px; letter-spacing: -0.5px; }
+        h2 { font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 16px 0; display: flex; justify-content: space-between; align-items: center; }
         .view { display: none; animation: fadeIn 0.3s ease; }
         .view.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        .bottom-nav { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(23, 23, 23, 0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; gap: 10px; padding: 8px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .nav-btn { background: transparent; color: var(--text-muted); border: none; padding: 12px 24px; border-radius: 20px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.3s; }
+        .bottom-nav { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(23, 23, 23, 0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; gap: 8px; padding: 6px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); z-index: 1000; }
+        .nav-btn { background: transparent; color: var(--text-muted); border: none; padding: 12px 28px; border-radius: 20px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.3s; flex: 1; }
         .nav-btn.active { background: var(--primary); color: #000; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
-
         label { font-weight: 600; font-size: 0.75rem; color: var(--text-muted); display: block; margin: 15px 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; }
         .sub-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; margin-top: 12px; }
-        
-        input[type="text"], input[type="date"], textarea { width: 100%; padding: 14px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: var(--dark); color: var(--text); outline: none; transition: 0.2s; font-family: 'Inter', sans-serif; }
+        input, textarea { width: 100%; padding: 14px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; background: var(--dark); color: var(--text); outline: none; transition: 0.2s; font-family: 'Inter', sans-serif; }
         input:focus, textarea:focus { border-color: var(--primary); }
-        textarea { resize: vertical; min-height: 80px; }
-        
-        .btn-main { background: var(--primary); color: #000; border: none; padding: 16px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.05rem; cursor: pointer; margin-top: 25px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-main:active { transform: scale(0.97); }
-        .btn-main:disabled { cursor: not-allowed; transform: none; }
-        .btn-main.loading { background: var(--border); color: var(--text-muted); }
-        .btn-main.loading::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); animation: sweep 1.2s infinite; }
-        .btn-main.success { background: var(--primary-fade); color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary), 0 0 15px rgba(16, 185, 129, 0.2); }
-
-        .dash-btn { background: #1e1e1e; border: 1px solid var(--primary); color: var(--primary); box-shadow: 0 4px 15px rgba(16,185,129,0.1); margin-top: 0; margin-bottom: 25px; }
-
-        .pill-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; margin-bottom: 15px; }
+        .btn-main { background: var(--primary); color: #000; border: none; padding: 16px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.05rem; cursor: pointer; margin-top: 25px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .dash-btn { background: #1e1e1e; border: 1px solid var(--primary); color: var(--primary); margin-top: 0; margin-bottom: 25px; }
+        .pill-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; margin-bottom: 15px; scrollbar-width: none; }
         .pill-row::-webkit-scrollbar { display: none; }
-        .pill { flex: 0 0 auto; padding: 12px 20px; background: var(--dark); border: 1px solid var(--border); border-radius: 12px; font-weight: 700; font-size: 0.95rem; color: var(--text-muted); scroll-snap-align: center; cursor: pointer; transition: 0.2s; user-select: none; position: relative; }
+        .pill { flex: 0 0 auto; padding: 12px 20px; background: var(--dark); border: 1px solid var(--border); border-radius: 12px; font-weight: 700; font-size: 0.95rem; color: var(--text-muted); cursor: pointer; transition: 0.2s; }
         .pill.active { background: var(--primary-fade); color: var(--primary); border-color: var(--primary); }
-
-        .advanced-toggle { color: var(--primary); font-size: 0.85rem; font-weight: 700; text-align: center; margin: 25px 0 15px 0; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; transition: 0.2s; }
-        .star-rating { display: flex; gap: 8px; font-size: 2.2rem; color: var(--border); cursor: pointer; justify-content: flex-start; margin-bottom: 15px; }
-        .star-rating span.active { color: #eab308; text-shadow: 0 0 10px rgba(234, 179, 8, 0.4); }
-
+        .advanced-toggle { color: var(--primary); font-size: 0.85rem; font-weight: 700; text-align: center; margin: 25px 0 15px 0; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; }
+        .star-rating { display: flex; gap: 8px; font-size: 2.2rem; color: var(--border); cursor: pointer; margin-bottom: 15px; }
+        .star-rating span { transition: color 0.2s; }
+        .star-rating span.active { color: #eab308; }
         .sync-badge { position: absolute; top: 20px; right: 20px; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); opacity: 0; transition: 0.3s; }
         .sync-badge.syncing { opacity: 1; animation: pulse 1s infinite; }
         @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.5); opacity: 1; } }
-
-        .log-list { display: flex; flex-direction: column; gap: 8px; }
-        .log-item { display: flex; align-items: center; background: var(--dark); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); }
-        .log-date { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); width: 55px; flex-shrink: 0; }
-        .log-info { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0 10px; }
-        .log-name { font-weight: 600; font-size: 0.95rem; color: var(--text); line-height: 1.2; }
+        .log-item { display: flex; align-items: center; background: var(--dark); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 8px; }
+        .log-info { flex: 1; padding: 0 10px; overflow: hidden; }
+        .log-name { font-weight: 600; font-size: 0.95rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
         .log-grade { font-size: 1.1rem; font-weight: 700; text-align: right; }
-
+        .log-grade.rp { color: var(--primary); }
+        .log-grade.fl { color: var(--flash); }
         .chart-container { position: relative; height: 300px; width: 100%; }
         .hidden { display: none !important; }
         .flex { display: flex; gap: 10px; } .flex > div { flex: 1; }
@@ -78,12 +53,10 @@
 </head>
 <body>
     <nav class="bottom-nav">
-        <button class="nav-btn active" id="nav-log" onclick="App.haptic(); State.view='log'">✍️ Log</button>
-        <button class="nav-btn" id="nav-dash" onclick="App.haptic(); State.view='dash'">📊 Dashboard</button>
+        <button class="nav-btn active" id="nav-log" onclick="State.view='log'">✍️ Log</button>
+        <button class="nav-btn" id="nav-dash" onclick="State.view='dash'">📊 Dashboard</button>
     </nav>
-
-    <div id="toast" class="toast">Action Successful</div>
-
+    <div id="toast" style="display:none"></div>
     <div class="container">
         <div id="view-log" class="view active">
             <h1>Send Log</h1>
@@ -97,7 +70,7 @@
                         <div class="pill" id="pill-yest" onclick="App.setDate('yesterday')">Yesterday</div>
                         <div class="pill" id="pill-custom" onclick="document.getElementById('native-date').showPicker()">Custom Date</div>
                     </div>
-                    <input type="date" id="native-date" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;" onchange="App.setDate('custom', this.value)">
+                    <input type="date" id="native-date" class="hidden" onchange="App.setDate('custom', this.value)">
                     <div id="input-indoor">
                         <label>Select Gym</label>
                         <div id="gymPicker" class="pill-row"></div>
@@ -108,83 +81,65 @@
                             <div><label>Crag</label><input type="text" id="input-crag" placeholder="Flatanger"></div>
                         </div>
                     </div>
-                    
                     <label>Grade</label>
                     <div id="gradePicker" class="pill-row"></div>
-
                     <label>Style of Ascent</label>
                     <div class="pill-row" id="styleSelector"></div>
-                    
-                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? '- Hide Details' : '+ Add Details (Optional)'; App.haptic();">+ Add Details (Optional)</div>
-                    
+                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? '- Hide Details' : '+ Add Details'; App.haptic();">+ Add Details</div>
                     <div id="advanced-content" class="hidden">
-                        
-                        <label>1. Experience</label>
+                        <label>Time of Day (Manual Override)</label>
+                        <div class="pill-row" id="timeBucketSelector">
+                            <div class="pill" id="time-morn" onclick="App.setTimeofday('Morning')">Morning</div>
+                            <div class="pill" id="time-aft" onclick="App.setTimeofday('Afternoon')">Afternoon</div>
+                            <div class="pill" id="time-eve" onclick="App.setTimeofday('Evening')">Evening</div>
+                        </div>
+                        <label>1. Effort & Grade Feel</label>
                         <div class="sub-label">My Effort</div>
                         <div class="pill-row" id="rpeSelector"></div>
-                        
                         <div class="sub-label">The Grade</div>
                         <div class="pill-row" id="gradeFeelSelector">
                             <div class="pill" id="feel-soft" onclick="App.toggleGradeFeel('Soft')">Soft</div>
                             <div class="pill" id="feel-hard" onclick="App.toggleGradeFeel('Hard')">Hard</div>
                         </div>
-                        
-                        <div class="sub-label">Route Rating</div>
-                        <div class="star-rating" id="starRating">
-                            <span onclick="App.setRating(1)">★</span>
-                            <span onclick="App.setRating(2)">★</span>
-                            <span onclick="App.setRating(3)">★</span>
-                            <span onclick="App.setRating(4)">★</span>
-                            <span onclick="App.setRating(5)">★</span>
+                        <label>2. Pre-Climb Fatigue</label>
+                        <div class="pill-row" id="fatigueSelector">
+                            <div class="pill" id="fat-1" onclick="State.activeFatigue=1">1 (Fresh)</div>
+                            <div class="pill" id="fat-3" onclick="State.activeFatigue=3">3 (Mid)</div>
+                            <div class="pill" id="fat-5" onclick="State.activeFatigue=5">5 (Tired)</div>
                         </div>
-
-                        <div class="sub-label">Time of Day (Optional)</div>
-                        <div class="pill-row" id="timeOfDaySelector"></div>
-
-                        <label>2. Steepness</label>
+                        <label>3. Route Rating</label>
+                        <div class="star-rating" id="starRating">
+                            <span onclick="App.setRating(1)">★</span><span onclick="App.setRating(2)">★</span><span onclick="App.setRating(3)">★</span><span onclick="App.setRating(4)">★</span><span onclick="App.setRating(5)">★</span>
+                        </div>
+                        <label>4. Steepness & Style</label>
                         <div class="pill-row" id="steepnessSelector"></div>
-
-                        <label>3. Climbing Style</label>
                         <div class="pill-row" id="climbStyleSelector"></div>
-
-                        <label>4. Hold Types</label>
+                        <label>5. Hold Types</label>
                         <div class="pill-row" id="holdsSelector"></div>
-
-                        <label>5. Notes</label>
+                        <label>6. Notes</label>
                         <textarea id="input-notes" placeholder="beta and headspace..."></textarea>
-
                     </div>
-                    
                     <button class="btn-main" onclick="App.logClimb()">Save to Cloud</button>
                 </div>
             </div>
         </div>
-
         <div id="view-dash" class="view">
             <h1>Dashboard</h1>
             <div class="card">
                 <button class="btn-main dash-btn" onclick="window.location.href='dashboard.html'">🧠 Open Nerd Dashboard</button>
-                
                 <div class="sync-badge"></div>
                 <div class="pill-row" id="dashSelector" style="margin-bottom: 25px;"></div>
-                <div class="chart-toggle-row" id="chartToggle"></div>
+                <div class="chart-toggle-row" id="chartToggle" style="display:flex; justify-content:center; gap:10px; margin-bottom:20px;"></div>
                 <div class="chart-container">
                     <canvas id="progressChart"></canvas>
                 </div>
             </div>
             <div class="card">
-                <h2>
-                    Logs
-                    <div class="chart-toggle-row" style="margin: 0;">
-                        <div class="chart-toggle-btn active" id="list-toggle-top" onclick="App.haptic(); State.listMode='top10';">Top 10</div>
-                        <div class="chart-toggle-btn" id="list-toggle-recent" onclick="App.haptic(); State.listMode='recent';">Recent</div>
-                    </div>
-                </h2>
-                <div id="logList" class="log-list"></div>
+                <h2>Logs <div id="log-count" style="font-size: 0.75rem; color: var(--text-muted); font-weight: 400;"></div></h2>
+                <div id="logList"></div>
             </div>
         </div>
     </div>
-    
     <script src="app.js?v=17"></script>
 </body>
 </html>
