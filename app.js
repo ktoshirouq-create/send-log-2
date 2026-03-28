@@ -2,7 +2,6 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err)));
 }
 
-// Verified Master URL
 const API_URL = "https://script.google.com/macros/s/AKfycbwMh-T7DB7S06_8DB2GC4dniByVHrRSqbODdLRhjciDOXSDL-V4_vzQtRXee2Wmqp9L/exec";
 
 const GRADES = {
@@ -33,12 +32,6 @@ const getScaleConfig = (disc) => {
     if (disc === 'Indoor Bouldering') return { labels: GRADES.bouldsIn, scores: GRADES.bouldsInScores, colors: GRADES.bouldsInColors };
     if (disc === 'Outdoor Bouldering') return { labels: GRADES.bouldsOut, scores: GRADES.bouldsOutScores, colors: [] };
     return { labels: GRADES.ropes, scores: GRADES.ropeScores, colors: [] };
-};
-
-const getBadge = (type, gradeText) => {
-    if (type !== 'Indoor Bouldering') return '';
-    const idx = GRADES.bouldsIn.indexOf(getBaseGrade(gradeText));
-    return idx > -1 ? `<span class="boulder-dot" style="background:${GRADES.bouldsInColors[idx]};"></span>` : '';
 };
 
 const State = new Proxy({
@@ -145,16 +138,13 @@ const App = {
         if(outBox) { outBox.classList.toggle('hidden', !isOut); document.getElementById('outdoor-name-lbl').innerText = d.includes('Boulder') ? 'Boulder Name' : 'Route Name'; }
         if(inBox) inBox.classList.toggle('hidden', isOut);
         
-        // RESTORED V16 Logic: Gym Banning
         const currentGyms = (d === 'Indoor Rope Climbing') ? GYMS.filter(g => g !== 'Løkka' && g !== 'Bryn') : GYMS;
         renderRow('gymPicker', currentGyms.map(g => `<div class="pill ${State.activeGym === g ? 'active' : ''}" onclick="State.activeGym='${g}'">${g}</div>`).join(''));
         
         renderRow('gradePicker', conf.labels.map((g, i) => {
-            const dot = conf.colors[i] ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
-            return `<div class="pill ${State.activeGrade.text === g ? 'active' : ''}" onclick="State.activeGrade={text:'${g}', score:${conf.scores[i]}}">${dot}${g}</div>`;
+            return `<div class="pill ${State.activeGrade.text === g ? 'active' : ''}" onclick="State.activeGrade={text:'${g}', score:${conf.scores[i]}}">${g}</div>`;
         }).join(''));
         
-        // RESTORED V16 Logic: Style Restriction (Onsight for Outdoor Ropes Only)
         const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash'], ['onsight', 'Onsight']] : [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash']];
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = styles[0][0];
         renderRow('styleSelector', styles.map(s => `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="State.activeStyle='${s[0]}'">${s[1]}</div>`).join(''));
@@ -177,7 +167,6 @@ const App = {
         const stars = document.querySelectorAll('.star-rating span');
         stars.forEach((s, i) => s.classList.toggle('active', i < State.activeRating));
 
-        // Toggles State
         const tMax = document.getElementById('chart-max'); const tAvg = document.getElementById('chart-avg');
         if(tMax && tAvg) { tMax.classList.toggle('active', State.chartMode==='max'); tAvg.classList.toggle('active', State.chartMode==='avg'); }
         const lTop = document.getElementById('list-toggle-top'); const lRec = document.getElementById('list-toggle-recent');
@@ -186,75 +175,48 @@ const App = {
         if (State.view === 'dash') App.renderDashboard();
     },
 
-    // RESTORED V16 MASTER DASHBOARD
     renderDashboard: () => {
         const d = State.discipline;
         const isRope = d.includes('Rope');
         const conf = getScaleConfig(d);
         const sixtyDaysAgo = new Date(); sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
         
-        // Use mapping correctly for the list
         const viewLogs = State.logs.filter(l => l && l.type === d).map(l => ({ ...l, cleanDate: (l.date ? String(l.date).substring(0,10) : getLocalISO()) }));
         
-        // Sorting Logic
         let displayLogs = (State.listMode === 'top10') 
             ? [...viewLogs].filter(l => new Date(l.cleanDate) >= sixtyDaysAgo).sort((a,b) => (b.score - a.score) || (Number(b.id) - Number(a.id))).slice(0, 10)
             : [...viewLogs].sort((a,b) => Number(b.id) - Number(a.id)).slice(0, 10);
         
-        let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
+        const list = document.getElementById('logList');
+        if(!list) return;
+
+        list.innerHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
+            
+            // Format Date: 24 Mar
             const parts = l.cleanDate.split('-'); 
-            const formattedDate = `${parts[2]} ${monthNames[parseInt(parts[1], 10) - 1]}`;
+            const formattedDate = `${parseInt(parts[2], 10)} ${monthNames[parseInt(parts[1], 10) - 1]}`;
             
             let rawGrade = String(l.grade || "");
-            const isF = rawGrade.includes('⚡') || rawGrade.includes('👁️');
-            const cleanDisplayGrade = getBaseGrade(rawGrade); 
-            const badge = getBadge(l.type, rawGrade);
-            const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>` : '';
             
             let logName = l.name || "Log";
-            let cragHTML = '';
             if (logName.includes(' @ ')) {
                 const p = logName.split(' @ ');
-                logName = p[0];
-                cragHTML = `<div class="log-crag">📍 ${p[1]}</div>`;
+                logName = p[0] + ` <span style="font-size:0.75rem; color:#a3a3a3; font-weight:normal;">@ ${p[1]}</span>`;
             }
-            
+
+            // Restore Sub-details (VERT • FLASH)
             const subItems = [];
             if (l.angle) subItems.push(String(l.angle));
-            if (l.style && STYLE_MAP[l.style]) subItems.push(STYLE_MAP[l.style]);
-            const subText = subItems.join(' • ').toUpperCase();
-            const discSpan = subText ? `<div class="log-disc">${subText}</div>` : '';
+            if (l.style && STYLE_MAP[l.style.toLowerCase()]) subItems.push(STYLE_MAP[l.style.toLowerCase()]);
+            const subText = subItems.filter(Boolean).join(' • ').toUpperCase();
             
-            let inlineColor = '';
-            if (l.type === 'Indoor Bouldering') {
-                const idx = GRADES.bouldsIn.indexOf(cleanDisplayGrade);
-                if (idx > -1 && GRADES.bouldsInColors[idx]) inlineColor = `color: ${GRADES.bouldsInColors[idx]} !important;`;
-            }
-            
-            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${logName}</div>${cragHTML}${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${cleanDisplayGrade}</div>${delBtn}</div>`;
+            const subHtml = subText ? `<br><small style="color:var(--text-muted); font-size:0.65rem; letter-spacing:0.5px;">${formattedDate} • ${subText}</small>` : `<br><small style="color:var(--text-muted); font-size:0.65rem; letter-spacing:0.5px;">${formattedDate}</small>`;
+            const delBtn = State.listMode === 'recent' ? `<button style="background:none; border:none; color:var(--danger); font-size:1.5rem; margin-left:10px; cursor:pointer; opacity:0.8;" onclick="App.deleteLog('${l.id}')">×</button>` : '';
+
+            // Current Layout + Re-injected Emoji and SubHtml
+            return `<div class="log-item"><div class="log-info"><div class="log-name" style="font-weight:600;">${logName}</div>${subHtml}</div><div class="log-grade rp" style="font-weight:700;">${rawGrade}</div>${delBtn}</div>`;
         }).join('');
-        
-        // XP Bar
-        if (State.listMode === 'top10' && displayLogs.length > 0) {
-            let avgS = Math.round(displayLogs.reduce((s, l) => s + Number(l.score||0), 0) / displayLogs.length);
-            avgS = Math.max(conf.scores[0], avgS);
-            let currIdx = conf.scores.findIndex(s => s > avgS) - 1;
-            if (currIdx < 0) currIdx = conf.scores.length - 1;
-            if (avgS >= conf.scores[conf.scores.length-1]) currIdx = conf.scores.length - 1;
 
-            let pct = 100, nextGrade = "MAX", nextColor = "var(--text-muted)";
-            if (currIdx < conf.scores.length - 1) {
-                const baseS = conf.scores[currIdx], nextS = conf.scores[currIdx + 1];
-                pct = Math.round(((avgS - baseS) / (nextS - baseS)) * 100);
-                nextGrade = conf.labels[currIdx + 1];
-                nextColor = conf.colors[currIdx + 1] || 'var(--primary)';
-            }
-            let barColor = conf.colors[currIdx] || 'var(--primary)';
-            listHTML += `<div class="xp-wrapper"><div class="xp-header"><span class="xp-title">Working Capacity</span><span class="xp-pct" style="color: ${barColor};">${pct}%</span></div><div class="xp-bar-cont"><span class="xp-grade" style="color: ${barColor};">${conf.labels[currIdx]}</span><div class="xp-track"><div class="xp-fill" style="width: ${pct}%; background: ${barColor}; box-shadow: 0 0 12px ${barColor};"></div></div><span class="xp-grade" style="color: ${nextColor}; text-shadow: 0 0 10px ${nextColor}40;">${nextGrade}</span></div></div>`;
-        }
-        document.getElementById('logList').innerHTML = listHTML;
-
-        // V16 Dual-Mode Chart Logic
         if (window.Chart) {
             if (App.chart) App.chart.destroy();
             const canvas = document.getElementById('progressChart');
@@ -347,7 +309,6 @@ const App = {
         else if (State.activeStyle === 'quick') { g += " 🚀"; }
         else if (State.activeStyle === 'project') { g += " 🛠️"; }
 
-        // Perfect Mapping payload - Zero Fatigue
         const l = {
             id: String(Date.now()),
             date: State.activeDate,
@@ -371,7 +332,6 @@ const App = {
         State.logs = [l, ...State.logs];
         SyncManager.push(l);
         
-        // Reset Inputs
         if (State.discipline.includes('Outdoor')) document.getElementById('input-name').value = '';
         document.getElementById('input-notes').value = '';
         State.activeRating = 0; State.activeGradefeel = ''; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = [];
