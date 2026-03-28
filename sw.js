@@ -1,11 +1,11 @@
-const CACHE_NAME = 'crag-logger-v16';
+const CACHE_NAME = 'crag-logger-v15';
 const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/dashboard.html',
-  '/dashboard.js'
+  './',
+  './index.html',
+  './style.css',
+  './app.js',
+  './dashboard.html',
+  './dashboard.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -23,7 +23,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
-            return caches.delete(cache); // This line is the cache-buster
+            return caches.delete(cache); // This line kills the old memory
           }
         })
       );
