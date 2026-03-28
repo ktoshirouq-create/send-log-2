@@ -1,9 +1,7 @@
-// Register the Service Worker for Offline PWA support
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err)));
 }
 
-// Hardcoded Master Google Script URL
 const API_URL = "https://script.google.com/macros/s/AKfycby0fW1C830QNXESDs6B1NFB9_gLRqOwOycCly63i4jDxlU7L8_W4Du4w-4hhGE4Pak2/exec";
 
 const GRADES = {
@@ -26,6 +24,7 @@ const STEEPNESS = ['Slab', 'Vertical', 'Overhang', 'Roof'];
 const CLIMB_STYLES = ['Endurance', 'Cruxy', 'Technical', 'Athletic'];
 const HOLDS = ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs'];
 const RPES = ['Breezy', 'Solid', 'Limit'];
+const TIMES_OF_DAY = ['Morning', 'Afternoon', 'Evening'];
 
 const getBaseGrade = (g) => String(g || "").replace(/[⚡👁️🚀🛠️\s]/g, '');
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
@@ -55,40 +54,22 @@ try {
 const State = new Proxy({
     view: 'log', discipline: 'Indoor Rope Climbing', activeGrade: { text: '6b', score: 633 },
     activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
-    activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
-    logs: safeLogs
+    activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [], 
+    activeTimeOfDay: '', logs: safeLogs
 }, {
     set(target, prop, value) {
-        if (prop === 'discipline' && target.discipline !== value) {
-            target.discipline = value;
-            const conf = getScaleConfig(value);
-            if (!conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
-                target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
-            }
-            if (value === 'Indoor Rope Climbing' && (target.activeGym === 'Løkka' || target.activeGym === 'Bryn')) {
-                target.activeGym = 'OKS';
-            }
-        } else {
-            target[prop] = value;
-        }
-        
+        target[prop] = value;
         if (prop === 'view') {
             ['log', 'dash'].forEach(v => {
                 const isActive = target.view === v;
                 document.getElementById(`view-${v}`).classList.toggle('active', isActive);
                 document.getElementById(`nav-${v}`).classList.toggle('active', isActive);
             });
-            setTimeout(() => App.centerActivePills(), 50); 
         }
-        
-        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeGrade', 'listMode', 'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 'activeClimbStyles', 'activeHolds'].includes(prop)) {
-            App.renderUI();
-        }
-        
+        App.renderUI();
         if (prop === 'logs') {
             localStorage.setItem('climbLogs', JSON.stringify(value));
             localStorage.setItem('climbingLogs', JSON.stringify(value)); 
-            if (target.view === 'dash') App.renderDashboard();
         }
         return true;
     }
@@ -98,369 +79,76 @@ const SyncManager = {
     trigger: () => {
         const b = document.querySelectorAll('.sync-badge');
         b.forEach(i => i.classList.add('syncing'));
-        if (!navigator.onLine) return setTimeout(() => b.forEach(i => i.classList.remove('syncing')), 1000);
-        
         fetch(API_URL).then(res => res.json()).then(data => {
             const cloudIds = new Set(data.map(d => String(d.id)));
             const pendingLocals = State.logs.filter(l => l && (!cloudIds.has(String(l.id)) || l._synced === false));
-            
             pendingLocals.forEach(localLog => SyncManager.push(localLog));
-
-            const cleanData = data.map(d => ({ ...d, id: String(d.id), _synced: true }));
-            const localOnly = State.logs.filter(l => l && !cloudIds.has(String(l.id)));
-            
-            const uniqueLogs = Array.from(new Map([...cleanData, ...localOnly].map(item => [String(item.id), item])).values());
+            const uniqueLogs = Array.from(new Map([...data.map(d => ({...d, _synced:true})), ...State.logs.filter(l => !cloudIds.has(String(l.id)))].map(item => [String(item.id), item])).values());
             State.logs = uniqueLogs.sort((a,b) => Number(b.id) - Number(a.id));
             b.forEach(i => i.classList.remove('syncing'));
         }).catch(() => b.forEach(i => i.classList.remove('syncing')));
     },
     push: async (payload) => { 
         if (!navigator.onLine) return;
-        try {
-            const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
-            const result = await response.json();
-            
-            if (result.status === 'success' || result.status === 'deleted') {
-                State.logs = State.logs.map(l => String(l.id) === String(payload.id) ? { ...l, _synced: true } : l);
-            }
-        } catch (error) {}
+        await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
     }
 };
 
 const App = {
-    chart: null,
-    init: () => {
-        if (window.Chart) { Chart.defaults.color = '#737373'; Chart.defaults.borderColor = '#262626'; }
-        try { App.renderUI(); } catch (e) { console.error("Render failed", e); }
-        SyncManager.trigger(); 
-        window.addEventListener('online', SyncManager.trigger);
-    },
+    init: () => { App.renderUI(); SyncManager.trigger(); },
     haptic: () => { if (navigator.vibrate) navigator.vibrate(40); },
-    toast: (msg) => {
-        const t = document.getElementById('toast');
-        if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
-    },
-    deleteLog: (id) => { 
-        App.haptic(); 
-        if(confirm('Delete this log?')) { 
-            State.logs = State.logs.filter(l => String(l.id) !== String(id)); 
-            SyncManager.push({ id: String(id), action: "delete" }); 
-            App.toast("Deleted"); 
-        } 
-    },
     setDate: (type, val = null) => {
-        App.haptic();
-        document.querySelectorAll('#datePicker .pill').forEach(p => p.classList.remove('active'));
-        if (type === 'today') { State.activeDate = getLocalISO(); document.getElementById('pill-today').classList.add('active'); }
-        else if (type === 'yesterday') { let yest = new Date(); yest.setDate(yest.getDate()-1); State.activeDate = getLocalISO(yest); document.getElementById('pill-yest').classList.add('active'); }
-        else if (type === 'custom' && val) { 
-            State.activeDate = val; const [, m, d] = val.split('-');
-            const customPill = document.getElementById('pill-custom');
-            customPill.classList.add('active');
-            customPill.innerText = `${monthNames[parseInt(m)-1]} ${parseInt(d)}`;
-        }
+        if (type === 'today') State.activeDate = getLocalISO();
+        else if (type === 'yesterday') { let yest = new Date(); yest.setDate(yest.getDate()-1); State.activeDate = getLocalISO(yest); }
+        else if (type === 'custom' && val) State.activeDate = val;
     },
-    centerActivePills: () => {
-        document.querySelectorAll('.pill-row').forEach(row => {
-            const active = row.querySelector('.pill.active');
-            if (active) {
-                const scrollPos = active.offsetLeft - (row.offsetWidth / 2) + (active.offsetWidth / 2);
-                row.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
-            }
-        });
-    },
-    
-    setRating: (num) => {
-        App.haptic();
-        State.activeRating = State.activeRating === num ? 0 : num; 
-    },
-    toggleGradeFeel: (feel) => {
-        App.haptic();
-        State.activeGradeFeel = State.activeGradeFeel === feel ? '' : feel;
-    },
+    setRating: (num) => { State.activeRating = State.activeRating === num ? 0 : num; },
+    toggleGradeFeel: (feel) => { State.activeGradeFeel = State.activeGradeFeel === feel ? '' : feel; },
     toggleMulti: (category, val) => {
-        if (category === 'style') {
-            State.activeClimbStyles = State.activeClimbStyles.includes(val) ? State.activeClimbStyles.filter(x => x !== val) : [...State.activeClimbStyles, val];
-        } else if (category === 'hold') {
-            State.activeHolds = State.activeHolds.includes(val) ? State.activeHolds.filter(x => x !== val) : [...State.activeHolds, val];
-        } else if (category === 'steepness') {
-            State.activeSteepness = State.activeSteepness.includes(val) ? State.activeSteepness.filter(x => x !== val) : [...State.activeSteepness, val];
-        }
+        if (category === 'style') State.activeClimbStyles = State.activeClimbStyles.includes(val) ? State.activeClimbStyles.filter(x => x !== val) : [...State.activeClimbStyles, val];
+        else if (category === 'hold') State.activeHolds = State.activeHolds.includes(val) ? State.activeHolds.filter(x => x !== val) : [...State.activeHolds, val];
+        else if (category === 'steepness') State.activeSteepness = State.activeSteepness.includes(val) ? State.activeSteepness.filter(x => x !== val) : [...State.activeSteepness, val];
     },
-
     renderUI: () => {
-        const dStr = String(State.discipline || "");
-        const isOut = dStr.includes('Outdoor'), isRope = dStr.includes('Rope'), isBould = dStr.includes('Boulder');
+        const dStr = State.discipline;
         const conf = getScaleConfig(dStr);
-
         const buildPills = (arr, activeVal, clickAction) => arr.map(item => `<div class="pill ${item === activeVal ? 'active' : ''}" onclick="App.haptic(); ${clickAction}='${item}';">${item}</div>`).join('');
 
         document.getElementById('typeSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
-        document.getElementById('dashSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
-        
-        document.getElementById('input-outdoor').className = isOut ? '' : 'hidden';
-        document.getElementById('input-indoor').className = isOut ? 'hidden' : '';
-        
-        document.getElementById('outdoor-name-lbl').innerText = isBould ? 'Boulder Name' : 'Route Name';
-        document.getElementById('input-name').placeholder = isBould ? 'La Marie Rose' : 'Silence';
-        document.getElementById('input-crag').placeholder = isBould ? 'Sector, Crag 🇬🇷' : 'Flatanger';
-
-        const cragInput = document.getElementById('input-crag');
-        if (!cragInput.value && localStorage.getItem('lastCrag')) {
-            cragInput.value = localStorage.getItem('lastCrag');
-        }
-
-        const currentGyms = (dStr === 'Indoor Rope Climbing') ? GYMS.filter(g => g !== 'Løkka' && g !== 'Bryn') : GYMS;
-        document.getElementById('gymPicker').innerHTML = buildPills(currentGyms, State.activeGym, "State.activeGym");
-        
-        document.getElementById('gradePicker').innerHTML = conf.labels.map((g, i) => {
-            const dot = conf.colors[i] ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
-            const isActive = String(g).toLowerCase() === String(State.activeGrade.text).toLowerCase();
-            return `<div class="pill ${isActive ? 'active' : ''}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
-        }).join('');
-
-        const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash'], ['onsight', 'Onsight']] : [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash']];
-        if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = styles[0][0];
-        document.getElementById('styleSelector').innerHTML = styles.map(s => `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="App.haptic(); State.activeStyle='${s[0]}';">${s[1]}</div>`).join('');
+        document.getElementById('gradePicker').innerHTML = conf.labels.map((g, i) => `<div class="pill ${String(g).toLowerCase() === String(State.activeGrade.text).toLowerCase() ? 'active' : ''}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${g}</div>`).join('');
         
         document.getElementById('rpeSelector').innerHTML = buildPills(RPES, State.activeRPE, "State.activeRPE");
         document.getElementById('steepnessSelector').innerHTML = STEEPNESS.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('steepness', '${s}')">${s}</div>`).join('');
         document.getElementById('climbStyleSelector').innerHTML = CLIMB_STYLES.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('style', '${s}')">${s}</div>`).join('');
         document.getElementById('holdsSelector').innerHTML = HOLDS.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('hold', '${h}')">${h}</div>`).join('');
-        
-        document.getElementById('feel-soft').className = `pill ${State.activeGradeFeel === 'Soft' ? 'active' : ''}`;
-        document.getElementById('feel-hard').className = `pill ${State.activeGradeFeel === 'Hard' ? 'active' : ''}`;
-        
+        document.getElementById('timeOfDaySelector').innerHTML = buildPills(TIMES_OF_DAY, State.activeTimeOfDay, "State.activeTimeOfDay");
+
         const stars = document.getElementById('starRating').children;
-        for(let i=0; i<stars.length; i++) {
-            stars[i].className = i < State.activeRating ? 'active' : '';
-        }
-
-        document.getElementById('chartToggle').innerHTML = `<div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='max';">Max Peak</div><div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='avg';">Avg (Top 10)</div>`;
-        
-        document.getElementById('list-toggle-top').className = `chart-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
-        document.getElementById('list-toggle-recent').className = `chart-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
-
-        if (State.view === 'dash') App.renderDashboard();
-        setTimeout(() => App.centerActivePills(), 10);
+        for(let i=0; i<stars.length; i++) stars[i].className = i < State.activeRating ? 'active' : '';
     },
-    
-    renderDashboard: () => {
-        const dStr = String(State.discipline || "");
-        const isRope = dStr.includes('Rope');
-        const conf = getScaleConfig(dStr);
-        const sixtyDaysAgo = new Date(); sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-        
-        const viewLogs = State.logs.filter(l => l && l.type === dStr).map(l => ({ ...l, cleanDate: (l.date ? String(l.date).substring(0,10) : getLocalISO()) }));
-        
-        let displayLogs = (State.listMode === 'top10') 
-            ? [...viewLogs].filter(l => new Date(l.cleanDate) >= sixtyDaysAgo).sort((a,b) => (b.score - a.score) || (Number(b.id) - Number(a.id))).slice(0, 10)
-            : [...viewLogs].sort((a,b) => Number(b.id) - Number(a.id)).slice(0, 10);
-        
-        let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
-            const d = l.cleanDate.split('-'); 
-            const formattedDate = `${d[2]} ${monthNames[parseInt(d[1], 10) - 1]}`;
-            
-            let rawGrade = String(l.grade || "");
-            const isF = rawGrade.includes('⚡') || rawGrade.includes('👁️');
-            
-            const cleanDisplayGrade = getBaseGrade(rawGrade); 
-            const badge = getBadge(l.type, rawGrade);
-            
-            const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
-            const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>` : '';
-            
-            let logName = l.name || "Log";
-            let cragHTML = '';
-            if (logName.includes(' @ ')) {
-                const parts = logName.split(' @ ');
-                logName = parts[0];
-                cragHTML = `<div class="log-crag">📍 ${parts[1]}</div>`;
-            }
-            
-            const subItems = [];
-            if (l.angle) subItems.push(String(l.angle));
-            if (l.style && STYLE_MAP[l.style]) subItems.push(STYLE_MAP[l.style]);
-            
-            const subText = subItems.join(' • ').toUpperCase();
-            const discSpan = subText ? `<div class="log-disc">${subText}</div>` : '';
-            
-            let inlineColor = '';
-            if (l.type === 'Indoor Bouldering') {
-                const idx = GRADES.bouldsIn.indexOf(getBaseGrade(rawGrade));
-                if (idx > -1 && GRADES.bouldsInColors[idx]) inlineColor = `color: ${GRADES.bouldsInColors[idx]} !important;`;
-            }
-            
-            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${logName}${syncWarning}</div>${cragHTML}${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${cleanDisplayGrade}</div>${delBtn}</div>`;
-        }).join('');
-        
-        if (State.listMode === 'top10' && displayLogs.length > 0) {
-            let avgS = Math.round(displayLogs.reduce((s, l) => s + Number(l.score||0), 0) / displayLogs.length);
-            avgS = Math.max(conf.scores[0], avgS);
-            let currIdx = conf.scores.findIndex(s => s > avgS) - 1;
-            if (currIdx < 0) currIdx = conf.scores.length - 1;
-            if (avgS >= conf.scores[conf.scores.length-1]) currIdx = conf.scores.length - 1;
-
-            let pct = 100, nextGrade = "MAX", nextColor = "var(--text-muted)";
-            if (currIdx < conf.scores.length - 1) {
-                const baseS = conf.scores[currIdx], nextS = conf.scores[currIdx + 1];
-                pct = Math.round(((avgS - baseS) / (nextS - baseS)) * 100);
-                nextGrade = conf.labels[currIdx + 1];
-                nextColor = conf.colors[currIdx + 1] || 'var(--primary)';
-            }
-            
-            let barColor = conf.colors[currIdx] || 'var(--primary)';
-            
-            listHTML += `
-            <div class="xp-wrapper">
-                <div class="xp-header">
-                    <span class="xp-title">Working Capacity</span>
-                    <span class="xp-pct" style="color: ${barColor};">${pct}%</span>
-                </div>
-                <div class="xp-bar-cont">
-                    <span class="xp-grade" style="color: ${barColor};">${conf.labels[currIdx]}</span>
-                    <div class="xp-track">
-                        <div class="xp-fill" style="width: ${pct}%; background: ${barColor}; box-shadow: 0 0 12px ${barColor};"></div>
-                    </div>
-                    <span class="xp-grade next" style="color: ${nextColor}; text-shadow: 0 0 10px ${nextColor}40;">${nextGrade}</span>
-                </div>
-            </div>`;
-        }
-        document.getElementById('logList').innerHTML = listHTML;
-
-        const noD = document.getElementById('noDataMsg');
-        const ctxCanvas = document.getElementById('progressChart');
-        if (!window.Chart) { ctxCanvas.style.display = 'none'; noD.style.display = 'block'; noD.innerText = "Charts unavailable without connection."; return; }
-
-        if(App.chart) App.chart.destroy();
-        const ctx = ctxCanvas.getContext('2d');
-        if (viewLogs.length === 0) { ctxCanvas.style.display = 'none'; noD.style.display = 'block'; noD.innerText = "Log climbs to view progression"; return; }
-        ctxCanvas.style.display = 'block'; noD.style.display = 'none';
-
-        const allM = [...new Set(viewLogs.map(l => l.cleanDate.substring(0,7)))].sort();
-        const cD = { rp: [], fl: [], rpG: [], flG: [], avg: [], avgG: [], lbl: [] };
-        
-        const getScoreIndex = (s, isF) => { 
-            let b = s - (isF ? (isRope ? 10 : 17) : 0); 
-            return conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-b) < Math.abs(p-b) ? c : p)); 
-        };
-        
-        allM.forEach(m => {
-            const [y, mo] = m.split('-').map(Number);
-            if (State.chartMode === 'max') {
-                const mL = viewLogs.filter(l => l.cleanDate.substring(0,7) === m && l.score);
-                const rpL = mL.filter(l => !String(l.grade||"").includes('⚡') && !String(l.grade||"").includes('👁️'));
-                const flL = mL.filter(l => String(l.grade||"").includes('⚡') || String(l.grade||"").includes('👁️'));
-                
-                let maxRp = rpL.length ? rpL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
-                let maxFl = flL.length ? flL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
-
-                cD.rp.push(maxRp ? getScoreIndex(maxRp.score, false) : null);
-                cD.rpG.push(maxRp ? maxRp.grade : "None");
-                cD.fl.push(maxFl ? getScoreIndex(maxFl.score, true) : null);
-                cD.flG.push(maxFl ? maxFl.grade : "None");
-            } else {
-                let pM = mo-1, pY = y; if (pM === 0) { pM = 12; pY = y-1; }
-                const pMS = `${pY}-${pM.toString().padStart(2, '0')}`;
-                const wL = viewLogs.filter(l => (l.cleanDate.substring(0,7) === m || l.cleanDate.substring(0,7) === pMS) && l.score).sort((a,b) => b.score - a.score).slice(0, 10);
-                
-                if (wL.length > 0) { 
-                    const avS = Math.round(wL.reduce((s, l) => s + l.score, 0) / wL.length);
-                    const avI = conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-avS) < Math.abs(p-avS) ? c : p)); 
-                    cD.avg.push(avI); cD.avgG.push(conf.labels[avI]); 
-                } else { 
-                    cD.avg.push(null); cD.avgG.push("None"); 
-                }
-            }
-            cD.lbl.push(`${monthNames[mo-1]} '${y.toString().slice(-2)}`);
-        });
-
-        let dSet = [], toolC;
-        if (State.chartMode === 'max') {
-            let g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, 'rgba(16, 185, 129, 0.25)'); g.addColorStop(1, 'transparent');
-            dSet = [{ label: 'Max Redpoint', data: cD.rp, borderColor: '#10b981', backgroundColor: g, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#10b981', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }, { label: 'Flash/Onsight', data: cD.fl, borderColor: '#db2777', backgroundColor: '#db2777', borderDash: [5,5], tension: 0.4, fill: false, pointRadius: 5, pointBackgroundColor: '#db2777', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }];
-            toolC = ctx => ctx.datasetIndex === 0 ? ` Redpoint: ${cD.rpG[ctx.dataIndex]}` : ` Flash: ${cD.flG[ctx.dataIndex]}`;
-        } else {
-            let gA = ctx.createLinearGradient(0, 0, 0, 300); gA.addColorStop(0, 'rgba(59, 130, 246, 0.35)'); gA.addColorStop(1, 'transparent');
-            dSet = [{ label: 'Top 10 Average', data: cD.avg, borderColor: '#3b82f6', backgroundColor: gA, tension: 0.4, fill: true, pointRadius: 6, pointBackgroundColor: '#3b82f6', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }];
-            toolC = ctx => ` Power Avg: ${cD.avgG[ctx.dataIndex]}`;
-        }
-        const aI = [...cD.rp.filter(x=>x!==null), ...cD.fl.filter(x=>x!==null), ...cD.avg.filter(x=>x!==null)];
-        App.chart = new Chart(ctx, { type: 'line', data: { labels: cD.lbl, datasets: dSet }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 10, callbacks: { label: toolC } } }, scales: { y: { min: Math.max(0, Math.min(...aI)-1), max: Math.min(conf.labels.length-1, Math.max(...aI)+1), ticks: { stepSize: 1, callback: v => conf.labels[v] } }, x: { grid: { display: false } } } } });
-    },
-    
     logClimb: () => {
-        App.haptic(); 
+        App.haptic();
         let s = State.activeGrade.score, g = State.activeGrade.text;
+        if(State.activeStyle === 'flash') s += 15;
         
-        if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
-        else if (State.activeStyle === 'onsight') { s += 10; g += " 👁️"; }
-        else if (State.activeStyle === 'quick') { g += " 🚀"; }
-        else if (State.activeStyle === 'project') { g += " 🛠️"; }
-        
-        const outName = document.getElementById('input-name').value.trim();
-        const outCrag = document.getElementById('input-crag').value.trim();
-        
-        if (State.discipline.includes('Outdoor') && outCrag) {
-            localStorage.setItem('lastCrag', outCrag);
+        // AUTO TIME ENGINE
+        let timeOfSession = State.activeTimeOfDay;
+        if (!timeOfSession) {
+            const hr = new Date().getHours();
+            if (hr >= 5 && hr < 12) timeOfSession = 'Morning';
+            else if (hr >= 12 && hr < 17) timeOfSession = 'Afternoon';
+            else timeOfSession = 'Evening';
         }
 
-        const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
-        if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
-        
-        const btn = document.querySelector('.btn-main');
-        btn.disabled = true;
-        btn.classList.add('loading');
-        btn.innerText = 'Saving...';
-        
-        const tagsArr = [
-            ...State.activeSteepness,
-            State.activeStyle,
-            State.activeRPE,
-            State.activeGradeFeel,
-            State.activeRating > 0 ? `${State.activeRating} Star` : '',
-            ...State.activeClimbStyles,
-            ...State.activeHolds
-        ].filter(Boolean); 
-        
-        const compiledTags = tagsArr.join(', ');
-        const steepnessData = State.activeSteepness.join(', ');
-        const notesData = document.getElementById('input-notes').value.trim();
-
+        const tagsArr = [...State.activeSteepness, State.activeStyle, State.activeRPE, State.activeGradeFeel, State.activeRating > 0 ? `${State.activeRating} Star` : '', ...State.activeClimbStyles, ...State.activeHolds, timeOfSession].filter(Boolean);
         const l = { 
-            id: String(Date.now()), date: State.activeDate, type: State.discipline, 
-            grade: g, score: s, name: n, angle: steepnessData, style: State.activeStyle, 
-            tags: compiledTags, notes: notesData, action: 'add', _synced: false 
+            id: String(Date.now()), date: State.activeDate, type: State.discipline, grade: g, score: s, 
+            name: State.discipline.includes('Outdoor') ? document.getElementById('input-name').value : State.activeGym, 
+            angle: State.activeSteepness.join(', '), tags: tagsArr.join(', '), notes: document.getElementById('input-notes').value, 
+            _synced: false 
         };
-        
-        State.logs = [...State.logs, l]; 
-        SyncManager.push(l); 
-        
-        if (State.discipline.includes('Outdoor')) { 
-            document.getElementById('input-name').value = ''; 
-        }
-        
-        document.getElementById('input-notes').value = '';
-        State.activeRating = 0;
-        State.activeGradeFeel = '';
-        State.activeClimbStyles = [];
-        State.activeHolds = [];
-        State.activeSteepness = [];
-        
-        setTimeout(() => {
-            btn.classList.remove('loading');
-            btn.classList.add('success');
-            
-            btn.innerHTML = `<svg class="checkmark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Saved!`;
-            
-            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
-            
-            setTimeout(() => {
-                btn.classList.remove('success');
-                btn.innerHTML = 'Save to Cloud';
-                btn.disabled = false;
-            }, 2000);
-        }, 400); 
+        State.logs = [...State.logs, l]; SyncManager.push(l);
+        State.activeRating = 0; State.activeTimeOfDay = ''; // Reset
     }
 };
 App.init();
