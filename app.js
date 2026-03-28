@@ -1,493 +1,220 @@
-// Register the Service Worker for Offline PWA support
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err)));
-}
-
-// Hardcoded Master Google Script URL
-const API_URL = "https://script.google.com/macros/s/AKfycby0fW1C830QNXESDs6B1NFB9_gLRqOwOycCly63i4jDxlU7L8_W4Du4w-4hhGE4Pak2/exec";
-
-const GRADES = {
-    ropes: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"],
-    ropeScores: [567,583,600,617,633,650,667,683,700,717,733,750],
-    bouldsIn: ["4","5","6A","6B","6C","7A","7B"],
-    bouldsInScores: [400,500,600,633,667,700,733],
-    bouldsInColors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"],
-    bouldsOut: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"],
-    bouldsOutScores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767]
-};
-
-const GYMS = ["OKS", "Torshov", "Løkka", "Bryn", "Gneiss", "Other"];
-const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const DISCIPLINES = ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'];
-const DISC_LABELS = ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder'];
-const STYLE_MAP = { 'project': 'Project', 'quick': 'Quick Send', 'flash': 'Flash', 'onsight': 'Onsight' };
-
-// V15 PRO BLUEPRINT CONSTANTS
-const STEEPNESS = ['Slab', 'Vertical', 'Overhang', 'Roof'];
-const CLIMB_STYLES = ['Endurance', 'Cruxy', 'Technical', 'Athletic'];
-const HOLDS = ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs'];
-const RPES = ['Breezy', 'Solid', 'Limit'];
-
-// --- HELPER FUNCTIONS ---
-const getBaseGrade = (g) => String(g || "").replace(/[⚡👁️🚀🛠️\s]/g, '');
-const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
-
-const getScaleConfig = (disc) => {
-    if (disc === 'Indoor Bouldering') return { labels: GRADES.bouldsIn, scores: GRADES.bouldsInScores, colors: GRADES.bouldsInColors };
-    if (disc === 'Outdoor Bouldering') return { labels: GRADES.bouldsOut, scores: GRADES.bouldsOutScores, colors: [] };
-    return { labels: GRADES.ropes, scores: GRADES.ropeScores, colors: [] };
-};
-
-const getBadge = (type, gradeText) => {
-    if (type !== 'Indoor Bouldering') return '';
-    const idx = GRADES.bouldsIn.indexOf(getBaseGrade(gradeText));
-    return idx > -1 ? `<span class="boulder-dot" style="background:${GRADES.bouldsInColors[idx]};"></span>` : '';
-};
-
-// --- SELF-HEALING MEMORY ---
-let safeLogs = [];
-try {
-    const rawLogs = localStorage.getItem('climbLogs');
-    if (rawLogs) safeLogs = JSON.parse(rawLogs);
-    if (!Array.isArray(safeLogs)) safeLogs = [];
-} catch (e) {
-    safeLogs = [];
-    localStorage.removeItem('climbLogs');
-}
-
-const State = new Proxy({
-    view: 'log', discipline: 'Indoor Rope Climbing', activeGrade: { text: '6b', score: 633 },
-    activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
-    // V15 Pro Blueprint States (Steepness is now an array)
-    activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
-    logs: safeLogs
-}, {
-    set(target, prop, value) {
-        if (prop === 'discipline' && target.discipline !== value) {
-            target.discipline = value;
-            const conf = getScaleConfig(value);
-            if (!conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
-                target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
-            }
-            if (value === 'Indoor Rope Climbing' && (target.activeGym === 'Løkka' || target.activeGym === 'Bryn')) {
-                target.activeGym = 'OKS';
-            }
-        } else {
-            target[prop] = value;
-        }
-        
-        if (prop === 'view') {
-            ['log', 'dash'].forEach(v => {
-                const isActive = target.view === v;
-                document.getElementById(`view-${v}`).classList.toggle('active', isActive);
-                document.getElementById(`nav-${v}`).classList.toggle('active', isActive);
-            });
-            setTimeout(() => App.centerActivePills(), 50); 
-        }
-        
-        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeGrade', 'listMode', 'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 'activeClimbStyles', 'activeHolds'].includes(prop)) {
-            App.renderUI();
-        }
-        
-        if (prop === 'logs') {
-            localStorage.setItem('climbLogs', JSON.stringify(value));
-            localStorage.setItem('climbingLogs', JSON.stringify(value)); // Syncs to Nerd Dashboard
-            if (target.view === 'dash') App.renderDashboard();
-        }
-        return true;
-    }
-});
-
-const SyncManager = {
-    trigger: () => {
-        const b = document.querySelectorAll('.sync-badge');
-        b.forEach(i => i.classList.add('syncing'));
-        if (!navigator.onLine) return setTimeout(() => b.forEach(i => i.classList.remove('syncing')), 1000);
-        
-        fetch(API_URL).then(res => res.json()).then(data => {
-            const cloudIds = new Set(data.map(d => String(d.id)));
-            const pendingLocals = State.logs.filter(l => l && (!cloudIds.has(String(l.id)) || l._synced === false));
-            
-            pendingLocals.forEach(localLog => SyncManager.push(localLog));
-
-            const cleanData = data.map(d => ({ ...d, id: String(d.id), _synced: true }));
-            const localOnly = State.logs.filter(l => l && !cloudIds.has(String(l.id)));
-            
-            const uniqueLogs = Array.from(new Map([...cleanData, ...localOnly].map(item => [String(item.id), item])).values());
-            State.logs = uniqueLogs.sort((a,b) => Number(b.id) - Number(a.id));
-            b.forEach(i => i.classList.remove('syncing'));
-        }).catch(() => b.forEach(i => i.classList.remove('syncing')));
-    },
-    push: async (payload) => { 
-        if (!navigator.onLine) return;
-        try {
-            const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
-            const result = await response.json();
-            
-            if (result.status === 'success' || result.status === 'deleted') {
-                State.logs = State.logs.map(l => String(l.id) === String(payload.id) ? { ...l, _synced: true } : l);
-            }
-        } catch (error) {}
-    }
-};
-
-const App = {
-    chart: null,
-    init: () => {
-        if (window.Chart) { Chart.defaults.color = '#737373'; Chart.defaults.borderColor = '#262626'; }
-        try { App.renderUI(); } catch (e) { console.error("Render failed", e); }
-        SyncManager.trigger(); 
-        window.addEventListener('online', SyncManager.trigger);
-    },
-    haptic: () => { if (navigator.vibrate) navigator.vibrate(40); },
-    toast: (msg) => {
-        const t = document.getElementById('toast');
-        if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
-    },
-    deleteLog: (id) => { 
-        App.haptic(); 
-        if(confirm('Delete this log?')) { 
-            State.logs = State.logs.filter(l => String(l.id) !== String(id)); 
-            SyncManager.push({ id: String(id), action: "delete" }); 
-            App.toast("Deleted"); 
-        } 
-    },
-    setDate: (type, val = null) => {
-        App.haptic();
-        document.querySelectorAll('#datePicker .pill').forEach(p => p.classList.remove('active'));
-        if (type === 'today') { State.activeDate = getLocalISO(); document.getElementById('pill-today').classList.add('active'); }
-        else if (type === 'yesterday') { let yest = new Date(); yest.setDate(yest.getDate()-1); State.activeDate = getLocalISO(yest); document.getElementById('pill-yest').classList.add('active'); }
-        else if (type === 'custom' && val) { 
-            State.activeDate = val; const [, m, d] = val.split('-');
-            const customPill = document.getElementById('pill-custom');
-            customPill.classList.add('active');
-            customPill.innerText = `${monthNames[parseInt(m)-1]} ${parseInt(d)}`;
-        }
-    },
-    centerActivePills: () => {
-        document.querySelectorAll('.pill-row').forEach(row => {
-            const active = row.querySelector('.pill.active');
-            if (active) {
-                const scrollPos = active.offsetLeft - (row.offsetWidth / 2) + (active.offsetWidth / 2);
-                row.scrollTo({ left: Math.max(0, scrollPos), behavior: 'smooth' });
-            }
-        });
-    },
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Send Log</title>
+    <link rel="manifest" href="manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     
-    // V15 State Handlers
-    setRating: (num) => {
-        App.haptic();
-        State.activeRating = State.activeRating === num ? 0 : num; // Toggle off if tapped again
-    },
-    toggleGradeFeel: (feel) => {
-        App.haptic();
-        State.activeGradeFeel = State.activeGradeFeel === feel ? '' : feel;
-    },
-    toggleMulti: (category, val) => {
-        if (category === 'style') {
-            State.activeClimbStyles = State.activeClimbStyles.includes(val) ? State.activeClimbStyles.filter(x => x !== val) : [...State.activeClimbStyles, val];
-        } else if (category === 'hold') {
-            State.activeHolds = State.activeHolds.includes(val) ? State.activeHolds.filter(x => x !== val) : [...State.activeHolds, val];
-        } else if (category === 'steepness') {
-            State.activeSteepness = State.activeSteepness.includes(val) ? State.activeSteepness.filter(x => x !== val) : [...State.activeSteepness, val];
-        }
-    },
-
-    renderUI: () => {
-        const dStr = String(State.discipline || "");
-        const isOut = dStr.includes('Outdoor'), isRope = dStr.includes('Rope'), isBould = dStr.includes('Boulder');
-        const conf = getScaleConfig(dStr);
-
-        const buildPills = (arr, activeVal, clickAction) => arr.map(item => `<div class="pill ${item === activeVal ? 'active' : ''}" onclick="App.haptic(); ${clickAction}='${item}';">${item}</div>`).join('');
-
-        document.getElementById('typeSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
-        document.getElementById('dashSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
-        
-        document.getElementById('input-outdoor').className = isOut ? '' : 'hidden';
-        document.getElementById('input-indoor').className = isOut ? 'hidden' : '';
-        
-        document.getElementById('outdoor-name-lbl').innerText = isBould ? 'Boulder Name' : 'Route Name';
-        document.getElementById('input-name').placeholder = isBould ? 'La Marie Rose' : 'Silence';
-        document.getElementById('input-crag').placeholder = isBould ? 'Sector, Crag 🇬🇷' : 'Flatanger';
-
-        const cragInput = document.getElementById('input-crag');
-        if (!cragInput.value && localStorage.getItem('lastCrag')) {
-            cragInput.value = localStorage.getItem('lastCrag');
-        }
-
-        const currentGyms = (dStr === 'Indoor Rope Climbing') ? GYMS.filter(g => g !== 'Løkka' && g !== 'Bryn') : GYMS;
-        document.getElementById('gymPicker').innerHTML = buildPills(currentGyms, State.activeGym, "State.activeGym");
-        
-        document.getElementById('gradePicker').innerHTML = conf.labels.map((g, i) => {
-            const dot = conf.colors[i] ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
-            const isActive = String(g).toLowerCase() === String(State.activeGrade.text).toLowerCase();
-            return `<div class="pill ${isActive ? 'active' : ''}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
-        }).join('');
-
-        const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash'], ['onsight', 'Onsight']] : [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash']];
-        if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = styles[0][0];
-        document.getElementById('styleSelector').innerHTML = styles.map(s => `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="App.haptic(); State.activeStyle='${s[0]}';">${s[1]}</div>`).join('');
-        
-        // V15 PRO BLUEPRINT RENDERING
-        document.getElementById('rpeSelector').innerHTML = buildPills(RPES, State.activeRPE, "State.activeRPE");
-        // Steepness is now rendered as a multi-select array
-        document.getElementById('steepnessSelector').innerHTML = STEEPNESS.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('steepness', '${s}')">${s}</div>`).join('');
-        document.getElementById('climbStyleSelector').innerHTML = CLIMB_STYLES.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('style', '${s}')">${s}</div>`).join('');
-        document.getElementById('holdsSelector').innerHTML = HOLDS.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" onclick="App.haptic(); App.toggleMulti('hold', '${h}')">${h}</div>`).join('');
-        
-        document.getElementById('feel-soft').className = `pill ${State.activeGradeFeel === 'Soft' ? 'active' : ''}`;
-        document.getElementById('feel-hard').className = `pill ${State.activeGradeFeel === 'Hard' ? 'active' : ''}`;
-        
-        const stars = document.getElementById('starRating').children;
-        for(let i=0; i<stars.length; i++) {
-            stars[i].className = i < State.activeRating ? 'active' : '';
-        }
-
-        document.getElementById('chartToggle').innerHTML = `<div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='max';">Max Peak</div><div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='avg';">Avg (Top 10)</div>`;
-        
-        document.getElementById('list-toggle-top').className = `chart-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
-        document.getElementById('list-toggle-recent').className = `chart-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
-
-        if (State.view === 'dash') App.renderDashboard();
-        setTimeout(() => App.centerActivePills(), 10);
-    },
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230a0a0a%22/><text y=%2250%22 x=%2250%22 font-size=%2255%22 text-anchor=%22middle%22 dominant-baseline=%22central%22>⛰️</text></svg>">
     
-    renderDashboard: () => {
-        const dStr = String(State.discipline || "");
-        const isRope = dStr.includes('Rope');
-        const conf = getScaleConfig(dStr);
-        const sixtyDaysAgo = new Date(); sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-        
-        const viewLogs = State.logs.filter(l => l && l.type === dStr).map(l => ({ ...l, cleanDate: (l.date ? String(l.date).substring(0,10) : getLocalISO()) }));
-        
-        let displayLogs = (State.listMode === 'top10') 
-            ? [...viewLogs].filter(l => new Date(l.cleanDate) >= sixtyDaysAgo).sort((a,b) => (b.score - a.score) || (Number(b.id) - Number(a.id))).slice(0, 10)
-            : [...viewLogs].sort((a,b) => Number(b.id) - Number(a.id)).slice(0, 10);
-        
-        let listHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
-            const d = l.cleanDate.split('-'); 
-            const formattedDate = `${d[2]} ${monthNames[parseInt(d[1], 10) - 1]}`;
-            
-            let rawGrade = String(l.grade || "");
-            const isF = rawGrade.includes('⚡') || rawGrade.includes('👁️');
-            
-            const cleanDisplayGrade = getBaseGrade(rawGrade); 
-            const badge = getBadge(l.type, rawGrade);
-            
-            const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
-            const delBtn = State.listMode === 'recent' ? `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>` : '';
-            
-            let logName = l.name || "Log";
-            let cragHTML = '';
-            if (logName.includes(' @ ')) {
-                const parts = logName.split(' @ ');
-                logName = parts[0];
-                cragHTML = `<div class="log-crag">📍 ${parts[1]}</div>`;
-            }
-            
-            const subItems = [];
-            if (l.angle) subItems.push(String(l.angle));
-            if (l.style && STYLE_MAP[l.style]) subItems.push(STYLE_MAP[l.style]);
-            
-            const subText = subItems.join(' • ').toUpperCase();
-            const discSpan = subText ? `<div class="log-disc">${subText}</div>` : '';
-            
-            let inlineColor = '';
-            if (l.type === 'Indoor Bouldering') {
-                const idx = GRADES.bouldsIn.indexOf(getBaseGrade(rawGrade));
-                if (idx > -1 && GRADES.bouldsInColors[idx]) inlineColor = `color: ${GRADES.bouldsInColors[idx]} !important;`;
-            }
-            
-            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${logName}${syncWarning}</div>${cragHTML}${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${cleanDisplayGrade}</div>${delBtn}</div>`;
-        }).join('');
-        
-        if (State.listMode === 'top10' && displayLogs.length > 0) {
-            let avgS = Math.round(displayLogs.reduce((s, l) => s + Number(l.score||0), 0) / displayLogs.length);
-            avgS = Math.max(conf.scores[0], avgS);
-            let currIdx = conf.scores.findIndex(s => s > avgS) - 1;
-            if (currIdx < 0) currIdx = conf.scores.length - 1;
-            if (avgS >= conf.scores[conf.scores.length-1]) currIdx = conf.scores.length - 1;
+    <style>
+        :root { 
+            --primary: #10b981; --primary-fade: rgba(16,185,129,0.15); 
+            --flash: #db2777; --flash-fade: rgba(219,39,119,0.15);
+            --dark: #0a0a0a; --card-bg: #171717; --border: #262626; 
+            --text: #f3f4f6; --text-muted: #737373; --danger: #ef4444;
+            --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --radius: 16px;
+        }
 
-            let pct = 100, nextGrade = "MAX", nextColor = "var(--text-muted)";
-            if (currIdx < conf.scores.length - 1) {
-                const baseS = conf.scores[currIdx], nextS = conf.scores[currIdx + 1];
-                pct = Math.round(((avgS - baseS) / (nextS - baseS)) * 100);
-                nextGrade = conf.labels[currIdx + 1];
-                nextColor = conf.colors[currIdx + 1] || 'var(--primary)';
-            }
-            
-            let barColor = conf.colors[currIdx] || 'var(--primary)';
-            
-            listHTML += `
-            <div class="xp-wrapper">
-                <div class="xp-header">
-                    <span class="xp-title">Working Capacity</span>
-                    <span class="xp-pct" style="color: ${barColor};">${pct}%</span>
-                </div>
-                <div class="xp-bar-cont">
-                    <span class="xp-grade" style="color: ${barColor};">${conf.labels[currIdx]}</span>
-                    <div class="xp-track">
-                        <div class="xp-fill" style="width: ${pct}%; background: ${barColor}; box-shadow: 0 0 12px ${barColor};"></div>
+        body { font-family: 'Inter', sans-serif; background: var(--dark); color: var(--text); margin: 0; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+        .container { max-width: 850px; margin: 0 auto; padding: var(--space-lg) var(--space-lg) 120px var(--space-lg); }
+        .card { background: var(--card-bg); padding: var(--space-lg); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: var(--space-lg); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
+        h1 { text-align: center; font-weight: 700; font-size: 1.5rem; margin: 10px 0 var(--space-lg) 0; letter-spacing: -0.5px; }
+        h2 { font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 var(--space-md) 0; color: var(--text); display: flex; justify-content: space-between; align-items: center; }
+
+        .view { display: none; animation: fadeIn 0.3s ease; }
+        .view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .bottom-nav { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(23, 23, 23, 0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; gap: 10px; padding: 8px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .nav-btn { background: transparent; color: var(--text-muted); border: none; padding: 12px 24px; border-radius: 20px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.3s; }
+        .nav-btn.active { background: var(--primary); color: #000; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
+
+        label { font-weight: 600; font-size: 0.75rem; color: var(--text-muted); display: block; margin: 15px 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+        .sub-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; margin-top: 12px; }
+        
+        input[type="text"], input[type="date"], textarea { width: 100%; padding: 14px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; background: var(--dark); color: var(--text); outline: none; transition: 0.2s; font-family: 'Inter', sans-serif; }
+        input:focus, textarea:focus { border-color: var(--primary); }
+        textarea { resize: vertical; min-height: 80px; }
+        
+        .btn-main { background: var(--primary); color: #000; border: none; padding: 16px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.05rem; cursor: pointer; margin-top: 25px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-main:active { transform: scale(0.97); }
+        .btn-main:disabled { cursor: not-allowed; transform: none; }
+        .btn-main.loading { background: var(--border); color: var(--text-muted); }
+        .btn-main.loading::after { content: ""; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent); animation: sweep 1.2s infinite; }
+        .btn-main.success { background: var(--primary-fade); color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary), 0 0 15px rgba(16, 185, 129, 0.2); }
+        @keyframes sweep { to { left: 200%; } }
+
+        .dash-btn { background: #1e1e1e; border: 1px solid var(--primary); color: var(--primary); box-shadow: 0 4px 15px rgba(16,185,129,0.1); margin-top: 0; margin-bottom: 25px; }
+
+        .checkmark-icon { width: 22px; height: 22px; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes popIn { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        .pill-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; scroll-snap-type: x mandatory; scrollbar-width: none; scroll-behavior: smooth; margin-bottom: 15px; }
+        .pill-row::-webkit-scrollbar { display: none; }
+        .pill { flex: 0 0 auto; padding: 12px 20px; background: var(--dark); border: 1px solid var(--border); border-radius: 12px; font-weight: 700; font-size: 0.95rem; color: var(--text-muted); scroll-snap-align: center; cursor: pointer; transition: 0.2s; user-select: none; position: relative; }
+        .pill.active { background: var(--primary-fade); color: var(--primary); border-color: var(--primary); }
+
+        .advanced-toggle { color: var(--primary); font-size: 0.85rem; font-weight: 700; text-align: center; margin: 25px 0 15px 0; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; transition: 0.2s; }
+        .advanced-toggle:active { background: rgba(255,255,255,0.05); }
+
+        .star-rating { display: flex; gap: 8px; font-size: 2.2rem; color: var(--border); cursor: pointer; justify-content: flex-start; margin-bottom: 15px; }
+        .star-rating span { transition: color 0.2s; user-select: none; }
+        .star-rating span.active { color: #eab308; text-shadow: 0 0 10px rgba(234, 179, 8, 0.4); }
+
+        .boulder-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; border: 1px solid rgba(255,255,255,0.2); vertical-align: middle; position: relative; top: -1px; }
+
+        .sync-badge { position: absolute; top: 20px; right: 20px; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); opacity: 0; transition: 0.3s; }
+        .sync-badge.syncing { opacity: 1; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.5); opacity: 1; } }
+
+        .toast { position: fixed; top: 20px; left: 50%; transform: translate(-50%, -20px); opacity: 0; background: rgba(38,38,38,0.9); backdrop-filter: blur(10px); color: #fff; padding: 12px 24px; border-radius: 30px; font-weight: 600; font-size: 0.9rem; border: 1px solid var(--border); transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 2000; pointer-events: none; }
+        .toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+        .log-list { display: flex; flex-direction: column; gap: 8px; }
+        .log-item { display: flex; align-items: center; background: var(--dark); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); }
+        .log-date { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); width: 55px; flex-shrink: 0; }
+        .log-info { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0 10px; }
+        .log-name { font-weight: 600; font-size: 0.95rem; color: var(--text); line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .log-crag { font-size: 0.75rem; color: #a3a3a3; font-weight: 600; margin-top: 2px; }
+        .log-disc { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; margin-top: 2px; }
+        .log-grade { font-size: 1.1rem; font-weight: 700; text-align: right; }
+        .log-grade.rp { color: var(--primary); }
+        .log-grade.fl { color: var(--flash); }
+
+        .log-del { background: transparent; border: none; color: var(--danger); font-size: 1.5rem; line-height: 1; opacity: 0.3; cursor: pointer; transition: 0.2s; margin-left: 10px; padding: 0 5px; }
+        .log-del:active { opacity: 1; transform: scale(0.8); }
+
+        .xp-wrapper { margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255,255,255,0.1); }
+        .xp-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+        .xp-title { font-size: 0.85rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+        .xp-pct { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.5px; }
+        .xp-bar-cont { display: flex; align-items: center; gap: 12px; }
+        .xp-grade { font-size: 1.15rem; font-weight: 800; color: var(--text); width: 42px; text-align: center; flex-shrink: 0; }
+        .xp-grade.next { color: #525252; transition: 0.3s; }
+        .xp-track { flex: 1; height: 12px; background: rgba(0,0,0,0.5); border-radius: 12px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.05); position: relative; overflow: hidden; }
+        .xp-fill { height: 100%; border-radius: 12px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        .chart-toggle-row { display: flex; justify-content: center; gap: 6px; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 6px; border-radius: 12px; border: 1px solid var(--border); width: fit-content; margin: 0 auto; }
+        .chart-toggle-btn { padding: 6px 14px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
+        .chart-toggle-btn.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.4); border: 1px solid rgba(16,185,129,0.2); }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+
+        .flex { display: flex; gap: 10px; } .flex > div { flex: 1; } .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <nav class="bottom-nav">
+        <button class="nav-btn active" id="nav-log" onclick="App.haptic(); State.view='log'">✍️ Log</button>
+        <button class="nav-btn" id="nav-dash" onclick="App.haptic(); State.view='dash'">📊 Dashboard</button>
+    </nav>
+
+    <div id="toast" class="toast">Action Successful</div>
+
+    <div class="container">
+        <div id="view-log" class="view active">
+            <h1>Send Log</h1>
+            <div class="card">
+                <div class="sync-badge"></div>
+                <div class="pill-row" id="typeSelector"></div>
+                <div id="climbForm">
+                    <label>Date</label>
+                    <div class="pill-row" id="datePicker">
+                        <div class="pill active" id="pill-today" onclick="App.setDate('today')">Today</div>
+                        <div class="pill" id="pill-yest" onclick="App.setDate('yesterday')">Yesterday</div>
+                        <div class="pill" id="pill-custom" onclick="document.getElementById('native-date').showPicker()">Custom Date</div>
                     </div>
-                    <span class="xp-grade next" style="color: ${nextColor}; text-shadow: 0 0 10px ${nextColor}40;">${nextGrade}</span>
+                    <input type="date" id="native-date" style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none;" onchange="App.setDate('custom', this.value)">
+                    <div id="input-indoor">
+                        <label>Select Gym</label>
+                        <div id="gymPicker" class="pill-row"></div>
+                    </div>
+                    <div id="input-outdoor" class="hidden">
+                        <div class="flex">
+                            <div><label id="outdoor-name-lbl">Route Name</label><input type="text" id="input-name" placeholder="Silence"></div>
+                            <div><label>Crag</label><input type="text" id="input-crag" placeholder="Flatanger"></div>
+                        </div>
+                    </div>
+                    
+                    <label>Grade</label>
+                    <div id="gradePicker" class="pill-row"></div>
+
+                    <label>Style of Ascent</label>
+                    <div class="pill-row" id="styleSelector"></div>
+                    
+                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? '- Hide Details' : '+ Add Details (Optional)'; App.haptic();">+ Add Details (Optional)</div>
+                    
+                    <div id="advanced-content" class="hidden">
+                        
+                        <label>1. Experience</label>
+                        <div class="sub-label">My Effort</div>
+                        <div class="pill-row" id="rpeSelector"></div>
+                        
+                        <div class="sub-label">The Grade</div>
+                        <div class="pill-row" id="gradeFeelSelector">
+                            <div class="pill" id="feel-soft" onclick="App.toggleGradeFeel('Soft')">Soft</div>
+                            <div class="pill" id="feel-hard" onclick="App.toggleGradeFeel('Hard')">Hard</div>
+                        </div>
+                        
+                        <div class="sub-label">Route Rating</div>
+                        <div class="star-rating" id="starRating">
+                            <span onclick="App.setRating(1)">★</span>
+                            <span onclick="App.setRating(2)">★</span>
+                            <span onclick="App.setRating(3)">★</span>
+                            <span onclick="App.setRating(4)">★</span>
+                            <span onclick="App.setRating(5)">★</span>
+                        </div>
+
+                        <label>2. Steepness</label>
+                        <div class="pill-row" id="steepnessSelector"></div>
+
+                        <label>3. Climbing Style</label>
+                        <div class="pill-row" id="climbStyleSelector"></div>
+
+                        <label>4. Hold Types</label>
+                        <div class="pill-row" id="holdsSelector"></div>
+
+                        <label>5. Notes</label>
+                        <textarea id="input-notes" placeholder="beta and headspace..."></textarea>
+
+                    </div>
+                    
+                    <button class="btn-main" onclick="App.logClimb()">Save to Cloud</button>
                 </div>
-            </div>`;
-        }
-        document.getElementById('logList').innerHTML = listHTML;
+            </div>
+        </div>
 
-        const noD = document.getElementById('noDataMsg');
-        const ctxCanvas = document.getElementById('progressChart');
-        if (!window.Chart) { ctxCanvas.style.display = 'none'; noD.style.display = 'block'; noD.innerText = "Charts unavailable without connection."; return; }
-
-        if(App.chart) App.chart.destroy();
-        const ctx = ctxCanvas.getContext('2d');
-        if (viewLogs.length === 0) { ctxCanvas.style.display = 'none'; noD.style.display = 'block'; noD.innerText = "Log climbs to view progression"; document.getElementById('pyramidCont').innerHTML = ''; return; }
-        ctxCanvas.style.display = 'block'; noD.style.display = 'none';
-
-        const allM = [...new Set(viewLogs.map(l => l.cleanDate.substring(0,7)))].sort();
-        const cD = { rp: [], fl: [], rpG: [], flG: [], avg: [], avgG: [], lbl: [] };
-        
-        const getScoreIndex = (s, isF) => { 
-            let b = s - (isF ? (isRope ? 10 : 17) : 0); 
-            return conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-b) < Math.abs(p-b) ? c : p)); 
-        };
-        
-        allM.forEach(m => {
-            const [y, mo] = m.split('-').map(Number);
-            if (State.chartMode === 'max') {
-                const mL = viewLogs.filter(l => l.cleanDate.substring(0,7) === m && l.score);
-                const rpL = mL.filter(l => !String(l.grade||"").includes('⚡') && !String(l.grade||"").includes('👁️'));
-                const flL = mL.filter(l => String(l.grade||"").includes('⚡') || String(l.grade||"").includes('👁️'));
+        <div id="view-dash" class="view">
+            <h1>Dashboard</h1>
+            <div class="card">
+                <button class="btn-main dash-btn" onclick="window.location.href='dashboard.html'">🧠 Open Nerd Dashboard</button>
                 
-                let maxRp = rpL.length ? rpL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
-                let maxFl = flL.length ? flL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
-
-                cD.rp.push(maxRp ? getScoreIndex(maxRp.score, false) : null);
-                cD.rpG.push(maxRp ? maxRp.grade : "None");
-                cD.fl.push(maxFl ? getScoreIndex(maxFl.score, true) : null);
-                cD.flG.push(maxFl ? maxFl.grade : "None");
-            } else {
-                let pM = mo-1, pY = y; if (pM === 0) { pM = 12; pY = y-1; }
-                const pMS = `${pY}-${pM.toString().padStart(2, '0')}`;
-                const wL = viewLogs.filter(l => (l.cleanDate.substring(0,7) === m || l.cleanDate.substring(0,7) === pMS) && l.score).sort((a,b) => b.score - a.score).slice(0, 10);
-                
-                if (wL.length > 0) { 
-                    const avS = Math.round(wL.reduce((s, l) => s + l.score, 0) / wL.length);
-                    const avI = conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-avS) < Math.abs(p-avS) ? c : p)); 
-                    cD.avg.push(avI); cD.avgG.push(conf.labels[avI]); 
-                } else { 
-                    cD.avg.push(null); cD.avgG.push("None"); 
-                }
-            }
-            cD.lbl.push(`${monthNames[mo-1]} '${y.toString().slice(-2)}`);
-        });
-
-        let dSet = [], toolC;
-        if (State.chartMode === 'max') {
-            let g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, 'rgba(16, 185, 129, 0.25)'); g.addColorStop(1, 'transparent');
-            dSet = [{ label: 'Max Redpoint', data: cD.rp, borderColor: '#10b981', backgroundColor: g, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#10b981', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }, { label: 'Flash/Onsight', data: cD.fl, borderColor: '#db2777', backgroundColor: '#db2777', borderDash: [5,5], tension: 0.4, fill: false, pointRadius: 5, pointBackgroundColor: '#db2777', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }];
-            toolC = ctx => ctx.datasetIndex === 0 ? ` Redpoint: ${cD.rpG[ctx.dataIndex]}` : ` Flash: ${cD.flG[ctx.dataIndex]}`;
-        } else {
-            let gA = ctx.createLinearGradient(0, 0, 0, 300); gA.addColorStop(0, 'rgba(59, 130, 246, 0.35)'); gA.addColorStop(1, 'transparent');
-            dSet = [{ label: 'Top 10 Average', data: cD.avg, borderColor: '#3b82f6', backgroundColor: gA, tension: 0.4, fill: true, pointRadius: 6, pointBackgroundColor: '#3b82f6', pointBorderColor: '#000', pointBorderWidth: 2, spanGaps: true }];
-            toolC = ctx => ` Power Avg: ${cD.avgG[ctx.dataIndex]}`;
-        }
-        const aI = [...cD.rp.filter(x=>x!==null), ...cD.fl.filter(x=>x!==null), ...cD.avg.filter(x=>x!==null)];
-        App.chart = new Chart(ctx, { type: 'line', data: { labels: cD.lbl, datasets: dSet }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 10, callbacks: { label: toolC } } }, scales: { y: { min: Math.max(0, Math.min(...aI)-1), max: Math.min(conf.labels.length-1, Math.max(...aI)+1), ticks: { stepSize: 1, callback: v => conf.labels[v] } }, x: { grid: { display: false } } } } });
-        
-        const gG = {}; let mT = 0;
-        const last60 = viewLogs.filter(l => new Date(l.cleanDate) >= sixtyDaysAgo);
-        last60.forEach(l => {
-            const bG = getBaseGrade(l.grade); 
-            const isF = String(l.grade||"").includes('⚡') || String(l.grade||"").includes('👁️');
-            if (!gG[bG]) gG[bG] = { rp: 0, fl: 0 };
-            if (isF) gG[bG].fl++; else gG[bG].rp++;
-            const t = gG[bG].rp + gG[bG].fl; if (t > mT) mT = t;
-        });
-        
-        document.getElementById('pyramidCont').innerHTML = Object.keys(gG).sort((a,b) => conf.labels.indexOf(b) - conf.labels.indexOf(a)).map(b => {
-            const g = gG[b]; const fP = (g.fl/mT)*100, rP = (g.rp/mT)*100;
-            const badge = getBadge(dStr, b);
-            let seg = ''; if (g.fl > 0) seg += `<div class="pyramid-seg fl" style="width: ${fP}%;">⚡ ${g.fl}</div>`; if (g.rp > 0) seg += `<div class="pyramid-seg rp" style="width: ${rP}%;">${g.rp}</div>`;
-            return `<div class="pyramid-row"><div class="pyramid-grade">${badge}${b}</div><div class="pyramid-track">${seg}</div></div>`;
-        }).join('') || '<div style="color:var(--text-muted); text-align:center; padding:10px;">No sends in the last 60 days.</div>';
-    },
+                <div class="sync-badge"></div>
+                <div class="pill-row" id="dashSelector" style="margin-bottom: 25px;"></div>
+                <div class="chart-toggle-row" id="chartToggle"></div>
+                <div class="chart-container">
+                    <div id="noDataMsg" style="color: var(--text-muted); font-style: italic; text-align: center; padding-top: 40px;">Log climbs to view progression</div>
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h2>
+                    Logs
+                    <div class="chart-toggle-row" style="margin: 0;">
+                        <div class="chart-toggle-btn active" id="list-toggle-top" onclick="App.haptic(); State.listMode='top10';">Top 10</div>
+                        <div class="chart-toggle-btn" id="list-toggle-recent" onclick="App.haptic(); State.listMode='recent';">Recent</div>
+                    </div>
+                </h2>
+                <div id="logList" class="log-list"></div>
+            </div>
+        </div>
+    </div>
     
-    logClimb: () => {
-        App.haptic(); 
-        let s = State.activeGrade.score, g = State.activeGrade.text;
-        
-        if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
-        else if (State.activeStyle === 'onsight') { s += 10; g += " 👁️"; }
-        else if (State.activeStyle === 'quick') { g += " 🚀"; }
-        else if (State.activeStyle === 'project') { g += " 🛠️"; }
-        
-        const outName = document.getElementById('input-name').value.trim();
-        const outCrag = document.getElementById('input-crag').value.trim();
-        
-        if (State.discipline.includes('Outdoor') && outCrag) {
-            localStorage.setItem('lastCrag', outCrag);
-        }
-
-        const n = State.discipline.includes('Outdoor') ? `${outName} @ ${outCrag}` : State.activeGym;
-        if (State.discipline.includes('Outdoor') && (!outName || !outCrag)) { App.toast("Fill info"); return; }
-        
-        const btn = document.querySelector('.btn-main');
-        btn.disabled = true;
-        btn.classList.add('loading');
-        btn.innerText = 'Saving...';
-        
-        // V15 Tagging Engine - Compiles all tags cleanly (Steepness is now pulled from the array)
-        const tagsArr = [
-            ...State.activeSteepness,
-            State.activeStyle,
-            State.activeRPE,
-            State.activeGradeFeel,
-            State.activeRating > 0 ? `${State.activeRating} Star` : '',
-            ...State.activeClimbStyles,
-            ...State.activeHolds
-        ].filter(Boolean); 
-        
-        const compiledTags = tagsArr.join(', ');
-        // We save steepness as a comma-separated string for backward compatibility
-        const steepnessData = State.activeSteepness.join(', ');
-        const notesData = document.getElementById('input-notes').value.trim();
-
-        const l = { 
-            id: String(Date.now()), date: State.activeDate, type: State.discipline, 
-            grade: g, score: s, name: n, angle: steepnessData, style: State.activeStyle, 
-            tags: compiledTags, notes: notesData, action: 'add', _synced: false 
-        };
-        
-        State.logs = [...State.logs, l]; 
-        SyncManager.push(l); 
-        
-        if (State.discipline.includes('Outdoor')) { 
-            document.getElementById('input-name').value = ''; 
-        }
-        
-        // Reset the advanced inputs after a successful log
-        document.getElementById('input-notes').value = '';
-        State.activeRating = 0;
-        State.activeGradeFeel = '';
-        State.activeClimbStyles = [];
-        State.activeHolds = [];
-        State.activeSteepness = [];
-        
-        setTimeout(() => {
-            btn.classList.remove('loading');
-            btn.classList.add('success');
-            
-            btn.innerHTML = `<svg class="checkmark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Saved!`;
-            
-            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
-            
-            setTimeout(() => {
-                btn.classList.remove('success');
-                btn.innerHTML = 'Save to Cloud';
-                btn.disabled = false;
-            }, 2000);
-        }, 400); 
-    }
-};
-App.init();
+    <script src="app.js?v=16"></script>
+</body>
+</html>
