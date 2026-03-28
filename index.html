@@ -12,42 +12,40 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230a0a0a%22/><text y=%2250%22 x=%2250%22 font-size=%2255%22 text-anchor=%22middle%22 dominant-baseline=%22central%22>⛰️</text></svg>">
     <style>
         :root { --primary: #10b981; --primary-fade: rgba(16,185,129,0.15); --flash: #db2777; --dark: #0a0a0a; --card-bg: #171717; --border: #262626; --text: #f3f4f6; --text-muted: #737373; --danger: #ef4444; --radius: 16px; }
-        body { font-family: 'Inter', sans-serif; background: var(--dark); color: var(--text); margin: 0; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
-        .container { max-width: 850px; margin: 0 auto; padding: 24px 24px 120px 24px; }
+        body { font-family: 'Inter', sans-serif; background: var(--dark); color: var(--text); margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+        .container { max-width: 850px; margin: 0 auto; padding: 24px 24px 140px 24px; }
         .card { background: var(--card-bg); padding: 24px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
         h1 { text-align: center; font-weight: 700; font-size: 1.5rem; margin-bottom: 24px; letter-spacing: -0.5px; }
         .view { display: none; animation: fadeIn 0.3s ease; }
         .view.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Fixed Nav Balance */
-        .bottom-nav { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(23, 23, 23, 0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; gap: 8px; padding: 6px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); z-index: 1000; width: 280px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .nav-btn { background: transparent; color: var(--text-muted); border: none; padding: 12px 0; border-radius: 24px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: 0.3s; flex: 1; text-align: center; }
+        /* Balanced Nav Bar */
+        .bottom-nav { position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); background: rgba(23, 23, 23, 0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; gap: 8px; padding: 6px; border-radius: 40px; border: 1px solid rgba(255,255,255,0.1); z-index: 1000; width: 280px; justify-content: space-between; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .nav-btn { background: transparent; color: var(--text-muted); border: none; padding: 12px 0; border-radius: 30px; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: 0.3s; flex: 1; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; }
         .nav-btn.active { background: var(--primary); color: #000; }
 
         label { font-weight: 600; font-size: 0.75rem; color: var(--text-muted); display: block; margin: 15px 0 8px 0; text-transform: uppercase; letter-spacing: 0.5px; }
         .sub-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px; margin-top: 12px; }
         input, textarea { width: 100%; padding: 14px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px; background: var(--dark); color: var(--text); outline: none; transition: 0.2s; font-family: 'Inter', sans-serif; }
-        input:focus, textarea:focus { border-color: var(--primary); }
         .btn-main { background: var(--primary); color: #000; border: none; padding: 16px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.05rem; cursor: pointer; margin-top: 25px; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .dash-btn { background: #1e1e1e; border: 1px solid var(--primary); color: var(--primary); margin-bottom: 25px; }
         .pill-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; margin-bottom: 15px; scrollbar-width: none; }
         .pill-row::-webkit-scrollbar { display: none; }
-        .pill { flex: 0 0 auto; padding: 12px 20px; background: var(--dark); border: 1px solid var(--border); border-radius: 12px; font-weight: 700; font-size: 0.95rem; color: var(--text-muted); cursor: pointer; transition: 0.2s; }
+        .pill { flex: 0 0 auto; padding: 12px 18px; background: var(--dark); border: 1px solid var(--border); border-radius: 12px; font-weight: 700; font-size: 0.9rem; color: var(--text-muted); cursor: pointer; transition: 0.2s; white-space: nowrap; }
         .pill.active { background: var(--primary-fade); color: var(--primary); border-color: var(--primary); }
-        .advanced-toggle { color: var(--primary); font-size: 0.85rem; font-weight: 700; text-align: center; margin: 25px 0 15px 0; cursor: pointer; text-transform: uppercase; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; }
+        .advanced-toggle { color: var(--primary); font-size: 0.85rem; font-weight: 700; text-align: center; margin: 25px 0 15px 0; cursor: pointer; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; }
         .star-rating { display: flex; gap: 8px; font-size: 2.2rem; color: var(--border); margin-bottom: 15px; }
         .star-rating span.active { color: #eab308; }
-        .sync-badge { position: absolute; top: 20px; right: 20px; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); opacity: 0; transition: 0.3s; }
+        .sync-badge { position: absolute; top: 20px; right: 20px; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); opacity: 0; }
         .sync-badge.syncing { opacity: 1; animation: pulse 1s infinite; }
         @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.5); opacity: 1; } }
         .log-item { display: flex; align-items: center; background: var(--dark); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 8px; }
         .log-info { flex: 1; padding: 0 10px; overflow: hidden; }
-        .log-name { font-weight: 600; font-size: 0.95rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .log-name { font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .log-grade { font-size: 1.1rem; font-weight: 700; text-align: right; }
         .log-grade.rp { color: var(--primary); }
         .log-grade.fl { color: var(--flash); }
-        .chart-container { position: relative; height: 300px; width: 100%; }
+        .chart-container { position: relative; height: 280px; width: 100%; }
         .hidden { display: none !important; }
         .flex { display: flex; gap: 10px; } .flex > div { flex: 1; }
     </style>
@@ -77,7 +75,7 @@
                     </div>
                     <div id="input-outdoor" class="hidden">
                         <div class="flex">
-                            <div><label>Route Name</label><input type="text" id="input-name" placeholder="Silence"></div>
+                            <div><label>Name</label><input type="text" id="input-name" placeholder="Silence"></div>
                             <div><label>Crag</label><input type="text" id="input-crag" placeholder="Flatanger"></div>
                         </div>
                     </div>
@@ -85,40 +83,37 @@
                     <div id="gradePicker" class="pill-row"></div>
                     <label>Style of Ascent</label>
                     <div class="pill-row" id="styleSelector"></div>
-                    
-                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? '- Hide Details' : '+ Add Details'; App.haptic();">+ Add Details</div>
+                    <div class="advanced-toggle" id="adv-toggle" onclick="App.toggleAdvanced()">+ Add Details</div>
                     <div id="advanced-content" class="hidden">
-                        <label>Time of Day (Manual Override)</label>
+                        <label>Time of Day</label>
                         <div class="pill-row" id="timeBucketSelector">
                             <div class="pill" id="time-morn" onclick="App.setTimeofday('Morning')">Morning</div>
                             <div class="pill" id="time-aft" onclick="App.setTimeofday('Afternoon')">Afternoon</div>
                             <div class="pill" id="time-eve" onclick="App.setTimeofday('Evening')">Evening</div>
                         </div>
-                        <label>1. Effort & Grade Feel</label>
-                        <div class="sub-label">My Effort</div>
+                        <label>Effort & Grade Feel</label>
                         <div class="pill-row" id="rpeSelector"></div>
-                        <div class="sub-label">The Grade</div>
                         <div class="pill-row" id="gradeFeelSelector">
                             <div class="pill" id="feel-soft" onclick="App.toggleGradeFeel('Soft')">Soft</div>
                             <div class="pill" id="feel-hard" onclick="App.toggleGradeFeel('Hard')">Hard</div>
                         </div>
-                        <label>2. Pre-Climb Fatigue</label>
+                        <label>Pre-Climb Fatigue</label>
                         <div class="pill-row" id="fatigueSelector">
                             <div class="pill" id="fat-1" onclick="State.activeFatigue=1">1 (Fresh)</div>
                             <div class="pill" id="fat-3" onclick="State.activeFatigue=3">3 (Mid)</div>
                             <div class="pill" id="fat-5" onclick="State.activeFatigue=5">5 (Tired)</div>
                         </div>
-                        <label>3. Route Rating</label>
+                        <label>Rating</label>
                         <div class="star-rating" id="starRating">
                             <span onclick="App.setRating(1)">★</span><span onclick="App.setRating(2)">★</span><span onclick="App.setRating(3)">★</span><span onclick="App.setRating(4)">★</span><span onclick="App.setRating(5)">★</span>
                         </div>
-                        <label>4. Steepness & Style</label>
+                        <label>Steepness & Style</label>
                         <div class="pill-row" id="steepnessSelector"></div>
                         <div class="pill-row" id="climbStyleSelector"></div>
-                        <label>5. Hold Types</label>
+                        <label>Hold Types</label>
                         <div class="pill-row" id="holdsSelector"></div>
-                        <label>6. Notes</label>
-                        <textarea id="input-notes" placeholder="beta and headspace..."></textarea>
+                        <label>Notes</label>
+                        <textarea id="input-notes" placeholder="Beta, headspace, double shifts..."></textarea>
                     </div>
                     <button class="btn-main" onclick="App.logClimb()">Save to Cloud</button>
                 </div>
@@ -127,12 +122,9 @@
         <div id="view-dash" class="view">
             <h1>Dashboard</h1>
             <div class="card">
-                <button class="btn-main dash-btn" onclick="window.location.href='dashboard.html'">🧠 Open Nerd Dashboard</button>
-                <div class="sync-badge"></div>
-                <div class="pill-row" id="dashSelector" style="margin-bottom: 25px;"></div>
-                <div class="chart-container">
-                    <canvas id="progressChart"></canvas>
-                </div>
+                <button class="btn-main" style="background:#1e1e1e; color:var(--primary); border:1px solid var(--primary); margin-top:0; margin-bottom:20px;" onclick="window.location.href='dashboard.html'">🧠 Open Nerd Dashboard</button>
+                <div class="pill-row" id="dashSelector"></div>
+                <div class="chart-container"><canvas id="progressChart"></canvas></div>
             </div>
             <div class="card">
                 <h2>Recent Logs</h2>
@@ -140,6 +132,6 @@
             </div>
         </div>
     </div>
-    <script src="app.js?v=17"></script>
+    <script src="app.js?v=18"></script>
 </body>
 </html>
