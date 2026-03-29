@@ -53,9 +53,14 @@ try {
     localStorage.removeItem('climbLogs');
 }
 
+// Memory Initialization
+let initDisc = localStorage.getItem('lastDiscipline') || 'Indoor Rope Climbing';
+let initStyle = localStorage.getItem('lastStyle') || 'quick';
+let initConf = getScaleConfig(initDisc);
+
 const State = new Proxy({
-    view: 'log', discipline: 'Indoor Rope Climbing', activeGrade: { text: '6b', score: 633 },
-    activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
+    view: 'log', discipline: initDisc, activeGrade: { text: initConf.labels[4] || initConf.labels[0], score: initConf.scores[4] || initConf.scores[0] },
+    activeStyle: initStyle, activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
     activeTimeBucket: '', logs: safeLogs
 }, {
@@ -215,7 +220,9 @@ const App = {
         }).join('');
 
         const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash'], ['onsight', 'Onsight']] : [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash']];
-        if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = styles[0][0];
+        // Enforce the 'quick' fallback if the style isn't available
+        if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = 'quick';
+        
         document.getElementById('styleSelector').innerHTML = styles.map(s => `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="App.haptic(); State.activeStyle='${s[0]}';">${s[1]}</div>`).join('');
         
         ['morn', 'aft', 'eve'].forEach(id => {
@@ -422,8 +429,6 @@ const App = {
 
             let metaHtml = '';
             metaHtml += `<div class="log-details-grid">`;
-            
-            // Injecting the full uncut names at the top of the details view
             metaHtml += `<div class="log-meta-item" style="grid-column: 1 / -1;">ROUTE<div class="log-meta-val" style="text-transform: none;">${fullRouteForDetails}</div></div>`;
             if (fullCragForDetails) {
                 metaHtml += `<div class="log-meta-item" style="grid-column: 1 / -1;">CRAG<div class="log-meta-val" style="text-transform: none;">${fullCragForDetails}</div></div>`;
@@ -440,9 +445,10 @@ const App = {
             
             let notesHtml = l.notes ? `<div class="log-notes-box">"${l.notes}"</div>` : '';
 
+            // The new Highlander "Only One Open" logic in the onclick handler
             return `
             <div class="log-card">
-                <div class="log-summary" onclick="App.haptic(); this.parentElement.classList.toggle('expanded');">
+                <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.log-card').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">
                     <div class="log-date">${formattedDate}</div>
                     <div class="log-info">
                         <div class="log-name">${displayRoute}${syncWarning}</div>
@@ -462,6 +468,10 @@ const App = {
     logClimb: () => {
         App.haptic(); 
         
+        // Save the current discipline and style to memory right before processing
+        localStorage.setItem('lastDiscipline', State.discipline);
+        localStorage.setItem('lastStyle', State.activeStyle);
+
         const now = new Date();
         const hours = now.getHours();
         const autoTime = hours < 12 ? 'Morning' : hours < 17 ? 'Afternoon' : 'Evening';
