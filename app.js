@@ -26,7 +26,7 @@ const CLIMB_STYLES = ['Endurance', 'Cruxy', 'Technical', 'Athletic'];
 const HOLDS = ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs'];
 const RPES = ['Breezy', 'Solid', 'Limit'];
 
-const getBaseGrade = (g) => String(g || "").replace(/[⚡👁️🚀🛠️\s]/g, '');
+const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️\s]/g, '');
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 
 const getScaleConfig = (disc) => {
@@ -82,7 +82,7 @@ const State = new Proxy({
             setTimeout(() => App.centerActivePills(), 50); 
         }
         
-        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeGrade', 'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 'activeClimbStyles', 'activeHolds', 'activeTimeBucket'].includes(prop)) {
+        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'listMode', 'activeGrade', 'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 'activeClimbStyles', 'activeHolds', 'activeTimeBucket'].includes(prop)) {
             App.renderUI();
         }
         
@@ -239,17 +239,67 @@ const App = {
     renderDashboard: () => {
         const dStr = String(State.discipline || "");
         const isRope = dStr.includes('Rope');
+        const isBould = dStr.includes('Boulder');
         const conf = getScaleConfig(dStr);
         
+        document.getElementById('listToggleRecent').className = `chart-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
+        document.getElementById('listToggleTop').className = `chart-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
+
         const viewLogs = State.logs.filter(l => l && l.type === dStr).map(l => ({ ...l, cleanDate: (l.date ? String(l.date).substring(0,10) : getLocalISO()) }));
-        let displayLogs = [...viewLogs].sort((a,b) => Number(b.id) - Number(a.id)).slice(0, 10);
+        let displayLogs = [];
+        
+        const now = new Date();
+        const sixtyDaysAgo = new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000));
+        const recent60 = viewLogs.filter(l => new Date(l.date) >= sixtyDaysAgo);
+
+        if (State.listMode === 'top10') {
+            displayLogs = recent60.sort((a,b) => b.score - a.score).slice(0, 10);
+            
+            const xpC = document.getElementById('xpContainer');
+            if (displayLogs.length > 0) {
+                xpC.classList.remove('hidden');
+                const avgScore = Math.round(displayLogs.reduce((sum, l) => sum + l.score, 0) / displayLogs.length);
+                const currentIdx = conf.scores.indexOf(conf.scores.slice().reverse().find(s => s <= avgScore) || conf.scores[0]);
+                const nextScore = conf.scores[Math.min(currentIdx + 1, conf.scores.length - 1)];
+                const currentBaseScore = conf.scores[currentIdx];
+                
+                let percent = 0;
+                if (nextScore > currentBaseScore) {
+                    percent = Math.min(100, Math.max(0, ((avgScore - currentBaseScore) / (nextScore - currentBaseScore)) * 100));
+                } else if (avgScore >= conf.scores[conf.scores.length - 1]) {
+                    percent = 100;
+                }
+                
+                document.getElementById('xpBaseGrade').innerText = conf.labels[currentIdx];
+                document.getElementById('xpNextGrade').innerText = conf.labels[Math.min(currentIdx + 1, conf.labels.length - 1)];
+                document.getElementById('xpBarFill').style.width = `${percent}%`;
+                document.getElementById('xpText').innerText = `Working Capacity: ${avgScore} (${displayLogs.length} logs)`;
+            } else {
+                xpC.classList.add('hidden');
+            }
+        } else {
+            displayLogs = [...viewLogs].sort((a,b) => Number(b.id) - Number(a.id)).slice(0, 10);
+            document.getElementById('xpContainer').classList.add('hidden');
+        }
         
         document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs found.</div>' : displayLogs.map(l => {
             const d = l.cleanDate.split('-'); 
             const formattedDate = `${d[2]} ${monthNames[parseInt(d[1], 10) - 1]}`;
             let rawGrade = String(l.grade || "");
-            const isF = rawGrade.includes('⚡') || rawGrade.includes('👁️');
+            
+            // BOULDER SQUEEZE LOGIC
             const cleanDisplayGrade = getBaseGrade(rawGrade); 
+            const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
+            let finalDisplayGrade = cleanDisplayGrade;
+            
+            // Add emoji back for ropes only
+            if (isRope) {
+                if (rawGrade.includes('⚡')) finalDisplayGrade += ' ⚡';
+                if (rawGrade.includes('💎') || rawGrade.includes('👁️')) finalDisplayGrade += ' 💎';
+                if (rawGrade.includes('🚀')) finalDisplayGrade += ' 🚀';
+                if (rawGrade.includes('🛠️')) finalDisplayGrade += ' 🛠️';
+            }
+
             const badge = getBadge(l.type, rawGrade);
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
             const delBtn = `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>`;
@@ -273,7 +323,7 @@ const App = {
                 if (idx > -1 && GRADES.bouldsInColors[idx]) inlineColor = `color: ${GRADES.bouldsInColors[idx]} !important;`;
             }
             
-            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${logName}${syncWarning}</div>${cragHTML}${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${cleanDisplayGrade}</div>${delBtn}</div>`;
+            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${logName}${syncWarning}</div>${cragHTML}${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${finalDisplayGrade}</div>${delBtn}</div>`;
         }).join('');
         
         const noD = document.getElementById('noDataMsg');
@@ -297,8 +347,8 @@ const App = {
             const [y, mo] = m.split('-').map(Number);
             if (State.chartMode === 'max') {
                 const mL = viewLogs.filter(l => l.cleanDate.substring(0,7) === m && l.score);
-                const rpL = mL.filter(l => !String(l.grade||"").includes('⚡') && !String(l.grade||"").includes('👁️'));
-                const flL = mL.filter(l => String(l.grade||"").includes('⚡') || String(l.grade||"").includes('👁️'));
+                const rpL = mL.filter(l => !String(l.grade||"").includes('⚡') && !String(l.grade||"").includes('💎') && !String(l.grade||"").includes('👁️'));
+                const flL = mL.filter(l => String(l.grade||"").includes('⚡') || String(l.grade||"").includes('💎') || String(l.grade||"").includes('👁️'));
                 
                 let maxRp = rpL.length ? rpL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
                 let maxFl = flL.length ? flL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
@@ -350,7 +400,7 @@ const App = {
 
         let s = State.activeGrade.score, g = State.activeGrade.text;
         if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
-        else if (State.activeStyle === 'onsight') { s += 10; g += " 👁️"; }
+        else if (State.activeStyle === 'onsight') { s += 10; g += " 💎"; }
         else if (State.activeStyle === 'quick') { g += " 🚀"; }
         else if (State.activeStyle === 'project') { g += " 🛠️"; }
         
