@@ -82,13 +82,17 @@ const State = new Proxy({
             setTimeout(() => App.centerActivePills(), 50); 
         }
         
-        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'listMode', 'activeGrade', 'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 'activeClimbStyles', 'activeHolds', 'activeTimeBucket'].includes(prop)) {
+        // FIX 1: Routing UI redraws correctly based on what was clicked
+        if (['discipline', 'view', 'activeGym', 'activeStyle', 'activeGrade', 'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 'activeClimbStyles', 'activeHolds', 'activeTimeBucket'].includes(prop)) {
             App.renderUI();
         }
+        if (['discipline', 'view', 'chartMode', 'listMode'].includes(prop)) {
+            if (target.view === 'dash') App.renderDashboard();
+        }
         
+        // FIX 2: Removed duplicate LocalStorage save
         if (prop === 'logs') {
             localStorage.setItem('climbLogs', JSON.stringify(value));
-            localStorage.setItem('climbingLogs', JSON.stringify(value)); 
             if (target.view === 'dash') App.renderDashboard();
         }
         return true;
@@ -336,7 +340,7 @@ const App = {
         if (viewLogs.length === 0) { ctxCanvas.style.display = 'none'; noD.style.display = 'block'; noD.innerText = "Log climbs to view progression"; return; }
         ctxCanvas.style.display = 'block'; noD.style.display = 'none';
 
-        const allM = [...new Set(viewLogs.map(l => l.cleanDate.substring(0,7)))].sort();
+        // FIX 3: Pre-bucket logs by month to avoid O(N*M) heavy filtering
         const cD = { rp: [], fl: [], rpG: [], flG: [], avg: [], avgG: [], lbl: [] };
         
         const getScoreIndex = (s, isF) => { 
@@ -344,12 +348,23 @@ const App = {
             return conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-b) < Math.abs(p-b) ? c : p)); 
         };
         
+        const logsByMonth = {};
+        viewLogs.forEach(l => {
+            if (!l.score) return;
+            const m = l.cleanDate.substring(0,7);
+            if (!logsByMonth[m]) logsByMonth[m] = [];
+            logsByMonth[m].push(l);
+        });
+
+        const allM = Object.keys(logsByMonth).sort();
+        
         allM.forEach(m => {
             const [y, mo] = m.split('-').map(Number);
+            const monthLogs = logsByMonth[m] || [];
+
             if (State.chartMode === 'max') {
-                const mL = viewLogs.filter(l => l.cleanDate.substring(0,7) === m && l.score);
-                const rpL = mL.filter(l => !String(l.grade||"").includes('⚡') && !String(l.grade||"").includes('💎') && !String(l.grade||"").includes('👁️'));
-                const flL = mL.filter(l => String(l.grade||"").includes('⚡') || String(l.grade||"").includes('💎') || String(l.grade||"").includes('👁️'));
+                const rpL = monthLogs.filter(l => !String(l.grade||"").includes('⚡') && !String(l.grade||"").includes('💎') && !String(l.grade||"").includes('👁️'));
+                const flL = monthLogs.filter(l => String(l.grade||"").includes('⚡') || String(l.grade||"").includes('💎') || String(l.grade||"").includes('👁️'));
                 
                 let maxRp = rpL.length ? rpL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
                 let maxFl = flL.length ? flL.reduce((max, cur) => cur.score > max.score ? cur : max) : null;
@@ -361,10 +376,12 @@ const App = {
             } else {
                 let pM = mo-1, pY = y; if (pM === 0) { pM = 12; pY = y-1; }
                 const pMS = `${pY}-${pM.toString().padStart(2, '0')}`;
-                const wL = viewLogs.filter(l => (l.cleanDate.substring(0,7) === m || l.cleanDate.substring(0,7) === pMS) && l.score).sort((a,b) => b.score - a.score).slice(0, 10);
                 
-                if (wL.length > 0) { 
-                    const avS = Math.round(wL.reduce((s, l) => s + l.score, 0) / wL.length);
+                const prevMonthLogs = logsByMonth[pMS] || [];
+                const combinedLogs = [...monthLogs, ...prevMonthLogs].sort((a,b) => b.score - a.score).slice(0, 10);
+                
+                if (combinedLogs.length > 0) { 
+                    const avS = Math.round(combinedLogs.reduce((s, l) => s + l.score, 0) / combinedLogs.length);
                     const avI = conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-avS) < Math.abs(p-avS) ? c : p)); 
                     cD.avg.push(avI); cD.avgG.push(conf.labels[avI]); 
                 } else { 
