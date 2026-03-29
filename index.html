@@ -21,7 +21,7 @@
         .container { max-width: 850px; margin: 0 auto; padding: 24px 24px 120px 24px; }
         .card { background: var(--card-bg); padding: 24px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
         h1 { text-align: center; font-weight: 700; font-size: 1.5rem; margin-bottom: 24px; }
-        h2 { font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 16px 0; display: flex; justify-content: space-between; align-items: center; }
+        h2 { font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 16px 0; display: flex; justify-content: space-between; align-items: center; transition: 0.3s; }
         
         .view { display: none; animation: fadeIn 0.3s ease; }
         .view.active { display: block; }
@@ -79,23 +79,21 @@
         .chart-toggle-btn.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.4); border: 1px solid rgba(16,185,129,0.2); }
         .chart-container { position: relative; height: 300px; width: 100%; }
 
-        /* NEW LOGS HEADER & TOGGLE UI */
         .log-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .log-header-row h2 { border: none; padding: 0; margin: 0; }
         .log-toggle { display: flex; background: #111; border-radius: 8px; padding: 3px; border: 1px solid #333; }
         .log-toggle-btn { background: transparent; color: #737373; border: 1px solid transparent; padding: 6px 12px; font-size: 0.7rem; font-weight: 700; border-radius: 6px; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
         .log-toggle-btn.active { color: var(--primary); border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.1); box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
 
-        /* V28 GLOW-UP: WORKING CAPACITY XP BAR */
         .xp-container { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px dashed #333; }
         .xp-row-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
         .xp-title { font-size: 0.75rem; font-weight: 700; color: #737373; text-transform: uppercase; letter-spacing: 1px; }
-        .xp-percent { font-size: 1.2rem; font-weight: 700; color: var(--primary); line-height: 1; }
+        .xp-percent { font-size: 1.2rem; font-weight: 700; color: var(--primary); line-height: 1; transition: 0.3s; }
         .xp-row-bottom { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
-        .xp-grade { font-size: 1.15rem; font-weight: 700; color: var(--primary); width: 35px; }
+        .xp-grade { font-size: 1.15rem; font-weight: 700; color: var(--primary); width: 35px; transition: 0.3s; }
         .xp-grade.right { text-align: right; }
         .xp-bar-bg { flex: 1; height: 12px; background: #262626; border-radius: 6px; overflow: hidden; position: relative; }
-        .xp-bar-fill { height: 100%; background: var(--primary); width: 0%; border-radius: 6px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 10px rgba(16,185,129,0.5); }
+        .xp-bar-fill { height: 100%; background: var(--primary); width: 0%; border-radius: 6px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s, box-shadow 0.3s; box-shadow: 0 0 10px rgba(16,185,129,0.5); }
 
         .flex { display: flex; gap: 10px; } .flex > div { flex: 1; } .hidden { display: none !important; }
     </style>
@@ -139,7 +137,7 @@
                     <label>Style of Ascent</label>
                     <div class="pill-row" id="styleSelector"></div>
                     
-                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? '- Hide Details' : '+ Add Details'; App.haptic();">+ Add Details</div>
+                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? 'Hide Details' : '+ Add Details'; App.haptic();">+ Add Details</div>
                     
                     <div id="advanced-content" class="hidden">
                         
@@ -205,7 +203,7 @@
             </div>
             <div class="card">
                 <div class="log-header-row">
-                    <h2 id="logHeader">Last 60 Days</h2>
+                    <h2 id="logListTitle">Last 60 Days</h2>
                     <div class="log-toggle">
                         <button class="log-toggle-btn active" id="listToggleTop" onclick="App.haptic(); State.listMode='top10';">Top 10</button>
                         <button class="log-toggle-btn" id="listToggleRecent" onclick="App.haptic(); State.listMode='recent';">Recent</button>
@@ -229,6 +227,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=31"></script>
+    <script src="app.js?v=32"></script>
 </body>
 </html>
