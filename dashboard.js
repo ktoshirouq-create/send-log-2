@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFilters('time-filter', 'time');
 
     function renderDashboard() {
-        // TIME FILTER LOGIC
         const now = new Date();
         let filteredLogs = allLogs.filter(l => {
             if (activeDisc !== 'All' && l.type !== activeDisc) return false;
@@ -37,7 +36,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return diffDays <= parseInt(activeTime);
         });
 
-        // 1. STATS
         document.getElementById('stat-sends').innerText = filteredLogs.length;
         const outDays = new Set(filteredLogs.filter(l => String(l.type).includes('Outdoor')).map(l => l.date)).size;
         document.getElementById('stat-outdoor').innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
@@ -46,7 +44,6 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredLogs.forEach(l => { if (l.score && l.score > maxScore) { maxScore = l.score; peakG = l.grade; } });
         document.getElementById('stat-peak').innerText = (filteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : getBaseGrade(peakG));
 
-        // 2. HABITS
         let dayC = {}, timeC = {};
         filteredLogs.forEach(l => { 
             if (l.day) dayC[l.day] = (dayC[l.day] || 0) + 1; 
@@ -59,7 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         Object.values(charts).forEach(c => { if(c) c.destroy(); });
 
-        // 3. SEND PYRAMID
         const grades = {};
         filteredLogs.forEach(l => {
             if (l.score) {
@@ -67,7 +63,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 grades[clean] = (grades[clean] || 0) + 1;
             }
         });
-        // Sort grades by difficulty (using the raw string compare or simple sort for now)
         const sortedGrades = Object.keys(grades).sort((a,b) => a.localeCompare(b));
         const pyrData = sortedGrades.map(g => grades[g]);
 
@@ -77,7 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
             options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { display: false } } }
         });
 
-        // 4. CNS CHART (Using null for empty weeks)
         const sortedCNS = [...filteredLogs].filter(l=>l.score).sort((a,b) => new Date(a.date) - new Date(b.date));
         const cnsData = { labels: ['W1', 'W2', 'W3', 'W4'], data: [null, null, null, null], grades: ['-','-','-','-'] };
         const weekBins = [[],[],[],[]];
@@ -97,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ' Peak: ' + cnsData.grades[ctx.dataIndex] } } }, scales: { y: { display: false }, x: { grid: { display: false } } } }
         });
 
-        // 5. ENERGY & GRIP
         let aero = 0, ancap = 0, power = 0;
         let grips = { 'Crimps':0, 'Slopers':0, 'Pockets':0, 'Pinches':0, 'Tufas':0, 'Jugs':0 };
         filteredLogs.forEach(l => {
@@ -109,7 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
         charts.pie = new Chart(document.getElementById('energyPieChart'), { type: 'doughnut', data: { labels: ['Aero', 'AnCap', 'Power'], datasets: [{ data: [aero, ancap, power], backgroundColor: ['#2196F3', '#FF9800', '#F44336'], borderColor: '#171717' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
         charts.radar = new Chart(document.getElementById('gripRadarChart'), { type: 'radar', data: { labels: Object.keys(grips), datasets: [{ data: Object.values(grips), borderColor: '#9C27B0', backgroundColor: 'rgba(156, 39, 176, 0.2)' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { r: { ticks: { display: false } } } } });
 
-        // 6. FOUR LISTS
         const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No logs fit this criteria.</div>'; };
         
         const hof = [...filteredLogs].filter(l => Number(l.rating) >= 4).sort((a,b)=>b.score-a.score).slice(0,5);
