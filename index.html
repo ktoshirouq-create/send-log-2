@@ -63,16 +63,26 @@
         .toast { position: fixed; top: 20px; left: 50%; transform: translate(-50%, -20px); opacity: 0; background: rgba(38,38,38,0.9); backdrop-filter: blur(10px); color: #fff; padding: 12px 24px; border-radius: 30px; font-weight: 600; border: 1px solid var(--border); transition: 0.3s; z-index: 2000; pointer-events: none; }
         .toast.show { transform: translate(-50%, 0); opacity: 1; }
 
-        .log-item { display: flex; align-items: center; background: var(--dark); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 8px; }
-        .log-date { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); width: 55px; }
-        .log-info { flex: 1; overflow: hidden; padding: 0 10px; }
-        .log-name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
-        .log-crag { font-size: 0.75rem; color: #a3a3a3; font-weight: 600; margin-top: 2px; }
-        .log-disc { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-top: 2px; }
-        .log-grade { font-size: 1.1rem; font-weight: 700; text-align: right; }
+        /* V33 ACCORDION LOG CARDS */
+        .log-card { background: var(--dark); border-radius: 10px; border: 1px solid var(--border); margin-bottom: 8px; overflow: hidden; transition: 0.3s; }
+        .log-summary { display: flex; align-items: center; padding: 14px 16px; cursor: pointer; user-select: none; }
+        .log-summary:active { background: #111; }
+        .log-date { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); width: 55px; flex-shrink: 0; }
+        .log-info { flex: 1; min-width: 0; padding: 0 10px; display: flex; flex-direction: column; justify-content: center; }
+        .log-name { font-weight: 600; font-size: 0.95rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .log-crag { font-size: 0.75rem; color: #a3a3a3; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .log-grade { font-size: 1.1rem; font-weight: 700; text-align: right; white-space: nowrap; flex-shrink: 0; }
         .log-grade.rp { color: var(--primary); }
         .log-grade.fl { color: var(--flash); }
-        .log-del { background: transparent; border: none; color: var(--danger); font-size: 1.5rem; opacity: 0.3; cursor: pointer; padding: 0 5px; margin-left: 10px; }
+        
+        .log-details { display: none; padding: 0 16px 16px 16px; border-top: 1px solid var(--border); background: #121212; }
+        .log-card.expanded .log-details { display: block; animation: fadeIn 0.2s ease; }
+        .log-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+        .log-meta-item { font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .log-meta-val { font-size: 0.9rem; color: var(--text); font-weight: 600; margin-top: 2px; text-transform: capitalize; }
+        .log-notes-box { margin-top: 16px; background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; font-style: italic; color: #a3a3a3; line-height: 1.4; }
+        .log-del-btn { width: 100%; margin-top: 16px; padding: 12px; background: rgba(239, 68, 68, 0.05); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
+        .log-del-btn:active { background: rgba(239, 68, 68, 0.15); }
 
         .chart-toggle-row { display: flex; justify-content: center; gap: 6px; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 6px; border-radius: 12px; border: 1px solid var(--border); width: fit-content; margin: 0 auto; }
         .chart-toggle-btn { padding: 6px 14px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); cursor: pointer; text-transform: uppercase; }
@@ -227,6 +237,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=32"></script>
+    <script src="app.js?v=33"></script>
 </body>
 </html>
