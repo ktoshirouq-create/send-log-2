@@ -34,12 +34,13 @@ const formatJournalDate = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
     const dateObj = new Date(y, parseInt(m)-1, d);
-    return `${dayNames[dateObj.getDay()]}, ${d} ${monthNames[parseInt(m)-1]}`;
+    return `${dayNames[dateObj.getDay()]}, ${d} ${monthNames[parseInt(m)-1]} '${y.substring(2)}`;
 };
+
 const formatShortDate = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
-    return `${d} ${monthNames[parseInt(m)-1]}`;
+    return `${d} ${monthNames[parseInt(m)-1]} '${y.substring(2)}`;
 };
 
 const getScaleConfig = (disc) => {
