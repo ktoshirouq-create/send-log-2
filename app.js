@@ -195,7 +195,6 @@ const Paintbrush = {
         document.getElementById('listToggleTop').className = `log-toggle-btn ${state.listMode === 'top10' ? 'active' : ''}`;
         document.getElementById('listToggleRecent').className = `log-toggle-btn ${state.listMode === 'recent' ? 'active' : ''}`;
 
-        // Dynamic Header Magic
         const headerEl = document.getElementById('logHeader');
         if (headerEl) {
             headerEl.innerText = state.listMode === 'top10' ? 'Last 60 Days' : 'Recent Logs';
@@ -240,23 +239,27 @@ const Paintbrush = {
                 }
             }
 
-            const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
             const delBtn = `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>`;
             
             let logName = l.name || "Log";
-            let cragHTML = '';
+            let locationText = '';
             if (logName.includes(' @ ')) {
                 const parts = logName.split(' @ ');
                 logName = parts[0];
-                cragHTML = `<div class="log-crag">📍 ${parts[1]}</div>`;
+                locationText = `📍 ${parts[1]}`;
             }
             
             const subItems = [];
+            if (locationText) subItems.push(locationText);
             if (l.angle) subItems.push(String(l.angle));
-            if (l.style && STYLE_MAP[l.style]) subItems.push(STYLE_MAP[l.style]);
-            const discSpan = subItems.length ? `<div class="log-disc">${subItems.join(' • ').toUpperCase()}</div>` : '';
             
-            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${logName}${syncWarning}</div>${cragHTML}${discSpan}</div><div class="log-grade ${(rawGrade.includes('⚡')||rawGrade.includes('💎')) ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${finalDisplayGrade}</div>${delBtn}</div>`;
+            // CLEANUP: We removed the l.style text here because the emoji covers it.
+            const discSpan = subItems.length ? `<div class="log-disc" style="text-transform: capitalize; color: #888; font-size: 0.7rem; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${subItems.join(' • ')}</div>` : '';
+            
+            // CLEANUP: Cloud icon is now flex-locked so it won't wrap awkwardly.
+            const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.75rem; flex-shrink: 0;">☁️✕</span>` : '';
+
+            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info" style="min-width: 0;"><div class="log-name" style="display: flex; align-items: center; gap: 6px;"><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${logName}</span>${syncWarning}</div>${discSpan}</div><div class="log-grade ${(rawGrade.includes('⚡')||rawGrade.includes('💎')) ? 'fl' : 'rp'}" style="${inlineColor}; flex-shrink: 0;">${badge}${finalDisplayGrade}</div>${delBtn}</div>`;
         }).join('');
         
         const noD = document.getElementById('noDataMsg');
