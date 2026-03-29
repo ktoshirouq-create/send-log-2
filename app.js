@@ -82,12 +82,10 @@ const State = new Proxy({
             setTimeout(() => App.centerActivePills(), 50); 
         }
         
-        // Removed listMode from this global render array to isolate it
         if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeGrade', 'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 'activeClimbStyles', 'activeHolds', 'activeTimeBucket'].includes(prop)) {
             App.renderUI();
         }
 
-        // The isolated trigger for the list toggle
         if (prop === 'listMode' && target.view === 'dash') {
             App.renderDashboardLogs();
         }
@@ -242,13 +240,11 @@ const App = {
         setTimeout(() => App.centerActivePills(), 10);
     },
     
-    // The Master wrapper now just calls the two isolated functions
     renderDashboard: () => {
         App.renderDashboardCharts();
         App.renderDashboardLogs();
     },
 
-    // Quarantined Area 1: The Charts
     renderDashboardCharts: () => {
         const dStr = String(State.discipline || "");
         const isRope = dStr.includes('Rope');
@@ -316,14 +312,19 @@ const App = {
         App.chart = new Chart(ctx, { type: 'line', data: { labels: cD.lbl, datasets: dSet }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: toolC } } }, scales: { y: { min: Math.max(0, Math.min(...aI)-1), max: Math.min(conf.labels.length-1, Math.max(...aI)+1), ticks: { stepSize: 1, callback: v => conf.labels[v] } }, x: { grid: { display: false } } } } });
     },
 
-    // Quarantined Area 2: The UI Logs & XP Bar
     renderDashboardLogs: () => {
         const dStr = String(State.discipline || "");
-        const isRope = dStr.includes('Rope');
         const conf = getScaleConfig(dStr);
         
         document.getElementById('listToggleTop').className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
         document.getElementById('listToggleRecent').className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
+
+        const titleEl = document.getElementById('logListTitle');
+        if (State.listMode === 'top10') {
+            titleEl.innerText = 'Last 60 Days';
+        } else {
+            titleEl.innerText = 'Recent Logs';
+        }
 
         const viewLogs = State.logs.filter(l => l && l.type === dStr).map(l => ({ ...l, cleanDate: (l.date ? String(l.date).substring(0,10) : getLocalISO()) }));
         let displayLogs = [];
@@ -340,7 +341,8 @@ const App = {
                 xpC.classList.remove('hidden');
                 const avgScore = Math.round(displayLogs.reduce((sum, l) => sum + l.score, 0) / displayLogs.length);
                 const currentIdx = conf.scores.indexOf(conf.scores.slice().reverse().find(s => s <= avgScore) || conf.scores[0]);
-                const nextScore = conf.scores[Math.min(currentIdx + 1, conf.scores.length - 1)];
+                const nextIdx = Math.min(currentIdx + 1, conf.scores.length - 1);
+                const nextScore = conf.scores[nextIdx];
                 const currentBaseScore = conf.scores[currentIdx];
                 
                 let percent = 0;
@@ -351,9 +353,25 @@ const App = {
                 }
                 
                 document.getElementById('xpBaseGrade').innerText = conf.labels[currentIdx];
-                document.getElementById('xpNextGrade').innerText = conf.labels[Math.min(currentIdx + 1, conf.labels.length - 1)];
+                document.getElementById('xpNextGrade').innerText = conf.labels[nextIdx];
+                
+                // Color mapping logic for Bouldering XP Bar
+                let baseColor = (conf.colors && conf.colors[currentIdx]) ? conf.colors[currentIdx] : 'var(--primary)';
+                let nextColor = (conf.colors && conf.colors[nextIdx]) ? conf.colors[nextIdx] : 'var(--primary)';
+
+                document.getElementById('xpBaseGrade').style.color = baseColor;
+                document.getElementById('xpNextGrade').style.color = nextColor;
+                document.getElementById('xpPercent').style.color = nextColor;
                 document.getElementById('xpPercent').innerText = `${Math.round(percent)}%`;
                 
+                if (conf.colors && conf.colors.length > 0) {
+                    document.getElementById('xpBarFill').style.background = `linear-gradient(90deg, ${baseColor}, ${nextColor})`;
+                    document.getElementById('xpBarFill').style.boxShadow = `0 0 10px ${nextColor}80`;
+                } else {
+                    document.getElementById('xpBarFill').style.background = 'var(--primary)';
+                    document.getElementById('xpBarFill').style.boxShadow = '0 0 10px rgba(16,185,129,0.5)';
+                }
+
                 setTimeout(() => {
                     document.getElementById('xpBarFill').style.width = `${percent}%`;
                 }, 10);
@@ -375,12 +393,11 @@ const App = {
             const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
             let finalDisplayGrade = cleanDisplayGrade;
             
-            if (isRope) {
-                if (rawGrade.includes('⚡')) finalDisplayGrade += ' ⚡';
-                if (rawGrade.includes('💎') || rawGrade.includes('👁️')) finalDisplayGrade += ' 💎';
-                if (rawGrade.includes('🚀')) finalDisplayGrade += ' 🚀';
-                if (rawGrade.includes('🛠️')) finalDisplayGrade += ' 🛠️';
-            }
+            // Emoji logic now applies universally to ropes and bouldering
+            if (rawGrade.includes('⚡')) finalDisplayGrade += ' ⚡';
+            if (rawGrade.includes('💎') || rawGrade.includes('👁️')) finalDisplayGrade += ' 💎';
+            if (rawGrade.includes('🚀')) finalDisplayGrade += ' 🚀';
+            if (rawGrade.includes('🛠️')) finalDisplayGrade += ' 🛠️';
 
             const badge = getBadge(l.type, rawGrade);
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
