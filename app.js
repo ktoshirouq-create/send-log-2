@@ -400,12 +400,18 @@ const App = {
             const badge = getBadge(l.type, rawGrade);
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
             
-            let logName = l.name || "Log";
-            let cragHTML = '';
-            if (logName.includes(' @ ')) {
-                const parts = logName.split(' @ ');
-                logName = parts[0];
-                cragHTML = `<div class="log-crag">📍 ${parts[1]}</div>`;
+            let fullLocationString = l.name || "Log";
+            let displayRoute = fullLocationString;
+            let displayCragHtml = '';
+            let fullRouteForDetails = fullLocationString;
+            let fullCragForDetails = '';
+
+            if (fullLocationString.includes(' @ ')) {
+                const parts = fullLocationString.split(' @ ');
+                displayRoute = parts[0];
+                fullRouteForDetails = parts[0];
+                fullCragForDetails = parts[1];
+                displayCragHtml = `<div class="log-crag">📍 ${parts[1]}</div>`;
             }
             
             let inlineColor = '';
@@ -414,19 +420,24 @@ const App = {
                 if (idx > -1 && GRADES.bouldsInColors[idx]) inlineColor = `color: ${GRADES.bouldsInColors[idx]} !important;`;
             }
 
-            // --- THE NEW EXPANDABLE ACCORDION LOGIC ---
             let metaHtml = '';
-            if (l.rating || l.effort || l.gradefeel || l.angle || l.holds || (l.style && STYLE_MAP[l.style])) {
-                metaHtml += `<div class="log-details-grid">`;
-                if (l.style && STYLE_MAP[l.style]) metaHtml += `<div class="log-meta-item">STYLE<div class="log-meta-val">${STYLE_MAP[l.style]}</div></div>`;
-                if (l.rating) metaHtml += `<div class="log-meta-item">RATING<div class="log-meta-val" style="color:#eab308; letter-spacing:2px;">${'★'.repeat(l.rating)}</div></div>`;
-                if (l.effort) metaHtml += `<div class="log-meta-item">EFFORT<div class="log-meta-val">${l.effort}</div></div>`;
-                if (l.gradefeel) metaHtml += `<div class="log-meta-item">FEEL<div class="log-meta-val">${l.gradefeel}</div></div>`;
-                if (l.angle) metaHtml += `<div class="log-meta-item">STEEPNESS<div class="log-meta-val">${l.angle}</div></div>`;
-                if (l.holds) metaHtml += `<div class="log-meta-item">HOLDS<div class="log-meta-val">${l.holds}</div></div>`;
-                if (l.climstyles) metaHtml += `<div class="log-meta-item">TYPE<div class="log-meta-val">${l.climstyles}</div></div>`;
-                metaHtml += `</div>`;
+            metaHtml += `<div class="log-details-grid">`;
+            
+            // Injecting the full uncut names at the top of the details view
+            metaHtml += `<div class="log-meta-item" style="grid-column: 1 / -1;">ROUTE<div class="log-meta-val" style="text-transform: none;">${fullRouteForDetails}</div></div>`;
+            if (fullCragForDetails) {
+                metaHtml += `<div class="log-meta-item" style="grid-column: 1 / -1;">CRAG<div class="log-meta-val" style="text-transform: none;">${fullCragForDetails}</div></div>`;
             }
+
+            if (l.style && STYLE_MAP[l.style]) metaHtml += `<div class="log-meta-item">STYLE<div class="log-meta-val">${STYLE_MAP[l.style]}</div></div>`;
+            if (l.rating) metaHtml += `<div class="log-meta-item">RATING<div class="log-meta-val" style="color:#eab308; letter-spacing:2px;">${'★'.repeat(l.rating)}</div></div>`;
+            if (l.effort) metaHtml += `<div class="log-meta-item">EFFORT<div class="log-meta-val">${l.effort}</div></div>`;
+            if (l.gradefeel) metaHtml += `<div class="log-meta-item">FEEL<div class="log-meta-val">${l.gradefeel}</div></div>`;
+            if (l.angle) metaHtml += `<div class="log-meta-item">STEEPNESS<div class="log-meta-val">${l.angle}</div></div>`;
+            if (l.holds) metaHtml += `<div class="log-meta-item">HOLDS<div class="log-meta-val">${l.holds}</div></div>`;
+            if (l.climstyles) metaHtml += `<div class="log-meta-item">TYPE<div class="log-meta-val">${l.climstyles}</div></div>`;
+            metaHtml += `</div>`;
+            
             let notesHtml = l.notes ? `<div class="log-notes-box">"${l.notes}"</div>` : '';
 
             return `
@@ -434,8 +445,8 @@ const App = {
                 <div class="log-summary" onclick="App.haptic(); this.parentElement.classList.toggle('expanded');">
                     <div class="log-date">${formattedDate}</div>
                     <div class="log-info">
-                        <div class="log-name">${logName}${syncWarning}</div>
-                        ${cragHTML}
+                        <div class="log-name">${displayRoute}${syncWarning}</div>
+                        ${displayCragHtml}
                     </div>
                     <div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${finalDisplayGrade}</div>
                 </div>
