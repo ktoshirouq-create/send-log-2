@@ -29,7 +29,6 @@ const RPES = ['Breezy', 'Solid', 'Limit'];
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌\s]/g, '');
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 
-// Bulletproof Date Parsers
 const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
 const formatJournalDate = (dStr) => {
     const clean = getCleanDate(dStr);
@@ -119,6 +118,7 @@ const SyncManager = {
         if (!navigator.onLine) return setTimeout(() => b.forEach(i => i.classList.remove('syncing')), 1000);
         
         fetch(API_URL).then(res => res.json()).then(data => {
+            // Once the Google Sheet script fixes the 2026 bugs, the local app pulls them down here!
             const cloudClimbs = data.climbs || [];
             const cloudSessions = data.sessions || [];
             
@@ -285,6 +285,10 @@ const App = {
 
         document.getElementById('chartToggle').innerHTML = `<div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='max';">Max Peak</div><div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='avg';">Avg (Top 10)</div>`;
 
+        // RE-ADDED LOGIC TO UN-STICK THE UI!
+        if (State.view === 'dash') App.renderDashboard();
+        if (State.view === 'journal') App.renderJournal();
+
         setTimeout(() => App.centerActivePills(), 10);
     },
 
@@ -292,7 +296,6 @@ const App = {
         const jList = document.getElementById('journalList');
         if (State.sessions.length === 0) { jList.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">No sessions found. Log a climb to start your journal.</div>'; return; }
 
-        // Sort properly using getCleanDate to avoid string comparison bugs
         const sortedSessions = [...State.sessions].sort((a,b) => new Date(getCleanDate(b.Date)) - new Date(getCleanDate(a.Date)));
 
         jList.innerHTML = sortedSessions.map(session => {
@@ -305,7 +308,6 @@ const App = {
             let maxSentStr = "-";
             const sends = children.filter(c => c.Style !== 'worked');
             if (sends.length > 0) {
-                // Force Number comparison
                 const maxSend = sends.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max);
                 maxSentStr = getBaseGrade(maxSend.Grade);
             }
@@ -391,7 +393,6 @@ const App = {
         const dStr = String(State.discipline || "");
         const isRope = dStr.includes('Rope');
         const conf = getScaleConfig(dStr);
-        // Force cleanDates
         const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
 
         const noD = document.getElementById('noDataMsg');
@@ -418,7 +419,6 @@ const App = {
                 const rpL = mL.filter(l => !String(l.Grade||"").includes('⚡') && !String(l.Grade||"").includes('💎'));
                 const flL = mL.filter(l => String(l.Grade||"").includes('⚡') || String(l.Grade||"").includes('💎'));
                 
-                // CRITICAL: Force Number comparison so math doesn't break
                 let maxRp = rpL.length ? rpL.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max) : null;
                 let maxFl = flL.length ? flL.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max) : null;
 
@@ -471,7 +471,6 @@ const App = {
 
         if (State.listMode === 'top10') {
             titleEl.innerText = 'Last 60 Days';
-            // Bulletproof 60-day window logic
             const sixtyDaysAgo = new Date();
             sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
             sixtyDaysAgo.setHours(0,0,0,0);
@@ -482,7 +481,6 @@ const App = {
                 return logDate >= sixtyDaysAgo;
             }).sort((a,b) => Number(b.Score) - Number(a.Score)).slice(0, 10);
 
-            // Re-activate Working Capacity Bar
             if (displayLogs.length > 0) {
                 xpC.classList.remove('hidden');
                 const avgScore = Math.round(displayLogs.reduce((sum, l) => sum + Number(l.Score), 0) / displayLogs.length);
