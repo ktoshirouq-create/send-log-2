@@ -22,11 +22,11 @@
         .card { background: var(--card-bg); padding: 24px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; }
         h1 { text-align: center; font-weight: 700; font-size: 1.5rem; margin-bottom: 24px; }
         h2 { font-size: 1.1rem; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin: 0 0 16px 0; display: flex; justify-content: space-between; align-items: center; }
+        
         .view { display: none; animation: fadeIn 0.3s ease; }
         .view.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* FIXED NAV SIZING */
         .bottom-nav { position: fixed; bottom: 20px; width: 90%; max-width: 400px; left: 50%; transform: translateX(-50%); background: rgba(23, 23, 23, 0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; gap: 10px; padding: 8px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         .nav-btn { flex: 1; background: transparent; color: var(--text-muted); border: none; padding: 12px; border-radius: 20px; font-weight: 600; cursor: pointer; transition: 0.3s; }
         .nav-btn.active { background: var(--primary); color: #000; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
@@ -47,7 +47,10 @@
         .pill { flex: 0 0 auto; padding: 12px 20px; background: var(--dark); border: 1px solid var(--border); border-radius: 12px; font-weight: 700; font-size: 0.95rem; color: var(--text-muted); scroll-snap-align: center; cursor: pointer; transition: 0.2s; user-select: none; }
         .pill.active { background: var(--primary-fade); color: var(--primary); border-color: var(--primary); }
 
-        .advanced-toggle { color: var(--primary); font-size: 0.85rem; font-weight: 700; text-align: center; margin: 25px 0 15px 0; cursor: pointer; text-transform: uppercase; padding: 12px; border: 1px dashed var(--border); border-radius: 10px; }
+        .advanced-toggle { background: #1e1e1e; color: var(--text); font-size: 0.85rem; font-weight: 700; text-align: center; margin: 25px 0 15px 0; cursor: pointer; text-transform: uppercase; padding: 14px; border: 1px solid var(--border); border-radius: 12px; transition: 0.2s; }
+        .advanced-toggle:active { transform: scale(0.98); }
+        .zone-divider { height: 1px; background: rgba(255,255,255,0.05); margin: 24px 0; border: none; }
+
         .star-rating { display: flex; gap: 8px; font-size: 2.2rem; color: var(--border); margin-bottom: 15px; }
         .star-rating span.active { color: #eab308; text-shadow: 0 0 10px rgba(234, 179, 8, 0.4); }
 
@@ -118,27 +121,19 @@
                     <label>Style of Ascent</label>
                     <div class="pill-row" id="styleSelector"></div>
                     
-                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? '- Hide Details' : '+ Add Details (Optional)'; App.haptic();">+ Add Details (Optional)</div>
+                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? 'Hide Details' : '+ Add Details'; App.haptic();">+ Add Details</div>
                     
                     <div id="advanced-content" class="hidden">
                         
-                        <label>Time of Day (Override)</label>
+                        <label>Time of Day</label>
                         <div class="pill-row" id="timeBucketSelector">
                             <div class="pill" id="time-morn" onclick="App.setTimeBucket('Morning')">Morning</div>
                             <div class="pill" id="time-aft" onclick="App.setTimeBucket('Afternoon')">Afternoon</div>
                             <div class="pill" id="time-eve" onclick="App.setTimeBucket('Evening')">Evening</div>
                         </div>
 
-                        <label>Pre-Climb Fatigue</label>
-                        <div class="pill-row" id="fatigueSelector">
-                            <div class="pill" id="fat-1" onclick="App.setFatigue(1)">1 (Fresh)</div>
-                            <div class="pill" id="fat-2" onclick="App.setFatigue(2)">2</div>
-                            <div class="pill" id="fat-3" onclick="App.setFatigue(3)">3 (Mid)</div>
-                            <div class="pill" id="fat-4" onclick="App.setFatigue(4)">4</div>
-                            <div class="pill" id="fat-5" onclick="App.setFatigue(5)">5 (Shift-Wrecked)</div>
-                        </div>
+                        <hr class="zone-divider">
 
-                        <label>Effort & Grade Feel</label>
                         <div class="sub-label">My Effort</div>
                         <div class="pill-row" id="rpeSelector"></div>
                         <div class="sub-label">The Grade</div>
@@ -156,6 +151,8 @@
                             <span onclick="App.setRating(5)">★</span>
                         </div>
 
+                        <hr class="zone-divider">
+
                         <label>Steepness</label>
                         <div class="pill-row" id="steepnessSelector"></div>
 
@@ -164,6 +161,8 @@
 
                         <label>Hold Types</label>
                         <div class="pill-row" id="holdsSelector"></div>
+
+                        <hr class="zone-divider">
 
                         <label>Notes</label>
                         <textarea id="input-notes" placeholder="beta and headspace..."></textarea>
@@ -193,6 +192,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=25"></script>
+    <script src="app.js?v=26"></script>
 </body>
 </html>
