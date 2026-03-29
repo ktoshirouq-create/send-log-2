@@ -195,6 +195,12 @@ const Paintbrush = {
         document.getElementById('listToggleTop').className = `log-toggle-btn ${state.listMode === 'top10' ? 'active' : ''}`;
         document.getElementById('listToggleRecent').className = `log-toggle-btn ${state.listMode === 'recent' ? 'active' : ''}`;
 
+        // Dynamic Header Magic
+        const headerEl = document.getElementById('logHeader');
+        if (headerEl) {
+            headerEl.innerText = state.listMode === 'top10' ? 'Last 60 Days' : 'Recent Logs';
+        }
+
         let displayLogs = [];
         const xpC = document.getElementById('xpContainer');
         
