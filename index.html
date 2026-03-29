@@ -27,8 +27,8 @@
         .view.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .bottom-nav { position: fixed; bottom: 20px; width: 90%; max-width: 400px; left: 50%; transform: translateX(-50%); background: rgba(23, 23, 23, 0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; gap: 10px; padding: 8px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .nav-btn { flex: 1; background: transparent; color: var(--text-muted); border: none; padding: 12px; border-radius: 20px; font-weight: 600; cursor: pointer; transition: 0.3s; }
+        .bottom-nav { position: fixed; bottom: 20px; width: 95%; max-width: 500px; left: 50%; transform: translateX(-50%); background: rgba(23, 23, 23, 0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; gap: 8px; padding: 8px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1); z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .nav-btn { flex: 1; background: transparent; color: var(--text-muted); border: none; padding: 12px 8px; border-radius: 20px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: 0.3s; white-space: nowrap; }
         .nav-btn.active { background: var(--primary); color: #000; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
 
         label { font-weight: 600; font-size: 0.75rem; color: var(--text-muted); display: block; margin: 15px 0 8px 0; text-transform: uppercase; }
@@ -63,7 +63,13 @@
         .toast { position: fixed; top: 20px; left: 50%; transform: translate(-50%, -20px); opacity: 0; background: rgba(38,38,38,0.9); backdrop-filter: blur(10px); color: #fff; padding: 12px 24px; border-radius: 30px; font-weight: 600; border: 1px solid var(--border); transition: 0.3s; z-index: 2000; pointer-events: none; }
         .toast.show { transform: translate(-50%, 0); opacity: 1; }
 
-        /* V35 TIGHT ACCORDION GRID */
+        /* BURNS COUNTER */
+        .burns-counter { display: flex; align-items: center; justify-content: space-between; background: var(--dark); border: 1px solid var(--border); border-radius: 12px; padding: 6px; width: 140px; margin-bottom: 15px; }
+        .burn-btn { background: #1e1e1e; border: none; color: var(--primary); font-size: 1.5rem; font-weight: 700; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .burn-btn:active { background: #333; transform: scale(0.95); }
+        .burns-val { font-size: 1.2rem; font-weight: 700; color: var(--text); width: 30px; text-align: center; }
+
+        /* LOG / SESSION CARDS */
         .log-card { background: var(--dark); border-radius: 10px; border: 1px solid var(--border); margin-bottom: 8px; overflow: hidden; transition: 0.3s; }
         .log-summary { display: flex; align-items: center; padding: 14px 16px; cursor: pointer; user-select: none; }
         .log-summary:active { background: #111; }
@@ -74,6 +80,7 @@
         .log-grade { font-size: 1.1rem; font-weight: 700; text-align: right; white-space: nowrap; flex-shrink: 0; }
         .log-grade.rp { color: var(--primary); }
         .log-grade.fl { color: var(--flash); }
+        .log-grade.fail { color: #f59e0b; } /* Orange for meaningful fails */
         
         .log-details { display: none; padding: 0 16px 16px 16px; border-top: 1px solid var(--border); background: #121212; }
         .log-card.expanded .log-details { display: block; animation: fadeIn 0.2s ease; }
@@ -84,6 +91,21 @@
         .log-del-btn { width: 100%; margin-top: 16px; padding: 12px; background: rgba(239, 68, 68, 0.05); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
         .log-del-btn:active { background: rgba(239, 68, 68, 0.15); }
 
+        /* SESSION SPECIFIC CSS */
+        .session-card { background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); overflow: hidden; }
+        .session-header { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
+        .session-title { font-size: 1.1rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+        .session-tag-btn { background: rgba(16,185,129,0.1); color: var(--primary); border: 1px solid rgba(16,185,129,0.2); padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; cursor: pointer; }
+        .session-stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 16px; background: #121212; }
+        .s-stat-box { text-align: center; }
+        .s-stat-lbl { font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+        .s-stat-val { font-size: 1.2rem; font-weight: 700; color: var(--text); }
+        .s-stat-val.highlight { color: var(--primary); }
+        .session-accordion-btn { width: 100%; background: #1a1a1a; color: var(--text-muted); border: none; padding: 12px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; cursor: pointer; border-top: 1px solid var(--border); }
+        .session-children { display: none; padding: 12px; background: var(--dark); }
+        .session-card.expanded .session-children { display: block; animation: fadeIn 0.2s ease; }
+        
+        /* DASHBOARD CHARTS */
         .chart-toggle-row { display: flex; justify-content: center; gap: 6px; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 6px; border-radius: 12px; border: 1px solid var(--border); width: fit-content; margin: 0 auto; }
         .chart-toggle-btn { padding: 6px 14px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); cursor: pointer; text-transform: uppercase; }
         .chart-toggle-btn.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.4); border: 1px solid rgba(16,185,129,0.2); }
@@ -95,22 +117,13 @@
         .log-toggle-btn { background: transparent; color: #737373; border: 1px solid transparent; padding: 6px 12px; font-size: 0.7rem; font-weight: 700; border-radius: 6px; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
         .log-toggle-btn.active { color: var(--primary); border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.1); box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
 
-        .xp-container { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px dashed #333; }
-        .xp-row-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
-        .xp-title { font-size: 0.75rem; font-weight: 700; color: #737373; text-transform: uppercase; letter-spacing: 1px; }
-        .xp-percent { font-size: 1.2rem; font-weight: 700; color: var(--primary); line-height: 1; transition: 0.3s; }
-        .xp-row-bottom { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
-        .xp-grade { font-size: 1.15rem; font-weight: 700; color: var(--primary); width: 35px; transition: 0.3s; }
-        .xp-grade.right { text-align: right; }
-        .xp-bar-bg { flex: 1; height: 12px; background: #262626; border-radius: 6px; overflow: hidden; position: relative; }
-        .xp-bar-fill { height: 100%; background: var(--primary); width: 0%; border-radius: 6px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s, box-shadow 0.3s; box-shadow: 0 0 10px rgba(16,185,129,0.5); }
-
         .flex { display: flex; gap: 10px; } .flex > div { flex: 1; } .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <nav class="bottom-nav">
         <button class="nav-btn active" id="nav-log" onclick="App.haptic(); State.view='log'">✍️ Log</button>
+        <button class="nav-btn" id="nav-journal" onclick="App.haptic(); State.view='journal'">📓 Journal</button>
         <button class="nav-btn" id="nav-dash" onclick="App.haptic(); State.view='dash'">📊 Dashboard</button>
     </nav>
 
@@ -144,8 +157,17 @@
                     <label>Grade</label>
                     <div id="gradePicker" class="pill-row"></div>
 
-                    <label>Style of Ascent</label>
+                    <label>Style / Result</label>
                     <div class="pill-row" id="styleSelector"></div>
+                    
+                    <div id="burns-container" class="hidden">
+                        <label>Burns Today</label>
+                        <div class="burns-counter">
+                            <button class="burn-btn" onclick="App.adjBurns(-1)">-</button>
+                            <span id="burns-val" class="burns-val">1</span>
+                            <button class="burn-btn" onclick="App.adjBurns(1)">+</button>
+                        </div>
+                    </div>
                     
                     <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? 'Hide Details' : '+ Add Details'; App.haptic();">+ Add Details</div>
                     
@@ -199,6 +221,12 @@
             </div>
         </div>
 
+        <div id="view-journal" class="view">
+            <h1>Training Journal</h1>
+            <div class="sync-badge"></div>
+            <div id="journalList"></div>
+        </div>
+
         <div id="view-dash" class="view">
             <h1>Dashboard</h1>
             <div class="card">
@@ -207,36 +235,23 @@
                 <div class="pill-row" id="dashSelector" style="margin-bottom: 25px;"></div>
                 <div class="chart-toggle-row" id="chartToggle"></div>
                 <div class="chart-container">
-                    <div id="noDataMsg" style="color: var(--text-muted); font-style: italic; text-align: center; padding-top: 40px; display: none;">Log climbs to view progression</div>
+                    <div id="noDataMsg" style="color: var(--text-muted); font-style: italic; text-align: center; padding-top: 40px; display: none;">Log sends to view progression</div>
                     <canvas id="progressChart"></canvas>
                 </div>
             </div>
             <div class="card">
                 <div class="log-header-row">
-                    <h2 id="logListTitle">Last 60 Days</h2>
+                    <h2 id="logListTitle">Top 10 Sends</h2>
                     <div class="log-toggle">
                         <button class="log-toggle-btn active" id="listToggleTop" onclick="App.haptic(); State.listMode='top10';">Top 10</button>
                         <button class="log-toggle-btn" id="listToggleRecent" onclick="App.haptic(); State.listMode='recent';">Recent</button>
                     </div>
                 </div>
-
-                <div id="xpContainer" class="xp-container hidden">
-                    <div class="xp-row-top">
-                        <div class="xp-title">Working Capacity</div>
-                        <div class="xp-percent" id="xpPercent">0%</div>
-                    </div>
-                    <div class="xp-row-bottom">
-                        <div class="xp-grade" id="xpBaseGrade">-</div>
-                        <div class="xp-bar-bg"><div class="xp-bar-fill" id="xpBarFill"></div></div>
-                        <div class="xp-grade right" id="xpNextGrade">-</div>
-                    </div>
-                </div>
-
                 <div id="logList" class="log-list"></div>
             </div>
         </div>
     </div>
     
-    <script src="app.js?v=37"></script>
+    <script src="app.js?v=38"></script>
 </body>
 </html>
