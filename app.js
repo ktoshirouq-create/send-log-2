@@ -220,7 +220,6 @@ const App = {
         }).join('');
 
         const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash'], ['onsight', 'Onsight']] : [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash']];
-        // Enforce the 'quick' fallback if the style isn't available
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = 'quick';
         
         document.getElementById('styleSelector').innerHTML = styles.map(s => `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="App.haptic(); State.activeStyle='${s[0]}';">${s[1]}</div>`).join('');
@@ -429,9 +428,13 @@ const App = {
 
             let metaHtml = '';
             metaHtml += `<div class="log-details-grid">`;
-            metaHtml += `<div class="log-meta-item" style="grid-column: 1 / -1;">ROUTE<div class="log-meta-val" style="text-transform: none;">${fullRouteForDetails}</div></div>`;
-            if (fullCragForDetails) {
-                metaHtml += `<div class="log-meta-item" style="grid-column: 1 / -1;">CRAG<div class="log-meta-val" style="text-transform: none;">${fullCragForDetails}</div></div>`;
+            
+            // Only inject ROUTE and CRAG if it's an Outdoor discipline
+            if (l.type && l.type.includes('Outdoor')) {
+                metaHtml += `<div class="log-meta-item" style="grid-column: 1 / -1;">ROUTE<div class="log-meta-val" style="text-transform: none;">${fullRouteForDetails}</div></div>`;
+                if (fullCragForDetails) {
+                    metaHtml += `<div class="log-meta-item" style="grid-column: 1 / -1;">CRAG<div class="log-meta-val" style="text-transform: none;">${fullCragForDetails}</div></div>`;
+                }
             }
 
             if (l.style && STYLE_MAP[l.style]) metaHtml += `<div class="log-meta-item">STYLE<div class="log-meta-val">${STYLE_MAP[l.style]}</div></div>`;
@@ -445,7 +448,6 @@ const App = {
             
             let notesHtml = l.notes ? `<div class="log-notes-box">"${l.notes}"</div>` : '';
 
-            // The new Highlander "Only One Open" logic in the onclick handler
             return `
             <div class="log-card">
                 <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.log-card').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">
@@ -468,7 +470,6 @@ const App = {
     logClimb: () => {
         App.haptic(); 
         
-        // Save the current discipline and style to memory right before processing
         localStorage.setItem('lastDiscipline', State.discipline);
         localStorage.setItem('lastStyle', State.activeStyle);
 
