@@ -1,10 +1,11 @@
-const CACHE_NAME = 'crag-logger-v25';
+const CACHE_NAME = 'crag-logger-v26';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './app.js',
   './dashboard.html',
-  './dashboard.js'
+  './dashboard.js',
+  './style.css'
 ];
 
 self.addEventListener('install', (event) => {
@@ -33,7 +34,6 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    // ignoreSearch: true is the magic key that prevents offline crashes
     caches.match(event.request, { ignoreSearch: true }).then((response) => {
       return response || fetch(event.request);
     })
