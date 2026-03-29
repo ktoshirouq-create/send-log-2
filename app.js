@@ -253,10 +253,7 @@ const Paintbrush = {
             if (locationText) subItems.push(locationText);
             if (l.angle) subItems.push(String(l.angle));
             
-            // CLEANUP: We removed the l.style text here because the emoji covers it.
             const discSpan = subItems.length ? `<div class="log-disc" style="text-transform: capitalize; color: #888; font-size: 0.7rem; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${subItems.join(' • ')}</div>` : '';
-            
-            // CLEANUP: Cloud icon is now flex-locked so it won't wrap awkwardly.
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.75rem; flex-shrink: 0;">☁️✕</span>` : '';
 
             return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info" style="min-width: 0;"><div class="log-name" style="display: flex; align-items: center; gap: 6px;"><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${logName}</span>${syncWarning}</div>${discSpan}</div><div class="log-grade ${(rawGrade.includes('⚡')||rawGrade.includes('💎')) ? 'fl' : 'rp'}" style="${inlineColor}; flex-shrink: 0;">${badge}${finalDisplayGrade}</div>${delBtn}</div>`;
