@@ -147,7 +147,7 @@ const App = {
     },
     deleteLog: (id) => { 
         App.haptic(); 
-        if(confirm('Delete this log?')) { 
+        if(confirm('Delete this log permanently?')) { 
             deletedLogs.push(String(id));
             localStorage.setItem('deletedLogs', JSON.stringify(deletedLogs));
             State.logs = State.logs.filter(l => String(l.id) !== String(id)); 
@@ -355,7 +355,6 @@ const App = {
                 document.getElementById('xpBaseGrade').innerText = conf.labels[currentIdx];
                 document.getElementById('xpNextGrade').innerText = conf.labels[nextIdx];
                 
-                // Color mapping logic for Bouldering XP Bar
                 let baseColor = (conf.colors && conf.colors[currentIdx]) ? conf.colors[currentIdx] : 'var(--primary)';
                 let nextColor = (conf.colors && conf.colors[nextIdx]) ? conf.colors[nextIdx] : 'var(--primary)';
 
@@ -393,7 +392,6 @@ const App = {
             const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
             let finalDisplayGrade = cleanDisplayGrade;
             
-            // Emoji logic now applies universally to ropes and bouldering
             if (rawGrade.includes('⚡')) finalDisplayGrade += ' ⚡';
             if (rawGrade.includes('💎') || rawGrade.includes('👁️')) finalDisplayGrade += ' 💎';
             if (rawGrade.includes('🚀')) finalDisplayGrade += ' 🚀';
@@ -401,7 +399,6 @@ const App = {
 
             const badge = getBadge(l.type, rawGrade);
             const syncWarning = l._synced === false ? `<span style="color: #ef4444; font-size: 0.7rem; margin-left: 6px;">☁️✕</span>` : '';
-            const delBtn = `<button class="log-del" onclick="App.deleteLog('${l.id}')">×</button>`;
             
             let logName = l.name || "Log";
             let cragHTML = '';
@@ -411,18 +408,43 @@ const App = {
                 cragHTML = `<div class="log-crag">📍 ${parts[1]}</div>`;
             }
             
-            const subItems = [];
-            if (l.angle) subItems.push(String(l.angle));
-            if (l.style && STYLE_MAP[l.style]) subItems.push(STYLE_MAP[l.style]);
-            const discSpan = subItems.length ? `<div class="log-disc">${subItems.join(' • ').toUpperCase()}</div>` : '';
-            
             let inlineColor = '';
             if (l.type === 'Indoor Bouldering') {
                 const idx = GRADES.bouldsIn.indexOf(getBaseGrade(rawGrade));
                 if (idx > -1 && GRADES.bouldsInColors[idx]) inlineColor = `color: ${GRADES.bouldsInColors[idx]} !important;`;
             }
-            
-            return `<div class="log-item"><div class="log-date">${formattedDate}</div><div class="log-info"><div class="log-name">${logName}${syncWarning}</div>${cragHTML}${discSpan}</div><div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${finalDisplayGrade}</div>${delBtn}</div>`;
+
+            // --- THE NEW EXPANDABLE ACCORDION LOGIC ---
+            let metaHtml = '';
+            if (l.rating || l.effort || l.gradefeel || l.angle || l.holds || (l.style && STYLE_MAP[l.style])) {
+                metaHtml += `<div class="log-details-grid">`;
+                if (l.style && STYLE_MAP[l.style]) metaHtml += `<div class="log-meta-item">STYLE<div class="log-meta-val">${STYLE_MAP[l.style]}</div></div>`;
+                if (l.rating) metaHtml += `<div class="log-meta-item">RATING<div class="log-meta-val" style="color:#eab308; letter-spacing:2px;">${'★'.repeat(l.rating)}</div></div>`;
+                if (l.effort) metaHtml += `<div class="log-meta-item">EFFORT<div class="log-meta-val">${l.effort}</div></div>`;
+                if (l.gradefeel) metaHtml += `<div class="log-meta-item">FEEL<div class="log-meta-val">${l.gradefeel}</div></div>`;
+                if (l.angle) metaHtml += `<div class="log-meta-item">STEEPNESS<div class="log-meta-val">${l.angle}</div></div>`;
+                if (l.holds) metaHtml += `<div class="log-meta-item">HOLDS<div class="log-meta-val">${l.holds}</div></div>`;
+                if (l.climstyles) metaHtml += `<div class="log-meta-item">TYPE<div class="log-meta-val">${l.climstyles}</div></div>`;
+                metaHtml += `</div>`;
+            }
+            let notesHtml = l.notes ? `<div class="log-notes-box">"${l.notes}"</div>` : '';
+
+            return `
+            <div class="log-card">
+                <div class="log-summary" onclick="App.haptic(); this.parentElement.classList.toggle('expanded');">
+                    <div class="log-date">${formattedDate}</div>
+                    <div class="log-info">
+                        <div class="log-name">${logName}${syncWarning}</div>
+                        ${cragHTML}
+                    </div>
+                    <div class="log-grade ${isF ? 'fl' : 'rp'}" style="${inlineColor}">${badge}${finalDisplayGrade}</div>
+                </div>
+                <div class="log-details">
+                    ${metaHtml}
+                    ${notesHtml}
+                    <button class="log-del-btn" onclick="App.deleteLog('${l.id}')">Delete Entry</button>
+                </div>
+            </div>`;
         }).join('');
     },
     
