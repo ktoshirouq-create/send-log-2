@@ -239,11 +239,10 @@ const App = {
     renderDashboard: () => {
         const dStr = String(State.discipline || "");
         const isRope = dStr.includes('Rope');
-        const isBould = dStr.includes('Boulder');
         const conf = getScaleConfig(dStr);
         
-        document.getElementById('listToggleRecent').className = `chart-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
-        document.getElementById('listToggleTop').className = `chart-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
+        document.getElementById('listToggleTop').className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
+        document.getElementById('listToggleRecent').className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
 
         const viewLogs = State.logs.filter(l => l && l.type === dStr).map(l => ({ ...l, cleanDate: (l.date ? String(l.date).substring(0,10) : getLocalISO()) }));
         let displayLogs = [];
@@ -272,8 +271,12 @@ const App = {
                 
                 document.getElementById('xpBaseGrade').innerText = conf.labels[currentIdx];
                 document.getElementById('xpNextGrade').innerText = conf.labels[Math.min(currentIdx + 1, conf.labels.length - 1)];
-                document.getElementById('xpBarFill').style.width = `${percent}%`;
-                document.getElementById('xpText').innerText = `Working Capacity: ${avgScore} (${displayLogs.length} logs)`;
+                document.getElementById('xpPercent').innerText = `${Math.round(percent)}%`;
+                
+                setTimeout(() => {
+                    document.getElementById('xpBarFill').style.width = `${percent}%`;
+                }, 100);
+
             } else {
                 xpC.classList.add('hidden');
             }
@@ -287,12 +290,10 @@ const App = {
             const formattedDate = `${d[2]} ${monthNames[parseInt(d[1], 10) - 1]}`;
             let rawGrade = String(l.grade || "");
             
-            // BOULDER SQUEEZE LOGIC
             const cleanDisplayGrade = getBaseGrade(rawGrade); 
             const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
             let finalDisplayGrade = cleanDisplayGrade;
             
-            // Add emoji back for ropes only
             if (isRope) {
                 if (rawGrade.includes('⚡')) finalDisplayGrade += ' ⚡';
                 if (rawGrade.includes('💎') || rawGrade.includes('👁️')) finalDisplayGrade += ' 💎';
