@@ -2,7 +2,7 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err)));
 }
 
-const API_URL = "https://script.google.com/macros/s/AKfycby0fW1C830QNXESDs6B1NFB9_gLRqOwOycCly63i4jDxlU7L8_W4Du4w-4hhGE4Pak2/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwMh-T7DB7S06_8DB2GC4dniByVHrRSqbODdLRhjciDOXSDL-V4_vzQtRXee2Wmqp9L/exec";
 
 const GRADES = {
     ropes: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"],
@@ -41,7 +41,6 @@ const getBadge = (type, gradeText) => {
     return idx > -1 ? `<span class="boulder-dot" style="background:${GRADES.bouldsInColors[idx]};"></span>` : '';
 };
 
-// ZOMBIE VACCINE
 let deletedLogs = JSON.parse(localStorage.getItem('deletedLogs') || '[]');
 
 let safeLogs = [];
@@ -58,7 +57,7 @@ const State = new Proxy({
     view: 'log', discipline: 'Indoor Rope Climbing', activeGrade: { text: '6b', score: 633 },
     activeStyle: 'project', activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
-    activeTimeBucket: '', activeFatigue: 0, logs: safeLogs
+    activeTimeBucket: '', logs: safeLogs
 }, {
     set(target, prop, value) {
         if (prop === 'discipline' && target.discipline !== value) {
@@ -83,7 +82,7 @@ const State = new Proxy({
             setTimeout(() => App.centerActivePills(), 50); 
         }
         
-        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeGrade', 'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 'activeClimbStyles', 'activeHolds', 'activeTimeBucket', 'activeFatigue'].includes(prop)) {
+        if (['discipline', 'view', 'activeGym', 'activeStyle', 'chartMode', 'activeGrade', 'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 'activeClimbStyles', 'activeHolds', 'activeTimeBucket'].includes(prop)) {
             App.renderUI();
         }
         
@@ -108,7 +107,6 @@ const SyncManager = {
             
             pendingLocals.forEach(localLog => SyncManager.push(localLog));
 
-            // Apply Blacklist Vaccine
             const cleanData = data.filter(d => !deletedLogs.includes(String(d.id))).map(d => ({ ...d, id: String(d.id), _synced: true }));
             const localOnly = State.logs.filter(l => l && !cloudIds.has(String(l.id)));
             
@@ -166,7 +164,6 @@ const App = {
         }
     },
     setTimeBucket: (val) => { App.haptic(); State.activeTimeBucket = State.activeTimeBucket === val ? '' : val; },
-    setFatigue: (val) => { App.haptic(); State.activeFatigue = State.activeFatigue === val ? 0 : val; },
     centerActivePills: () => {
         document.querySelectorAll('.pill-row').forEach(row => {
             const active = row.querySelector('.pill.active');
@@ -221,8 +218,6 @@ const App = {
             const val = document.getElementById(`time-${id}`).innerText;
             document.getElementById(`time-${id}`).className = `pill ${State.activeTimeBucket === val ? 'active' : ''}`;
         });
-
-        [1,2,3,4,5].forEach(num => document.getElementById(`fat-${num}`).className = `pill ${State.activeFatigue === num ? 'active' : ''}`);
 
         document.getElementById('rpeSelector').innerHTML = buildPills(RPES, State.activeRPE, "App.haptic(); State.activeRPE");
         document.getElementById('steepnessSelector').innerHTML = STEEPNESS.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" onclick="App.toggleMulti('steepness', '${s}')">${s}</div>`).join('');
@@ -345,7 +340,6 @@ const App = {
     logClimb: () => {
         App.haptic(); 
         
-        // Smart-Manual Time Engine
         const now = new Date();
         const hours = now.getHours();
         const autoTime = hours < 12 ? 'Morning' : hours < 17 ? 'Afternoon' : 'Evening';
@@ -371,7 +365,6 @@ const App = {
         btn.disabled = true;
         btn.innerText = 'Saving...';
         
-        // DEEP SYNC MAPPING
         const l = { 
             id: String(Date.now()), 
             date: State.activeDate, 
@@ -388,7 +381,6 @@ const App = {
             rating: State.activeRating > 0 ? State.activeRating : "",
             holds: State.activeHolds.join(', '),
             climstyles: State.activeClimbStyles.join(', '),
-            fatigue: State.activeFatigue > 0 ? State.activeFatigue : "",
             notes: document.getElementById('input-notes').value.trim(),
             action: 'add', 
             _synced: false 
@@ -399,7 +391,7 @@ const App = {
         
         if (State.discipline.includes('Outdoor')) document.getElementById('input-name').value = ''; 
         document.getElementById('input-notes').value = '';
-        State.activeRating = 0; State.activeGradeFeel = ''; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; State.activeTimeBucket = ''; State.activeFatigue = 0;
+        State.activeRating = 0; State.activeGradeFeel = ''; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; State.activeTimeBucket = '';
         
         setTimeout(() => {
             btn.innerHTML = '✓ Saved!';
