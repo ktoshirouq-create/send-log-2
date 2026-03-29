@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
     Chart.defaults.color = '#737373';
     Chart.defaults.borderColor = '#262626';
 
-    const getBaseGrade = (g) => String(g || "").replace(/[⚡👁️🚀🛠️\s]/g, '');
+    // FIX 1: Swapped 👁️ for 💎
+    const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️\s]/g, '');
 
     const attachFilters = (id, propName) => {
         document.querySelectorAll(`#${id} .filter-pill`).forEach(pill => {
@@ -104,24 +105,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No logs fit this criteria.</div>'; };
         
-        const hof = [...filteredLogs].filter(l => Number(l.rating) >= 4).sort((a,b)=>b.score-a.score).slice(0,5);
+        const hof = [...filteredLogs].filter(l => Number(l.rating) >= 4).sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,5);
         renderList('list-fame', hof.map(l => `<div class="list-item"><div><div class="list-main">${l.name}</div><div class="list-sub">${l.rating} Stars</div></div><div class="list-badge">${getBaseGrade(l.grade)}</div></div>`).join(''));
 
-        const limit = [...filteredLogs].filter(l => (l.effort||"").includes('Limit') || (l.gradefeel||"").includes('Hard')).sort((a,b)=>b.score-a.score).slice(0,5);
+        const limit = [...filteredLogs].filter(l => (l.effort||"").includes('Limit') || (l.gradefeel||"").includes('Hard')).sort((a,b)=>(b.score||0)-(a.score||0)).slice(0,5);
         renderList('list-limit', limit.map(l => `<div class="list-item"><div><div class="list-main">${l.name}</div><div class="list-sub">${l.date}</div></div><div class="list-badge" style="color:#ef4444;">${getBaseGrade(l.grade)}</div></div>`).join(''));
 
         let steepHTML = '';
         ['Slab', 'Vertical', 'Overhang', 'Roof'].forEach(st => {
             const logsForSt = filteredLogs.filter(l => (l.angle||"").includes(st));
             if(logsForSt.length > 0) {
-                const peak = logsForSt.reduce((max, cur) => cur.score > max.score ? cur : max);
+                // FIX 2: Safety fallback to prevent crashes if score is missing
+                const peak = logsForSt.reduce((max, cur) => (cur.score || 0) > (max.score || 0) ? cur : max);
                 steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="color:#3b82f6;">${getBaseGrade(peak.grade)}</div></div>`;
             } else steepHTML += `<div class="list-item"><div class="list-main" style="color:#555;">${st}</div><div class="list-badge" style="background:transparent; color:#555;">-</div></div>`;
         });
         renderList('list-steepness', steepHTML);
 
         const locs = {};
-        filteredLogs.forEach(l => { let n = l.name; if(n.includes('@')) n = n.split('@')[1].trim(); locs[n] = (locs[n] || 0) + 1; });
+        filteredLogs.forEach(l => { let n = l.name; if(n && n.includes('@')) n = n.split('@')[1].trim(); locs[n] = (locs[n] || 0) + 1; });
         const topLocs = Object.keys(locs).sort((a,b)=>locs[b]-locs[a]).slice(0,5);
         renderList('list-locations', topLocs.map(loc => `<div class="list-item"><div class="list-main">${loc}</div><div class="list-badge" style="color:#fff;">${locs[loc]} Session${locs[loc]>1?'s':''}</div></div>`).join(''));
     }
