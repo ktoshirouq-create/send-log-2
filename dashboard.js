@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     Chart.defaults.color = '#737373';
     Chart.defaults.borderColor = '#262626';
 
-    // FIX 1: Swapped 👁️ for 💎
     const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️\s]/g, '');
 
     const attachFilters = (id, propName) => {
@@ -115,7 +114,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ['Slab', 'Vertical', 'Overhang', 'Roof'].forEach(st => {
             const logsForSt = filteredLogs.filter(l => (l.angle||"").includes(st));
             if(logsForSt.length > 0) {
-                // FIX 2: Safety fallback to prevent crashes if score is missing
                 const peak = logsForSt.reduce((max, cur) => (cur.score || 0) > (max.score || 0) ? cur : max);
                 steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="color:#3b82f6;">${getBaseGrade(peak.grade)}</div></div>`;
             } else steepHTML += `<div class="list-item"><div class="list-main" style="color:#555;">${st}</div><div class="list-badge" style="background:transparent; color:#555;">-</div></div>`;
