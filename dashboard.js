@@ -9,10 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️\s]/g, '');
 
-    const attachFilters = (id, propName) => {
-        document.querySelectorAll(`#${id} .filter-pill`).forEach(pill => {
-            pill.addEventListener('click', (e) => {
-                document.querySelectorAll(`#${id} .filter-pill`).forEach(p => p.classList.remove('active'));
+    // Flexible attacher to handle both pills and text tabs
+    const attachFilters = (id, propName, className) => {
+        document.querySelectorAll(`#${id} .${className}`).forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll(`#${id} .${className}`).forEach(p => p.classList.remove('active'));
                 e.target.classList.add('active');
                 if (propName === 'disc') activeDisc = e.target.getAttribute('data-filter');
                 if (propName === 'time') activeTime = e.target.getAttribute('data-time');
@@ -20,8 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     };
-    attachFilters('disc-filter', 'disc');
-    attachFilters('time-filter', 'time');
+    attachFilters('disc-filter', 'disc', 'filter-pill');
+    attachFilters('time-filter', 'time', 'time-tab');
 
     function renderDashboard() {
         const now = new Date();
@@ -30,8 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (activeTime === 'All') return true;
             
             const logDate = new Date(l.date);
-            if (activeTime === 'YTD') return logDate.getFullYear() === now.getFullYear();
-            
             const diffDays = (now - logDate) / (1000 * 60 * 60 * 24);
             return diffDays <= parseInt(activeTime);
         });
@@ -44,33 +43,61 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredLogs.forEach(l => { if (l.score && l.score > maxScore) { maxScore = l.score; peakG = l.grade; } });
         document.getElementById('stat-peak').innerText = (filteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : getBaseGrade(peakG));
 
+        // V31 IDENTITY GRID LOGIC
         let dayC = {}, timeC = {};
+        let indoorCount = 0;
+        
         filteredLogs.forEach(l => { 
             if (l.day) dayC[l.day] = (dayC[l.day] || 0) + 1; 
             if (l.timeofday) timeC[l.timeofday] = (timeC[l.timeofday] || 0) + 1; 
+            if (String(l.type).includes('Indoor')) indoorCount++;
         });
+        
         const topDay = Object.keys(dayC).length ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-';
         const topTime = Object.keys(timeC).length ? Object.keys(timeC).reduce((a, b) => timeC[a] > timeC[b] ? a : b) : '-';
-        document.getElementById('habit-day').innerText = topDay;
-        document.getElementById('habit-time').innerText = topTime;
+        
+        let envLabel = '-';
+        if (filteredLogs.length > 0) {
+            const inRatio = indoorCount / filteredLogs.length;
+            if (inRatio >= 0.8) envLabel = 'Gym Rat 🐀';
+            else if (inRatio <= 0.4) envLabel = 'Crag Hound 🐺';
+            else envLabel = 'Weekend Warrior 🏕️';
+        }
+
+        document.getElementById('id-day').innerText = topDay;
+        document.getElementById('id-time').innerText = topTime;
+        document.getElementById('id-env').innerText = envLabel;
+        document.getElementById('id-arch').innerText = 'TBD 🔒';
 
         Object.values(charts).forEach(c => { if(c) c.destroy(); });
 
-        const grades = {};
-        filteredLogs.forEach(l => {
-            if (l.score) {
-                const clean = getBaseGrade(l.grade);
-                grades[clean] = (grades[clean] || 0) + 1;
-            }
-        });
-        const sortedGrades = Object.keys(grades).sort((a,b) => a.localeCompare(b));
-        const pyrData = sortedGrades.map(g => grades[g]);
+        // V31 SMART PYRAMID LOGIC
+        const pyrCanvas = document.getElementById('pyramidChart');
+        const pyrOverlay = document.getElementById('pyramidOverlay');
 
-        charts.pyr = new Chart(document.getElementById('pyramidChart'), {
-            type: 'bar',
-            data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: '#10b981', borderRadius: 4 }] },
-            options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { display: false } } }
-        });
+        if (activeDisc === 'All') {
+            pyrCanvas.style.display = 'none';
+            pyrOverlay.style.display = 'flex';
+        } else {
+            pyrCanvas.style.display = 'block';
+            pyrOverlay.style.display = 'none';
+            
+            const grades = {};
+            filteredLogs.forEach(l => {
+                if (l.score) {
+                    const clean = getBaseGrade(l.grade);
+                    grades[clean] = (grades[clean] || 0) + 1;
+                }
+            });
+            const sortedGrades = Object.keys(grades).sort((a,b) => a.localeCompare(b));
+            const pyrData = sortedGrades.map(g => grades[g]);
+
+            charts.pyr = new Chart(pyrCanvas, {
+                type: 'bar',
+                data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: '#10b981', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { display: false } } }
+            });
+        }
 
         const sortedCNS = [...filteredLogs].filter(l=>l.score).sort((a,b) => new Date(a.date) - new Date(b.date));
         const cnsData = { labels: ['W1', 'W2', 'W3', 'W4'], data: [null, null, null, null], grades: ['-','-','-','-'] };
