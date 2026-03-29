@@ -79,12 +79,23 @@
         .chart-toggle-btn.active { background: var(--card-bg); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.4); border: 1px solid rgba(16,185,129,0.2); }
         .chart-container { position: relative; height: 300px; width: 100%; }
 
-        /* XP BAR STYLES */
-        .xp-container { background: #1e1e1e; border-radius: 10px; padding: 12px; margin-bottom: 20px; border: 1px solid var(--border); }
-        .xp-header { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; }
-        .xp-bar-bg { height: 8px; background: #262626; border-radius: 4px; overflow: hidden; position: relative; }
-        .xp-bar-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.5s ease; border-radius: 4px; }
-        .xp-text { font-size: 0.75rem; color: #a3a3a3; text-align: center; margin-top: 8px; font-weight: 600; }
+        /* NEW LOGS HEADER & TOGGLE UI */
+        .log-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .log-header-row h2 { border: none; padding: 0; margin: 0; }
+        .log-toggle { display: flex; background: #111; border-radius: 8px; padding: 3px; border: 1px solid #333; }
+        .log-toggle-btn { background: transparent; color: #737373; border: 1px solid transparent; padding: 6px 12px; font-size: 0.7rem; font-weight: 700; border-radius: 6px; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
+        .log-toggle-btn.active { color: var(--primary); border-color: rgba(16,185,129,0.5); background: rgba(16,185,129,0.1); box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+
+        /* V28 GLOW-UP: WORKING CAPACITY XP BAR */
+        .xp-container { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px dashed #333; }
+        .xp-row-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
+        .xp-title { font-size: 0.75rem; font-weight: 700; color: #737373; text-transform: uppercase; letter-spacing: 1px; }
+        .xp-percent { font-size: 1.2rem; font-weight: 700; color: var(--primary); line-height: 1; }
+        .xp-row-bottom { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
+        .xp-grade { font-size: 1.15rem; font-weight: 700; color: var(--primary); width: 35px; }
+        .xp-grade.right { text-align: right; }
+        .xp-bar-bg { flex: 1; height: 12px; background: #262626; border-radius: 6px; overflow: hidden; position: relative; }
+        .xp-bar-fill { height: 100%; background: var(--primary); width: 0%; border-radius: 6px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 0 10px rgba(16,185,129,0.5); }
 
         .flex { display: flex; gap: 10px; } .flex > div { flex: 1; } .hidden { display: none !important; }
     </style>
@@ -193,23 +204,31 @@
                 </div>
             </div>
             <div class="card">
-                <h2>
-                    Logs
-                    <div style="display:flex; gap:5px;">
-                        <button class="chart-toggle-btn" id="listToggleRecent" onclick="App.haptic(); State.listMode='recent';" style="padding:4px 8px; font-size:0.6rem;">Recent</button>
-                        <button class="chart-toggle-btn active" id="listToggleTop" onclick="App.haptic(); State.listMode='top10';" style="padding:4px 8px; font-size:0.6rem;">Top 10 (60d)</button>
+                <div class="log-header-row">
+                    <h2>Logs</h2>
+                    <div class="log-toggle">
+                        <button class="log-toggle-btn active" id="listToggleTop" onclick="App.haptic(); State.listMode='top10';">Top 10</button>
+                        <button class="log-toggle-btn" id="listToggleRecent" onclick="App.haptic(); State.listMode='recent';">Recent</button>
                     </div>
-                </h2>
-                <div id="xpContainer" class="xp-container hidden">
-                    <div class="xp-header"><span id="xpBaseGrade">-</span><span id="xpNextGrade">-</span></div>
-                    <div class="xp-bar-bg"><div class="xp-bar-fill" id="xpBarFill"></div></div>
-                    <div class="xp-text" id="xpText">Log climbs to build capacity</div>
                 </div>
+
+                <div id="xpContainer" class="xp-container hidden">
+                    <div class="xp-row-top">
+                        <div class="xp-title">Working Capacity</div>
+                        <div class="xp-percent" id="xpPercent">0%</div>
+                    </div>
+                    <div class="xp-row-bottom">
+                        <div class="xp-grade" id="xpBaseGrade">-</div>
+                        <div class="xp-bar-bg"><div class="xp-bar-fill" id="xpBarFill"></div></div>
+                        <div class="xp-grade right" id="xpNextGrade">-</div>
+                    </div>
+                </div>
+
                 <div id="logList" class="log-list"></div>
             </div>
         </div>
     </div>
     
-    <script src="app.js?v=27"></script>
+    <script src="app.js?v=28"></script>
 </body>
 </html>
