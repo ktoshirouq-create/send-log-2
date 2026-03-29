@@ -1,41 +1,33 @@
-const CACHE_NAME = 'crag-logger-v37';
-const ASSETS_TO_CACHE = [
-  './',
-  './index.html',
-  './app.js',
-  './dashboard.html',
-  './dashboard.js',
-  './style.css'
+const CACHE_NAME = 'crag-logger-v38';
+const ASSETS = [
+  '/',
+  '/index.html',
+  '/dashboard.html',
+  '/app.js',
+  '/dashboard.js',
+  '/manifest.json'
 ];
 
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
   );
+  self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache); 
-          }
-        })
-      );
-    })
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(
+      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+    ))
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then((response) => {
-      return response || fetch(event.request);
+self.addEventListener('fetch', e => {
+  e.respondWith(
+    caches.match(e.request, { ignoreSearch: true }).then(cached => {
+      return cached || fetch(e.request);
     })
   );
 });
