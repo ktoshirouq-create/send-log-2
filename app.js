@@ -60,7 +60,6 @@ const getBadge = (type, gradeText) => {
     return idx > -1 ? `<span class="boulder-dot" style="background:${GRADES.bouldsInColors[idx]};"></span>` : '';
 };
 
-// CLEANED: Look only at the permanent master keys now. Bridge burned.
 let deletedClimbs = JSON.parse(localStorage.getItem('crag_deleted_climbs') || '[]');
 let deletedSessions = JSON.parse(localStorage.getItem('crag_deleted_sessions') || '[]');
 
@@ -71,6 +70,7 @@ let initDisc = localStorage.getItem('lastDiscipline') || 'Indoor Rope Climbing';
 let initStyle = localStorage.getItem('lastStyle') || 'quick';
 let initConf = getScaleConfig(initDisc);
 
+// EXHIBIT C: The Optimized Proxy (Traffic Cop)
 const State = new Proxy({
     view: 'log', discipline: initDisc, activeGrade: { text: initConf.labels[4] || initConf.labels[0], score: initConf.scores[4] || initConf.scores[0] },
     activeStyle: initStyle, activeBurns: 1, activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
@@ -78,8 +78,11 @@ const State = new Proxy({
     activeTimeBucket: '', climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
 }, {
     set(target, prop, value) {
+        let needsHardRebuild = false;
+
         if (prop === 'discipline' && target.discipline !== value) {
             target.discipline = value;
+            needsHardRebuild = true;
             const conf = getScaleConfig(value);
             if (!conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
                 target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
@@ -89,6 +92,10 @@ const State = new Proxy({
             }
         } else {
             target[prop] = value;
+        }
+
+        if (needsHardRebuild) {
+            App.renderUI(); // The Sledgehammer
         }
         
         if (prop === 'view') {
@@ -102,14 +109,15 @@ const State = new Proxy({
             setTimeout(() => App.centerActivePills(), 50); 
         }
         
-        const triggersUI = [
-            'discipline', 'activeGym', 'activeStyle', 'activeBurns', 'chartMode', 
+        const softPaintTriggers = [
+            'activeGym', 'activeStyle', 'activeBurns', 'chartMode', 
             'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 
             'activeClimbStyles', 'activeHolds', 'activeTimeBucket', 'activeGrade'
         ];
         
-        if (triggersUI.includes(prop)) {
-            App.renderUI();
+        if (softPaintTriggers.includes(prop) && !needsHardRebuild) {
+            App.updateUISelections(); // The Scalpel
+            if (prop === 'chartMode' && target.view === 'dash') App.renderDashboardCharts();
         }
 
         if (prop === 'listMode' && target.view === 'dash') App.renderDashboardLogs();
@@ -266,16 +274,12 @@ const App = {
         App.haptic();
         document.getElementById('sessionModal').classList.remove('active');
     },
-    
     setModalFocus: (val, init = false) => {
         if(!init) App.haptic();
         const current = document.getElementById('modalFocusVal').value;
         const newVal = (!init && current === val) ? "" : val;
         document.getElementById('modalFocusVal').value = newVal;
-        
-        document.querySelectorAll('#sec-focus .pill').forEach(p => {
-            p.classList.toggle('active', newVal !== "" && p.innerText === newVal);
-        });
+        document.querySelectorAll('#sec-focus .pill').forEach(p => { p.classList.toggle('active', newVal !== "" && p.innerText === newVal); });
     },
     setModalFatigue: (val, init = false) => {
         if(!init) App.haptic();
@@ -283,20 +287,14 @@ const App = {
         const strVal = String(val);
         const newVal = (!init && current === strVal) ? "" : strVal;
         document.getElementById('modalFatigueVal').value = newVal;
-        
-        document.querySelectorAll('#sec-fatigue .pill').forEach(p => {
-            p.classList.toggle('active', newVal !== "" && p.innerText === newVal);
-        });
+        document.querySelectorAll('#sec-fatigue .pill').forEach(p => { p.classList.toggle('active', newVal !== "" && p.innerText === newVal); });
     },
     setModalWarmUp: (val, init = false) => {
         if(!init) App.haptic();
         const current = document.getElementById('modalWarmUpVal').value;
         const newVal = (!init && current === val) ? "" : val;
         document.getElementById('modalWarmUpVal').value = newVal;
-        
-        document.querySelectorAll('#sec-warmup .pill').forEach(p => {
-            p.classList.toggle('active', newVal !== "" && p.innerText === newVal);
-        });
+        document.querySelectorAll('#sec-warmup .pill').forEach(p => { p.classList.toggle('active', newVal !== "" && p.innerText === newVal); });
     },
     
     saveSessionModal: () => {
@@ -308,19 +306,20 @@ const App = {
         
         State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: focus, Fatigue: fatigue, WarmUp: warmup, _synced: false} : s);
         SyncManager.pushAll(State.sessions.filter(s => s._synced === false), []);
-        
         App.closeSessionModal();
     },
 
+    // EXHIBIT C: The Initial Hard Build
     renderUI: () => {
         const dStr = String(State.discipline || "");
         const isOut = dStr.includes('Outdoor'), isRope = dStr.includes('Rope'), isBould = dStr.includes('Boulder');
         const conf = getScaleConfig(dStr);
 
-        const buildPills = (arr, activeVal, clickAction) => arr.map(item => `<div class="pill ${item === activeVal ? 'active' : ''}" onclick="${clickAction}='${item}';">${item}</div>`).join('');
+        // ADDED data-val so the Scalpel knows what to target
+        const buildPills = (arr, activeVal, clickAction) => arr.map(item => `<div class="pill ${item === activeVal ? 'active' : ''}" data-val="${item}" onclick="${clickAction}='${item}';">${item}</div>`).join('');
 
-        document.getElementById('typeSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
-        document.getElementById('dashSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
+        document.getElementById('typeSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
+        document.getElementById('dashSelector').innerHTML = DISCIPLINES.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${DISC_LABELS[i]}</div>`).join('');
         
         document.getElementById('input-outdoor').className = isOut ? '' : 'hidden';
         document.getElementById('input-indoor').className = isOut ? 'hidden' : '';
@@ -336,46 +335,75 @@ const App = {
         document.getElementById('gradePicker').innerHTML = conf.labels.map((g, i) => {
             const dot = conf.colors[i] ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
             const isActive = String(g).toLowerCase() === String(State.activeGrade.text).toLowerCase();
-            return `<div class="pill ${isActive ? 'active' : ''}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
+            return `<div class="pill ${isActive ? 'active' : ''}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
         }).join('');
 
         const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['onsight', 'Onsight'], ['worked', 'Worked']] : [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['worked', 'Worked']];
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = 'quick';
         
         document.getElementById('styleSelector').innerHTML = styles.map(s => {
-            return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
+            return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
                 if(['flash', 'onsight'].includes('${s[0]}')){ State.activeBurns = 1; }
                 else if('${s[0]}' === 'quick' && State.activeBurns === 1){ State.activeBurns = 2; }
                 else if(['project', 'worked'].includes('${s[0]}') && State.activeBurns < 3){ State.activeBurns = 3; }
             ">${s[1]}</div>`;
         }).join('');
-        
-        const bCont = document.getElementById('burns-container');
-        if (['flash', 'onsight'].includes(State.activeStyle)) { bCont.classList.add('hidden'); } else { bCont.classList.remove('hidden'); }
-        document.getElementById('burns-val').innerText = State.activeBurns;
-        
-        ['morn', 'aft', 'eve'].forEach(id => {
-            const val = document.getElementById(`time-${id}`).innerText;
-            document.getElementById(`time-${id}`).className = `pill ${State.activeTimeBucket === val ? 'active' : ''}`;
-        });
 
         document.getElementById('rpeSelector').innerHTML = buildPills(RPES, State.activeRPE, "App.haptic(); State.activeRPE");
-        document.getElementById('steepnessSelector').innerHTML = STEEPNESS.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" onclick="App.toggleMulti('steepness', '${s}')">${s}</div>`).join('');
-        document.getElementById('climbStyleSelector').innerHTML = CLIMB_STYLES.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" onclick="App.toggleMulti('style', '${s}')">${s}</div>`).join('');
-        document.getElementById('holdsSelector').innerHTML = HOLDS.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join('');
+        document.getElementById('steepnessSelector').innerHTML = STEEPNESS.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('steepness', '${s}')">${s}</div>`).join('');
+        document.getElementById('climbStyleSelector').innerHTML = CLIMB_STYLES.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('style', '${s}')">${s}</div>`).join('');
+        document.getElementById('holdsSelector').innerHTML = HOLDS.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" data-val="${h}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join('');
         
-        document.getElementById('feel-soft').className = `pill ${State.activeGradeFeel === 'Soft' ? 'active' : ''}`;
-        document.getElementById('feel-hard').className = `pill ${State.activeGradeFeel === 'Hard' ? 'active' : ''}`;
-        
-        const stars = document.getElementById('starRating').children;
-        for(let i=0; i<stars.length; i++) stars[i].className = i < State.activeRating ? 'active' : '';
+        document.getElementById('chartToggle').innerHTML = `<div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" data-val="max" onclick="App.haptic(); State.chartMode='max';">Max Peak</div><div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" data-val="avg" onclick="App.haptic(); State.chartMode='avg';">Avg (Top 10)</div>`;
 
-        document.getElementById('chartToggle').innerHTML = `<div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='max';">Max Peak</div><div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='avg';">Avg (Top 10)</div>`;
+        App.updateUISelections(); // Run Soft Paint immediately to catch hardcoded elements (stars, time)
 
         if (State.view === 'dash') App.renderDashboard();
         if (State.view === 'journal') App.renderJournal();
 
         setTimeout(() => App.centerActivePills(), 10);
+    },
+
+    // EXHIBIT C: The New Soft Paint Scalpel
+    updateUISelections: () => {
+        const syncSingle = (selector, val) => {
+            document.querySelectorAll(`${selector} .pill, ${selector} .chart-toggle-btn`).forEach(p => {
+                p.classList.toggle('active', p.getAttribute('data-val') === String(val));
+            });
+        };
+        const syncMulti = (selector, valArr) => {
+            document.querySelectorAll(`${selector} .pill`).forEach(p => {
+                p.classList.toggle('active', valArr.includes(p.getAttribute('data-val')));
+            });
+        };
+
+        syncSingle('#typeSelector', State.discipline);
+        syncSingle('#dashSelector', State.discipline);
+        syncSingle('#gymPicker', State.activeGym);
+        syncSingle('#gradePicker', State.activeGrade.text);
+        syncSingle('#styleSelector', State.activeStyle);
+        syncSingle('#rpeSelector', State.activeRPE);
+        syncMulti('#steepnessSelector', State.activeSteepness);
+        syncMulti('#climbStyleSelector', State.activeClimbStyles);
+        syncMulti('#holdsSelector', State.activeHolds);
+        syncSingle('#chartToggle', State.chartMode);
+
+        // Sync hardcoded elements
+        ['morn', 'aft', 'eve'].forEach(id => {
+            const el = document.getElementById(`time-${id}`);
+            if (el) el.classList.toggle('active', State.activeTimeBucket === el.innerText);
+        });
+
+        document.getElementById('feel-soft').classList.toggle('active', State.activeGradeFeel === 'Soft');
+        document.getElementById('feel-hard').classList.toggle('active', State.activeGradeFeel === 'Hard');
+
+        const stars = document.getElementById('starRating').children;
+        for(let i=0; i<stars.length; i++) stars[i].className = i < State.activeRating ? 'active' : '';
+
+        const bCont = document.getElementById('burns-container');
+        if (['flash', 'onsight'].includes(State.activeStyle)) bCont.classList.add('hidden');
+        else bCont.classList.remove('hidden');
+        document.getElementById('burns-val').innerText = State.activeBurns;
     },
 
     renderJournal: () => {
