@@ -194,9 +194,13 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFilters('disc-filter', 'disc', 'filter-pill');
     attachFilters('time-filter', 'time', 'time-tab');
 
-    // V43: The RPG Calculation Engine (Abstracted for reuse)
+    // V44: The Upgraded RPG Engine with a Base Floor (40/100)
     const calcRPG = (logs) => {
-        let attr = { Power: 1, Endurance: 1, Technique: 1, Fingers: 1, Headspace: 1, Tenacity: 1 };
+        let attr = { Power: 0, Endurance: 0, Technique: 0, Fingers: 0, Headspace: 0, Tenacity: 0 };
+        
+        // If there are no logs in this phase, return a baseline shape
+        if (logs.length === 0) return { Power: 40, Endurance: 40, Technique: 40, Fingers: 40, Headspace: 40, Tenacity: 40 };
+
         logs.forEach(l => {
             const angle = String(getV(l, 'Angle') || "");
             const styleTag = String(getV(l, 'ClimStyles') || getV(l, 'climstyles') || "").toLowerCase();
@@ -229,16 +233,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (styleResult === 'worked') attr.Tenacity += 1; 
         });
         
-        // Normalize to a 100-point shape scale
+        // V44 Math: Base floor of 40, max dynamic span of 60.
         const maxVal = Math.max(...Object.values(attr), 1);
-        Object.keys(attr).forEach(k => attr[k] = Math.round((attr[k] / maxVal) * 100));
+        Object.keys(attr).forEach(k => attr[k] = 40 + Math.round((attr[k] / maxVal) * 60));
         return attr;
     };
 
     function renderDashboard() {
         const now = new Date();
         
-        // V43: We need the All-Time logs for the Ghost shape, filtering ONLY by Discipline
         const allTimeLogsFiltered = allLogs.filter(l => {
             const type = String(getV(l, 'Type') || "");
             let normalizedType = type;
@@ -383,7 +386,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // V43: Generate Normalized Data
         const currAttr = calcRPG(currentFilteredLogs);
         const baseAttr = calcRPG(allTimeLogsFiltered);
 
@@ -400,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const archEl = document.getElementById('id-arch');
         archEl.innerText = archetype;
 
-        // V43: The "Haaland" Overlapping Profile Radar
+        // V44: The Hacked, Cleaned "FIFA" Radar Graph
         charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
             type: 'radar', 
             data: { 
@@ -413,31 +415,33 @@ document.addEventListener('DOMContentLoaded', () => {
                         backgroundColor: 'rgba(16, 185, 129, 0.4)', 
                         pointBackgroundColor: '#10b981',
                         pointRadius: 0,
-                        borderWidth: 2
+                        borderWidth: 2,
+                        fill: true
                     },
                     { 
                         label: 'All-Time Base',
                         data: Object.values(baseAttr), 
-                        borderColor: 'rgba(255,255,255,0.2)', 
+                        borderColor: 'rgba(255,255,255,0.3)', 
                         backgroundColor: 'rgba(255,255,255,0.05)', 
                         pointRadius: 0,
-                        borderWidth: 1,
-                        borderDash: [5, 5]
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        fill: true
                     }
                 ] 
             }, 
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 plugins: { 
-                    legend: { display: true, position: 'top', labels: { color: '#737373', boxWidth: 10, font: {size: 10} } } 
+                    legend: { display: true, position: 'top', labels: { color: '#737373', boxWidth: 12, font: {size: 11} } } 
                 }, 
                 scales: { 
                     r: { 
                         min: 0, max: 100,
                         ticks: { display: false, stepSize: 20 }, 
                         grid: { color: 'rgba(255,255,255,0.05)' }, 
-                        angleLines: { color: 'rgba(255,255,255,0.05)' },
-                        pointLabels: { color: '#a3a3a3', font: { size: 11, weight: 'bold' } }
+                        angleLines: { display: false }, // V44 FIX: Hides the ugly internal spokes!
+                        pointLabels: { color: '#f3f4f6', font: { size: 11, weight: 'bold' } }
                     } 
                 } 
             } 
