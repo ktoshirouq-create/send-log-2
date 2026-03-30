@@ -9,19 +9,21 @@ const AppConfig = {
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'],
     discLabels: ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder'],
-    styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'worked': 'Worked' },
+    styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     climbStyles: ['Endurance', 'Cruxy', 'Technical', 'Athletic'],
     holds: ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs'],
     rpes: ['Breezy', 'Solid', 'Limit'],
     grades: {
-        ropes: { labels: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
+        // V42: Expanded to 5a
+        ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
 };
 
-const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌\s]/g, '');
+// V42: Regex updated to strip TR and AB emojis
+const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
 
@@ -61,7 +63,7 @@ let initConf = getScaleConfig(initDisc);
 
 const State = new Proxy({
     view: 'log', discipline: initDisc, 
-    activeGrade: { text: initConf.labels[4] || initConf.labels[0], score: initConf.scores[4] || initConf.scores[0] },
+    activeGrade: { text: initConf.labels[8] || initConf.labels[0], score: initConf.scores[8] || initConf.scores[0] }, // Default around 6b
     activeStyle: initStyle, activeBurns: 1, activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
     activeTimeBucket: '', climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
@@ -162,7 +164,7 @@ const SyncManager = {
 
 const App = {
     chart: null,
-    isSaving: false, // V61 FIX: Added saving lock
+    isSaving: false,
     init: () => {
         if (window.Chart) { Chart.defaults.color = '#737373'; Chart.defaults.borderColor = '#262626'; }
         App.renderUI();
@@ -278,7 +280,6 @@ const App = {
         App.closeSessionModal();
     },
 
-    // V61 FIX: Respect the saving lock
     validateForm: () => {
         if (App.isSaving) return; 
         
@@ -319,12 +320,19 @@ const App = {
             return `<div class="pill ${String(g) === String(State.activeGrade.text) ? 'active' : ''}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
         }).join('');
 
-        const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['onsight', 'Onsight'], ['worked', 'Worked']] : [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['worked', 'Worked']];
+        // V42 FIX: Inject Top Rope and Auto Belay where appropriate
+        let styles = [];
+        if (isRope) {
+            if (isOut) styles = [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['onsight', 'Onsight'], ['toprope', 'Top Rope'], ['worked', 'Worked']];
+            else styles = [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['toprope', 'Top Rope'], ['autobelay', 'Auto Belay'], ['worked', 'Worked']];
+        } else {
+            styles = [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['worked', 'Worked']];
+        }
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = 'quick';
         
         document.getElementById('styleSelector').innerHTML = styles.map(s => {
             return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
-                if(['flash', 'onsight'].includes('${s[0]}')){ State.activeBurns = 1; }
+                if(['flash', 'onsight', 'toprope', 'autobelay'].includes('${s[0]}')){ State.activeBurns = 1; }
                 else if('${s[0]}' === 'quick' && State.activeBurns === 1){ State.activeBurns = 2; }
                 else if(['project', 'worked'].includes('${s[0]}') && State.activeBurns < 3){ State.activeBurns = 3; }
             ">${s[1]}</div>`;
@@ -396,7 +404,7 @@ const App = {
             const totalBurns = children.reduce((sum, c) => sum + (Number(c.Burns) || 1), 0);
             
             let maxSentStr = "-", maxColor = '#fff';
-            const sends = children.filter(c => c.Style !== 'worked');
+            const sends = children.filter(c => c.Style !== 'worked' && c.Style !== 'toprope' && c.Style !== 'autobelay');
             if (sends.length > 0) {
                 const maxSend = sends.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max);
                 maxSentStr = getBaseGrade(maxSend.Grade);
@@ -469,7 +477,7 @@ const App = {
 
     renderDashboardCharts: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
-        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked' && l.Style !== 'toprope' && l.Style !== 'autobelay').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
         const ctxCanvas = document.getElementById('progressChart');
         if (!window.Chart || viewLogs.length === 0) { ctxCanvas.style.display = 'none'; document.getElementById('noDataMsg').style.display = 'block'; return; }
         ctxCanvas.style.display = 'block'; document.getElementById('noDataMsg').style.display = 'none';
@@ -527,7 +535,7 @@ const App = {
 
     renderDashboardLogs: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
-        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked' && l.Style !== 'toprope' && l.Style !== 'autobelay').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
         
         document.getElementById('listToggleTop').className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
         document.getElementById('listToggleRecent').className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
@@ -595,16 +603,20 @@ const App = {
         const isOut = State.discipline.includes('Outdoor'), outN = document.getElementById('input-name').value.trim(), outC = document.getElementById('input-crag').value.trim();
         if (isOut && (!outN || !outC)) return;
         
-        App.isSaving = true; // V61 FIX: Lock the button validation
+        App.isSaving = true; 
 
         const n = isOut ? `${outN} @ ${outC}` : State.activeGym;
         const climbDateStr = State.activeDate;
         let s = State.activeGrade.score, g = State.activeGrade.text;
+        
+        // V42 FIX: TR and AB assign emojis and Zero points
         if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
         else if (State.activeStyle === 'onsight') { s += 10; g += " 💎"; }
         else if (State.activeStyle === 'quick') g += " 🚀";
         else if (State.activeStyle === 'project') g += " 🛠️";
         else if (State.activeStyle === 'worked') { g += " ❌"; s = 0; }
+        else if (State.activeStyle === 'toprope') { g += " 🪢"; s = 0; }
+        else if (State.activeStyle === 'autobelay') { g += " 🔄"; s = 0; }
         
         const sessionID = `${climbDateStr}_${(isOut ? outC : State.activeGym).replace(/[^a-zA-Z0-9\s]/g, '').trim()}`;
         if (!State.sessions.find(s => s.SessionID === sessionID)) {
@@ -629,13 +641,13 @@ const App = {
         SyncManager.pushAll(State.sessions.filter(s => !s._synced), [climb]); 
         
         State.activeRating = 0; State.activeGradeFeel = ''; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
-        State.activeBurns = ['flash', 'onsight'].includes(State.activeStyle) ? 1 : (State.activeStyle === 'quick' ? 2 : 3);
+        State.activeBurns = ['flash', 'onsight', 'toprope', 'autobelay'].includes(State.activeStyle) ? 1 : (State.activeStyle === 'quick' ? 2 : 3);
         
         setTimeout(() => {
             btn.innerHTML = '✓ Saved!';
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
             setTimeout(() => { 
-                App.isSaving = false; // V61 FIX: Unlock the button validation
+                App.isSaving = false; 
                 App.validateForm(); 
             }, 2000);
         }, 400); 
