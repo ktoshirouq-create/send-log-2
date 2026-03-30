@@ -91,29 +91,29 @@
         .log-del-btn { width: 100%; margin-top: 16px; padding: 12px; background: rgba(239, 68, 68, 0.05); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
         .log-del-btn:active { background: rgba(239, 68, 68, 0.15); }
 
-        /* SESSION SPECIFIC CSS (V45 Redesign) */
-        .session-card { background: var(--card-bg); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.4); overflow: hidden; }
+        /* SESSION SPECIFIC CSS (V46 Redesign) */
+        .session-card { background: linear-gradient(145deg, #1a1a1a, #111); border-radius: var(--radius); border: 1px solid #2a2a2a; margin-bottom: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.6); overflow: hidden; transition: 0.3s; }
         .session-header { padding: 16px 16px 8px 16px; display: flex; justify-content: space-between; align-items: flex-start; }
         .s-date-block { display: flex; flex-direction: column; }
         .s-date-main { font-size: 1.15rem; font-weight: 700; color: #fff; }
         .s-date-sub { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; margin-top: 2px; }
-        .s-loc { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; background: #1f1f1f; padding: 6px 12px; border-radius: 20px; border: 1px solid #2a2a2a; }
+        .s-loc { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; background: rgba(255,255,255,0.03); padding: 6px 12px; border-radius: 20px; border: 1px solid #333; }
         
-        .s-tags-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .s-tags-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px 16px; }
         .s-tag { padding: 6px 12px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
         .s-tag:active { transform: scale(0.95); }
         .s-tag.focus-tag { background: rgba(59, 130, 246, 0.1); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.2); } 
         .s-tag.fatigue-tag { background: rgba(249, 115, 22, 0.1); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.2); } 
-        .s-tag.empty-tag { background: transparent; color: var(--text-muted); border: 1px dashed var(--text-muted); }
+        .s-tag.empty-tag { background: transparent; color: var(--text-muted); border: 1px dashed #444; }
 
-        .session-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 16px 10px; background: #121212; }
+        .session-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 16px 10px; background: rgba(0,0,0,0.3); border-top: 1px solid #222; border-bottom: 1px solid #222; }
         .s-stat-box { text-align: center; }
         .s-stat-lbl { font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
-        .s-stat-val { font-size: 1.15rem; font-weight: 700; color: #fff; }
-        .s-stat-val.highlight { color: var(--primary); }
-        .session-accordion-btn { width: 100%; background: #1a1a1a; color: var(--text-muted); border: none; padding: 12px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; cursor: pointer; border-top: 1px solid var(--border); transition: 0.2s; }
+        .s-stat-val { font-size: 1.3rem; font-weight: 700; color: #fff; }
+        
+        .session-accordion-btn { width: 100%; background: transparent; color: var(--text-muted); border: none; padding: 14px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; cursor: pointer; transition: 0.2s; }
         .session-accordion-btn:active { background: #222; }
-        .session-children { display: none; padding: 12px; background: var(--dark); }
+        .session-children { display: none; padding: 12px; background: var(--dark); border-top: 1px solid #222; }
         .session-card.expanded .session-children { display: block; animation: fadeIn 0.2s ease; }
 
         .load-more-btn { background: transparent; color: var(--text-muted); border: 1px solid var(--border); padding: 14px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; margin-top: 10px; text-transform: uppercase; }
@@ -160,20 +160,27 @@
 
     <div id="sessionModal" class="modal-overlay">
         <div class="modal-content">
-            <h2 style="border:none; margin-bottom: 20px;">Edit Session</h2>
+            <h2 style="border:none; margin-bottom: 20px; color:var(--primary);">Session Settings</h2>
             <input type="hidden" id="modalSessionId">
             
             <label>Session Focus</label>
             <div class="pill-row" style="margin-bottom: 10px;" id="quickFocusRow">
-                <div class="pill" onclick="document.getElementById('modalFocus').value='Limit'">Limit</div>
-                <div class="pill" onclick="document.getElementById('modalFocus').value='Endurance'">Endurance</div>
-                <div class="pill" onclick="document.getElementById('modalFocus').value='Volume'">Volume</div>
-                <div class="pill" onclick="document.getElementById('modalFocus').value='Rehab'">Rehab</div>
+                <div class="pill" onclick="App.setModalFocus('Limit')">Limit</div>
+                <div class="pill" onclick="App.setModalFocus('Endurance')">Endurance</div>
+                <div class="pill" onclick="App.setModalFocus('Volume')">Volume</div>
+                <div class="pill" onclick="App.setModalFocus('Rehab')">Rehab</div>
             </div>
-            <input type="text" id="modalFocus" placeholder="e.g. Limit, Mileage, Comp...">
+            <input type="text" id="modalFocus" placeholder="Or type custom focus...">
             
-            <label style="margin-top: 20px;">Overall Fatigue (1-10)</label>
-            <input type="number" id="modalFatigue" min="1" max="10" placeholder="e.g. 8">
+            <label style="margin-top: 20px;">Systemic Fatigue (1-5)</label>
+            <div class="pill-row" id="modalFatigueRow">
+                <div class="pill" onclick="App.setModalFatigue(1)">1</div>
+                <div class="pill" onclick="App.setModalFatigue(2)">2</div>
+                <div class="pill" onclick="App.setModalFatigue(3)">3</div>
+                <div class="pill" onclick="App.setModalFatigue(4)">4</div>
+                <div class="pill" onclick="App.setModalFatigue(5)">5 (Max)</div>
+            </div>
+            <input type="hidden" id="modalFatigueVal">
             
             <div class="flex" style="margin-top: 25px;">
                 <button class="btn-main" style="background:#262626; color:#a3a3a3; margin-top:0;" onclick="App.closeSessionModal()">Cancel</button>
@@ -318,6 +325,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=45"></script>
+    <script src="app.js?v=46"></script>
 </body>
 </html>
