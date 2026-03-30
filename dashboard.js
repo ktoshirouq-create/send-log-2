@@ -28,12 +28,12 @@ const formatShortDate = (dStr) => {
 const Dashboard = {
     sortCol: 'Date',
     sortAsc: false,
-    logLimit: 50, // V38: Strict cap on rendered rows
+    logLimit: 50, 
     
     sortLogbook: (col) => {
         if (Dashboard.sortCol === col) Dashboard.sortAsc = !Dashboard.sortAsc; 
         else { Dashboard.sortCol = col; Dashboard.sortAsc = false; }
-        Dashboard.logLimit = 50; // Reset limit when sorting
+        Dashboard.logLimit = 50; 
         Dashboard.renderLogbook();
     },
 
@@ -73,7 +73,6 @@ const Dashboard = {
             return;
         }
 
-        // V38: Pagination slice
         const paginatedData = displayData.slice(0, Dashboard.logLimit);
 
         let tableHtml = paginatedData.map(l => {
@@ -115,7 +114,6 @@ const Dashboard = {
             </tr>`;
         }).join('');
 
-        // V38: Load More Button
         if (displayData.length > Dashboard.logLimit) {
             tableHtml += `
             <tr class="table-row" onclick="Dashboard.logLimit += 50; Dashboard.renderLogbook();">
@@ -143,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
     allSessionsMaster = allSessions; 
     
     let activeDisc = 'All';
-    let activeTime = '90'; // V38 FIX: Set default properly back to 90
+    let activeTime = '90'; 
     let charts = { pie: null, radar: null, line: null, pyr: null };
     
     const getScaleConfig = (disc) => {
@@ -153,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     document.getElementById('logSearch').addEventListener('input', () => {
-        Dashboard.logLimit = 50; // Reset limit on search
+        Dashboard.logLimit = 50; 
         Dashboard.renderLogbook();
     });
 
