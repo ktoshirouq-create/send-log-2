@@ -60,11 +60,27 @@ const getBadge = (type, gradeText) => {
     return idx > -1 ? `<span class="boulder-dot" style="background:${GRADES.bouldsInColors[idx]};"></span>` : '';
 };
 
-let deletedClimbs = JSON.parse(localStorage.getItem('deletedClimbs') || '[]');
-let deletedSessions = JSON.parse(localStorage.getItem('deletedSessions') || '[]');
+// EXHIBIT B: The Master Storage Migration
+let deletedClimbs = JSON.parse(localStorage.getItem('crag_deleted_climbs') || localStorage.getItem('deletedClimbs') || '[]');
+let deletedSessions = JSON.parse(localStorage.getItem('crag_deleted_sessions') || localStorage.getItem('deletedSessions') || '[]');
 
-let safeClimbs = JSON.parse(localStorage.getItem('v38_climbs') || '[]');
-let safeSessions = JSON.parse(localStorage.getItem('v38_sessions') || '[]');
+let safeClimbs = JSON.parse(localStorage.getItem('crag_climbs_master') || localStorage.getItem('v38_climbs') || '[]');
+let safeSessions = JSON.parse(localStorage.getItem('crag_sessions_master') || localStorage.getItem('v38_sessions') || '[]');
+
+// Run the Memory Cleanup exactly once if the old ghosts still exist
+if (localStorage.getItem('v38_climbs')) {
+    localStorage.setItem('crag_climbs_master', JSON.stringify(safeClimbs));
+    localStorage.setItem('crag_sessions_master', JSON.stringify(safeSessions));
+    localStorage.setItem('crag_deleted_climbs', JSON.stringify(deletedClimbs));
+    localStorage.setItem('crag_deleted_sessions', JSON.stringify(deletedSessions));
+    
+    // Purge the ghosts
+    localStorage.removeItem('v38_climbs');
+    localStorage.removeItem('v38_sessions');
+    localStorage.removeItem('deletedClimbs');
+    localStorage.removeItem('deletedSessions');
+    console.log("Memory Migration Complete.");
+}
 
 let initDisc = localStorage.getItem('lastDiscipline') || 'Indoor Rope Climbing';
 let initStyle = localStorage.getItem('lastStyle') || 'quick';
@@ -115,8 +131,9 @@ const State = new Proxy({
         
         if (prop === 'climbs' || prop === 'sessions' || prop === 'journalLimit') {
             if (prop !== 'journalLimit') {
-                localStorage.setItem('v38_climbs', JSON.stringify(target.climbs));
-                localStorage.setItem('v38_sessions', JSON.stringify(target.sessions)); 
+                // Update to permanent master keys
+                localStorage.setItem('crag_climbs_master', JSON.stringify(target.climbs));
+                localStorage.setItem('crag_sessions_master', JSON.stringify(target.sessions)); 
             }
             if (target.view === 'dash') App.renderDashboard();
             if (target.view === 'journal') App.renderJournal();
@@ -169,8 +186,8 @@ const SyncManager = {
             if (result.status === 'success') {
                 State.climbs = State.climbs.map(c => ({...c, _synced: true}));
                 State.sessions = State.sessions.map(s => ({...s, _synced: true}));
-                deletedClimbs = []; localStorage.setItem('deletedClimbs', '[]');
-                deletedSessions = []; localStorage.setItem('deletedSessions', '[]');
+                deletedClimbs = []; localStorage.setItem('crag_deleted_climbs', '[]');
+                deletedSessions = []; localStorage.setItem('crag_deleted_sessions', '[]');
             }
         } catch (error) {}
     }
@@ -193,7 +210,7 @@ const App = {
         App.haptic(); 
         if(confirm('Delete this log permanently?')) { 
             deletedClimbs.push(String(id));
-            localStorage.setItem('deletedClimbs', JSON.stringify(deletedClimbs));
+            localStorage.setItem('crag_deleted_climbs', JSON.stringify(deletedClimbs));
             State.climbs = State.climbs.filter(l => String(l.ClimbID) !== String(id)); 
             SyncManager.pushAll([], []); 
             App.toast("Deleted"); 
@@ -434,10 +451,10 @@ const App = {
                 }
             }
 
-            let bgClass = ''; 
+            // EXHIBIT A: Cleaner CSS Classes instead of inline strings
+            let bgClass = 'bg-mixed'; 
             if (domDisc === 'boulder') bgClass = 'bg-boulder';
             else if (domDisc === 'rope') bgClass = 'bg-rope';
-            else if (domDisc === 'mixed') bgClass = 'bg-mixed';
 
             const focusTagHtml = session.Focus ? `<div class="s-tag focus-tag" onclick="App.openSessionModal('${session.SessionID}', 'focus')">${session.Focus}</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}', 'focus')">+ Focus</div>`;
             const fatigueTagHtml = session.Fatigue ? `<div class="s-tag fatigue-tag" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">Fatigue: ${session.Fatigue}/10</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">+ Fatigue</div>`;
