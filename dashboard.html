@@ -11,7 +11,6 @@
         .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #262626; padding-bottom: 15px; margin-bottom: 15px; }
         .back-btn { background: #262626; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
         
-        /* UPDATED V31 FILTERS */
         .sticky-zone { position: sticky; top: 0; background: rgba(10,10,10,0.95); backdrop-filter: blur(10px); z-index: 100; padding: 10px 0; border-bottom: 1px solid #262626; margin-bottom: 20px; }
         .filter-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 15px; scrollbar-width: none; }
         .filter-row::-webkit-scrollbar { display: none; }
@@ -32,7 +31,6 @@
         .dash-card { background: #171717; padding: 20px; border-radius: 12px; border: 1px solid #262626; margin-bottom: 20px; position: relative; }
         .section-header { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #737373; margin-bottom: 15px; border-bottom: 1px solid #262626; padding-bottom: 8px; font-weight: bold; }
         
-        /* V31 IDENTITY GRID */
         .identity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .identity-card { background: #111; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
         .id-lbl { font-size: 10px; color: #737373; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
@@ -48,6 +46,29 @@
         .list-sub { color: #737373; font-size: 0.8rem; }
         .list-badge { background: rgba(16,185,129,0.15); color: #10b981; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; }
         .empty-msg { color: #737373; font-style: italic; font-size: 0.9rem; text-align: center; padding: 20px 0; }
+
+        /* V34: MASTER LOGBOOK CSS */
+        .search-bar { width: 100%; padding: 14px 16px; background: #111; border: 1px solid #333; border-radius: 8px; color: #fff; margin-bottom: 15px; font-size: 0.95rem; box-sizing: border-box; transition: 0.2s; }
+        .search-bar:focus { outline: none; border-color: #10b981; box-shadow: 0 0 10px rgba(16,185,129,0.1); }
+        
+        .table-responsive { overflow-x: auto; scrollbar-width: none; }
+        .table-responsive::-webkit-scrollbar { display: none; }
+        .log-table { width: 100%; border-collapse: collapse; text-align: left; min-width: 600px; }
+        .log-table th { padding: 12px 10px; font-size: 0.75rem; text-transform: uppercase; color: #737373; cursor: pointer; border-bottom: 1px solid #333; user-select: none; transition: 0.2s; }
+        .log-table th:hover { color: #10b981; }
+        .log-table td { padding: 14px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
+        
+        .table-row { cursor: pointer; transition: background 0.2s; }
+        .table-row:hover { background: rgba(255,255,255,0.03); }
+        .table-row.expanded { background: #111; border-left: 2px solid #10b981; }
+        
+        .details-row { display: none; background: #0a0a0a; }
+        .details-row.active { display: table-row; }
+        .details-content { padding: 20px; border-bottom: 1px solid #333; }
+        .details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .d-lbl { font-size: 0.65rem; color: #737373; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; letter-spacing: 0.5px; }
+        .d-val { font-size: 0.9rem; color: #fff; font-weight: 600; text-transform: capitalize; }
+        .d-notes { background: #111; padding: 15px; border-radius: 8px; border: 1px solid #262626; font-style: italic; color: #a3a3a3; font-size: 0.85rem; line-height: 1.4; }
 
         @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
     </style>
@@ -115,6 +136,31 @@
         <div class="dash-card"><div class="section-header">Top Frequented Locations</div><div id="list-locations"></div></div>
     </div>
 
-    <script src="dashboard.js?v=33"></script> 
+    <div class="dash-card" style="margin-bottom: 40px;">
+        <div class="section-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Master Logbook</span>
+            <span id="logCount" style="color:#10b981; font-weight:bold;">0 Logs</span>
+        </div>
+        
+        <input type="text" id="logSearch" class="search-bar" placeholder="Search routes, crags, notes, holds...">
+        
+        <div class="table-responsive">
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th onclick="Dashboard.sortLogbook('Date')">Date ↕</th>
+                        <th onclick="Dashboard.sortLogbook('Name')">Route ↕</th>
+                        <th onclick="Dashboard.sortLogbook('Grade')">Grade ↕</th>
+                        <th onclick="Dashboard.sortLogbook('Style')">Style ↕</th>
+                        <th onclick="Dashboard.sortLogbook('Burns')">Burns ↕</th>
+                    </tr>
+                </thead>
+                <tbody id="masterLogbookBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="dashboard.js?v=34"></script> 
 </body>
 </html>
