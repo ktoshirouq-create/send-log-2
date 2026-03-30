@@ -39,10 +39,7 @@
         
         .btn-main { background: var(--primary); color: #000; border: none; padding: 16px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.05rem; cursor: pointer; margin-top: 25px; transition: all 0.3s; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-main:active { transform: scale(0.97); }
-        
-        /* V57: Gray out disabled button specifically */
         .btn-main:disabled { background: #333 !important; color: #737373 !important; cursor: not-allowed; box-shadow: none; transform: none; }
-        
         .dash-btn { background: #1e1e1e; border: 1px solid var(--primary); color: var(--primary); margin-top: 0; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(16,185,129,0.1); }
 
         .pill-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; scroll-snap-type: x mandatory; scrollbar-width: none; margin-bottom: 15px; }
@@ -263,7 +260,7 @@
                         </div>
                     </div>
                     
-                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('Add') ? '- Hide Details' : '+ Add Details'; App.haptic();">+ Add Details</div>
+                    <div class="advanced-toggle" onclick="const c = document.getElementById('advanced-content'); c.classList.toggle('hidden'); this.innerText = c.classList.contains('hidden') ? '+ Add Details' : '- Hide Details'; App.haptic();">+ Add Details</div>
                     
                     <div id="advanced-content" class="hidden">
                         
@@ -359,6 +356,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=57"></script>
+    <script src="app.js?v=59"></script>
 </body>
 </html>
