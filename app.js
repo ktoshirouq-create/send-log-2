@@ -434,25 +434,23 @@ const App = {
                 }
             }
 
-            let bgGradient = 'linear-gradient(145deg, #1a1a1a, #111)'; 
-            if (domDisc === 'boulder') bgGradient = 'linear-gradient(145deg, #121826, #0a0d14)';
-            else if (domDisc === 'rope') bgGradient = 'linear-gradient(145deg, #0e1e16, #08120d)';
-            else if (domDisc === 'mixed') bgGradient = 'linear-gradient(145deg, #121826, #0e1e16)';
+            let bgClass = ''; 
+            if (domDisc === 'boulder') bgClass = 'bg-boulder';
+            else if (domDisc === 'rope') bgClass = 'bg-rope';
+            else if (domDisc === 'mixed') bgClass = 'bg-mixed';
 
             const focusTagHtml = session.Focus ? `<div class="s-tag focus-tag" onclick="App.openSessionModal('${session.SessionID}', 'focus')">${session.Focus}</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}', 'focus')">+ Focus</div>`;
             const fatigueTagHtml = session.Fatigue ? `<div class="s-tag fatigue-tag" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">Fatigue: ${session.Fatigue}/10</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">+ Fatigue</div>`;
             const warmupTagHtml = session.WarmUp ? `<div class="s-tag warmup-tag" onclick="App.openSessionModal('${session.SessionID}', 'warmup')">Warm-up: ${session.WarmUp}</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}', 'warmup')">+ Warm-up</div>`;
             
-            let borderStyle = "border-left: 4px solid transparent;";
+            let fatigueClass = '';
             if (session.Fatigue) {
                 const fScore = Number(session.Fatigue);
-                let fColor = '#444';
-                if (fScore <= 2) fColor = '#22c55e'; // Green
-                else if (fScore <= 4) fColor = '#84cc16'; // Light Green
-                else if (fScore <= 6) fColor = '#eab308'; // Yellow
-                else if (fScore <= 8) fColor = '#f97316'; // Orange
-                else if (fScore <= 10) fColor = '#ef4444'; // Red
-                borderStyle = `border-left: 4px solid ${fColor};`;
+                if (fScore <= 2) fatigueClass = 'f-tier-1'; 
+                else if (fScore <= 4) fatigueClass = 'f-tier-2'; 
+                else if (fScore <= 6) fatigueClass = 'f-tier-3'; 
+                else if (fScore <= 8) fatigueClass = 'f-tier-4'; 
+                else if (fScore <= 10) fatigueClass = 'f-tier-5'; 
             }
 
             const childrenHtml = children.map(l => {
