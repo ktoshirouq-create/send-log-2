@@ -19,7 +19,9 @@ const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DISCIPLINES = ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'];
 const DISC_LABELS = ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder'];
-const STYLE_MAP = { 'project': 'Project', 'quick': 'Quick Send', 'flash': 'Flash', 'onsight': 'Onsight', 'worked': 'Worked' };
+
+// CLEANED: "Quick Send" is now just "Send"
+const STYLE_MAP = { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'worked': 'Worked' };
 
 const STEEPNESS = ['Slab', 'Vertical', 'Overhang', 'Roof'];
 const CLIMB_STYLES = ['Endurance', 'Cruxy', 'Technical', 'Athletic'];
@@ -230,14 +232,12 @@ const App = {
     },
     adjBurns: (dir) => { App.haptic(); State.activeBurns = Math.max(1, State.activeBurns + dir); },
     
-    // THE FIX: Modals now remove the `.hidden` class properly
     openSessionModal: (sessionId, mode) => {
         App.haptic();
         const s = State.sessions.find(x => String(x.SessionID) === String(sessionId));
         if(!s) return;
         document.getElementById('modalSessionId').value = s.SessionID;
         
-        // Hide all sections initially by adding the class
         ['sec-focus', 'sec-fatigue', 'sec-warmup'].forEach(id => {
             document.getElementById(id).classList.add('hidden');
         });
@@ -246,7 +246,6 @@ const App = {
         document.getElementById('modalFatigueVal').value = s.Fatigue || "";
         document.getElementById('modalWarmUpVal').value = s.WarmUp || "";
 
-        // Reveal only the targeted section
         if (mode === 'focus') {
             document.getElementById('sec-focus').classList.remove('hidden');
             document.getElementById('modalTitle').innerText = 'Session Focus';
@@ -268,6 +267,7 @@ const App = {
         document.getElementById('sessionModal').classList.remove('active');
     },
     
+    // THE FIX: Strict checking so it doesn't highlight everything when blank
     setModalFocus: (val, init = false) => {
         if(!init) App.haptic();
         const current = document.getElementById('modalFocusVal').value;
@@ -275,7 +275,7 @@ const App = {
         document.getElementById('modalFocusVal').value = newVal;
         
         document.querySelectorAll('#sec-focus .pill').forEach(p => {
-            p.classList.toggle('active', p.innerText === newVal);
+            p.classList.toggle('active', newVal !== "" && p.innerText === newVal);
         });
     },
     setModalFatigue: (val, init = false) => {
@@ -286,7 +286,7 @@ const App = {
         document.getElementById('modalFatigueVal').value = newVal;
         
         document.querySelectorAll('#sec-fatigue .pill').forEach(p => {
-            p.classList.toggle('active', p.innerText === newVal);
+            p.classList.toggle('active', newVal !== "" && p.innerText === newVal);
         });
     },
     setModalWarmUp: (val, init = false) => {
@@ -296,7 +296,7 @@ const App = {
         document.getElementById('modalWarmUpVal').value = newVal;
         
         document.querySelectorAll('#sec-warmup .pill').forEach(p => {
-            p.classList.toggle('active', String(p.innerText).startsWith(newVal));
+            p.classList.toggle('active', newVal !== "" && p.innerText === newVal);
         });
     },
     
@@ -340,7 +340,8 @@ const App = {
             return `<div class="pill ${isActive ? 'active' : ''}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
         }).join('');
 
-        const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash'], ['onsight', 'Onsight'], ['worked', 'Worked']] : [['project', 'Project'], ['quick', 'Quick Send'], ['flash', 'Flash'], ['worked', 'Worked']];
+        // CLEANED: "Send" is now explicitly the label
+        const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['onsight', 'Onsight'], ['worked', 'Worked']] : [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['worked', 'Worked']];
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = 'quick';
         
         document.getElementById('styleSelector').innerHTML = styles.map(s => {
@@ -379,7 +380,6 @@ const App = {
         setTimeout(() => App.centerActivePills(), 10);
     },
 
-    // THE FIX: The highly optimized O(N) Hash Map engine for the Journal
     renderJournal: () => {
         const jList = document.getElementById('journalList');
         if (State.sessions.length === 0) { jList.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">No sessions found. Log a climb to start your journal.</div>'; return; }
@@ -387,7 +387,6 @@ const App = {
         const sortedSessions = [...State.sessions].sort((a,b) => new Date(getCleanDate(b.Date)) - new Date(getCleanDate(a.Date)));
         const visibleSessions = sortedSessions.slice(0, State.journalLimit);
 
-        // Pre-group all climbs into a lightning-fast dictionary
         const climbsBySession = {};
         State.climbs.forEach(c => {
             if (!climbsBySession[c.SessionID]) climbsBySession[c.SessionID] = [];
