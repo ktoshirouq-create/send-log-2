@@ -162,6 +162,7 @@ const SyncManager = {
 
 const App = {
     chart: null,
+    isSaving: false, // V61 FIX: Added saving lock
     init: () => {
         if (window.Chart) { Chart.defaults.color = '#737373'; Chart.defaults.borderColor = '#262626'; }
         App.renderUI();
@@ -277,7 +278,10 @@ const App = {
         App.closeSessionModal();
     },
 
+    // V61 FIX: Respect the saving lock
     validateForm: () => {
+        if (App.isSaving) return; 
+        
         const btn = document.getElementById('saveClimbBtn');
         if (!btn) return;
         const isOut = State.discipline.includes('Outdoor');
@@ -521,19 +525,16 @@ const App = {
         });
     },
 
-    // EXHIBIT C: Restored 60-Day Filter and Toggles
     renderDashboardLogs: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
         const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
         
-        // HIGHLIGHT FIX
         document.getElementById('listToggleTop').className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
         document.getElementById('listToggleRecent').className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
         
         let displayLogs = [];
         const titleEl = document.getElementById('logListTitle');
         
-        // 60-DAY MATH RESTORED
         if (State.listMode === 'top10') {
             titleEl.innerText = 'Last 60 Days';
             const sixtyDaysAgo = new Date();
@@ -594,6 +595,8 @@ const App = {
         const isOut = State.discipline.includes('Outdoor'), outN = document.getElementById('input-name').value.trim(), outC = document.getElementById('input-crag').value.trim();
         if (isOut && (!outN || !outC)) return;
         
+        App.isSaving = true; // V61 FIX: Lock the button validation
+
         const n = isOut ? `${outN} @ ${outC}` : State.activeGym;
         const climbDateStr = State.activeDate;
         let s = State.activeGrade.score, g = State.activeGrade.text;
@@ -619,19 +622,22 @@ const App = {
             Notes: document.getElementById('input-notes').value.trim(), _synced: false 
         };
         
+        document.getElementById('input-notes').value = '';
+        if (isOut) document.getElementById('input-name').value = '';
+        
         State.climbs = [climb, ...State.climbs]; 
         SyncManager.pushAll(State.sessions.filter(s => !s._synced), [climb]); 
         
-        document.getElementById('input-notes').value = '';
-        if (isOut) document.getElementById('input-name').value = '';
         State.activeRating = 0; State.activeGradeFeel = ''; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
-        
         State.activeBurns = ['flash', 'onsight'].includes(State.activeStyle) ? 1 : (State.activeStyle === 'quick' ? 2 : 3);
         
         setTimeout(() => {
             btn.innerHTML = '✓ Saved!';
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
-            setTimeout(() => { App.validateForm(); }, 2000);
+            setTimeout(() => { 
+                App.isSaving = false; // V61 FIX: Unlock the button validation
+                App.validateForm(); 
+            }, 2000);
         }, 400); 
     }
 };
