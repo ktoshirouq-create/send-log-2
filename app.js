@@ -2,7 +2,6 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed:', err)));
 }
 
-// EXHIBIT D: The Master Configuration Filing Cabinet
 const AppConfig = {
     api: "https://script.google.com/macros/s/AKfycbwMh-T7DB7S06_8DB2GC4dniByVHrRSqbODdLRhjciDOXSDL-V4_vzQtRXee2Wmqp9L/exec",
     gyms: ["OKS", "Torshov", "Løkka", "Bryn", "Gneiss", "Other"],
@@ -60,7 +59,6 @@ let initDisc = localStorage.getItem('lastDiscipline') || 'Indoor Rope Climbing';
 let initStyle = localStorage.getItem('lastStyle') || 'quick';
 let initConf = getScaleConfig(initDisc);
 
-// V58 FIX: Set local vars for Proxy initialization
 const State = new Proxy({
     view: 'log', discipline: initDisc, 
     activeGrade: { text: initConf.labels[4] || initConf.labels[0], score: initConf.scores[4] || initConf.scores[0] },
@@ -415,11 +413,12 @@ const App = {
             let fClass = fScore ? `f-tier-${Math.ceil(fScore/2)}` : '';
 
             const childrenHtml = children.map(l => {
-                const isF = l.Grade.includes('⚡') || l.Grade.includes('💎');
+                const rawGrade = String(l.Grade || "");
+                const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
                 const isFail = l.Style === 'worked';
                 let inlineColor = '';
                 if (l.Type === 'Indoor Bouldering') {
-                    const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(l.Grade));
+                    const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(rawGrade));
                     if (idx > -1) inlineColor = `color: ${AppConfig.grades.bouldsIn.colors[idx]} !important;`;
                 }
 
@@ -427,7 +426,7 @@ const App = {
                 <div class="log-card" style="border-color: rgba(255,255,255,0.05); background: rgba(0,0,0,0.2);">
                     <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.session-children .log-card').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">
                         <div class="log-info" style="padding-left:0;"><div class="log-name">${l.Name.split(' @ ')[0]}${l._synced === false ? ' ☁️✕' : ''}</div></div>
-                        <div class="log-grade ${isF ? 'fl' : (isFail ? 'fail' : 'rp')}" style="${inlineColor}">${getBadge(l.Type, l.Grade)}${l.Grade}</div>
+                        <div class="log-grade ${isF ? 'fl' : (isFail ? 'fail' : 'rp')}" style="${inlineColor}">${getBadge(l.Type, rawGrade)}${rawGrade}</div>
                     </div>
                     <div class="log-details">
                         <div class="log-details-grid">
@@ -464,6 +463,7 @@ const App = {
     
     renderDashboard: () => { App.renderDashboardCharts(); App.renderDashboardLogs(); },
 
+    // EXHIBIT A: Restored Full Chart Aesthetics
     renderDashboardCharts: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
         const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
@@ -472,19 +472,25 @@ const App = {
         ctxCanvas.style.display = 'block'; document.getElementById('noDataMsg').style.display = 'none';
 
         if(App.chart) App.chart.destroy();
+        const ctx = ctxCanvas.getContext('2d');
         const allM = [...new Set(viewLogs.map(l => l.cleanDate.substring(0,7)))].sort();
         const cD = { rp: [], fl: [], rpG: [], flG: [], avg: [], avgG: [], lbl: [] };
+        
+        const getScoreIndex = (s, isF) => { 
+            let b = s - (isF ? (dStr.includes('Rope') ? 10 : 17) : 0); 
+            return conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-b) < Math.abs(p-b) ? c : p)); 
+        };
         
         allM.forEach(m => {
             const [y, mo] = m.split('-').map(Number);
             const mL = viewLogs.filter(l => l.cleanDate.substring(0,7) === m);
             if (State.chartMode === 'max') {
-                const rpL = mL.filter(l => !l.Grade.includes('⚡') && !l.Grade.includes('💎'));
-                const flL = mL.filter(l => l.Grade.includes('⚡') || l.Grade.includes('💎'));
+                const rpL = mL.filter(l => !String(l.Grade||"").includes('⚡') && !String(l.Grade||"").includes('💎'));
+                const flL = mL.filter(l => String(l.Grade||"").includes('⚡') || String(l.Grade||"").includes('💎'));
                 const maxRp = rpL.length ? rpL.reduce((p, c) => Number(c.Score) > Number(p.Score) ? c : p) : null;
                 const maxFl = flL.length ? flL.reduce((p, c) => Number(c.Score) > Number(p.Score) ? c : p) : null;
-                cD.rp.push(maxRp ? conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-Number(maxRp.Score)) < Math.abs(p-Number(maxRp.Score)) ? c : p)) : null);
-                cD.fl.push(maxFl ? conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-(Number(maxFl.Score)-(dStr.includes('Rope')?10:17))) < Math.abs(p-(Number(maxFl.Score)-(dStr.includes('Rope')?10:17))) ? c : p)) : null);
+                cD.rp.push(maxRp ? getScoreIndex(Number(maxRp.Score), false) : null);
+                cD.fl.push(maxFl ? getScoreIndex(Number(maxFl.Score), true) : null);
                 cD.rpG.push(maxRp ? maxRp.Grade : ""); cD.flG.push(maxFl ? maxFl.Grade : "");
             } else {
                 const top10 = mL.sort((a,b) => Number(b.Score) - Number(a.Score)).slice(0, 10);
@@ -495,19 +501,28 @@ const App = {
             cD.lbl.push(`${AppConfig.months[mo-1]} '${y.toString().slice(-2)}`);
         });
 
-        App.chart = new Chart(ctxCanvas.getContext('2d'), { 
+        let dSet = [], toolC;
+        if (State.chartMode === 'max') {
+            let g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, 'rgba(16, 185, 129, 0.25)'); g.addColorStop(1, 'transparent');
+            dSet = [
+                { label: 'Max Redpoint', data: cD.rp, borderColor: '#10b981', backgroundColor: g, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#10b981', spanGaps: true }, 
+                { label: 'Flash/Onsight', data: cD.fl, borderColor: '#db2777', borderDash: [5,5], tension: 0.4, fill: false, pointRadius: 5, pointBackgroundColor: '#db2777', spanGaps: true }
+            ];
+            toolC = chartCtx => chartCtx.datasetIndex === 0 ? ` Redpoint: ${cD.rpG[chartCtx.dataIndex]}` : ` Flash: ${cD.flG[chartCtx.dataIndex]}`;
+        } else {
+            let gA = ctx.createLinearGradient(0, 0, 0, 300); gA.addColorStop(0, 'rgba(59, 130, 246, 0.35)'); gA.addColorStop(1, 'transparent');
+            dSet = [{ label: 'Top 10 Average', data: cD.avg, borderColor: '#3b82f6', backgroundColor: gA, tension: 0.4, fill: true, pointRadius: 6, pointBackgroundColor: '#3b82f6', spanGaps: true }];
+            toolC = chartCtx => ` Power Avg: ${cD.avgG[chartCtx.dataIndex]}`;
+        }
+        
+        App.chart = new Chart(ctx, { 
             type: 'line', 
-            data: { 
-                labels: cD.lbl, 
-                datasets: State.chartMode === 'max' ? [
-                    { data: cD.rp, borderColor: '#10b981', tension: 0.4, pointRadius: 4 },
-                    { data: cD.fl, borderColor: '#db2777', borderDash: [5,5], tension: 0.4, pointRadius: 4 }
-                ] : [{ data: cD.avg, borderColor: '#3b82f6', tension: 0.4, fill: true, backgroundColor: 'rgba(59,130,246,0.1)' }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => conf.labels[v] || "" } }, x: { grid: { display: false } } } }
+            data: { labels: cD.lbl, datasets: dSet },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: toolC } } }, scales: { y: { ticks: { callback: v => conf.labels[v] || "" } }, x: { grid: { display: false } } } }
         });
     },
 
+    // EXHIBIT C: Crash-proof Log Render
     renderDashboardLogs: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
         const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
@@ -526,10 +541,11 @@ const App = {
         }
 
         document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs.</div>' : displayLogs.map(l => {
-            const isF = l.Grade.includes('⚡') || l.Grade.includes('💎'), isFail = l.Style === 'worked';
+            const rawGrade = String(l.Grade || "");
+            const isF = rawGrade.includes('⚡') || rawGrade.includes('💎'), isFail = l.Style === 'worked';
             let inlineColor = '';
             if (l.Type === 'Indoor Bouldering') {
-                const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(l.Grade));
+                const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(rawGrade));
                 if (idx > -1) inlineColor = `color: ${AppConfig.grades.bouldsIn.colors[idx]} !important;`;
             }
 
@@ -538,7 +554,7 @@ const App = {
                 <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">
                     <div class="log-date" style="width: 50px;">${formatShortDate(l.cleanDate)}</div>
                     <div class="log-info" style="padding-left:0;"><div class="log-name">${l.Name.split(' @ ')[0]}</div></div>
-                    <div class="log-grade ${isF ? 'fl' : (isFail ? 'fail' : 'rp')}" style="${inlineColor}">${getBadge(l.Type, l.Grade)}${l.Grade}</div>
+                    <div class="log-grade ${isF ? 'fl' : (isFail ? 'fail' : 'rp')}" style="${inlineColor}">${getBadge(l.Type, rawGrade)}${rawGrade}</div>
                 </div>
                 <div class="log-details">
                     <div class="log-details-grid">
@@ -588,6 +604,8 @@ const App = {
         document.getElementById('input-notes').value = '';
         if (isOut) document.getElementById('input-name').value = '';
         State.activeRating = 0; State.activeGradeFeel = ''; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
+        
+        State.activeBurns = ['flash', 'onsight'].includes(State.activeStyle) ? 1 : (State.activeStyle === 'quick' ? 2 : 3);
         
         setTimeout(() => {
             btn.innerHTML = '✓ Saved!';
