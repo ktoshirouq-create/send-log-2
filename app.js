@@ -505,7 +505,7 @@ const App = {
             }).join('');
 
             return `
-            <div class="session-card" style="${borderStyle} background: ${bgGradient};">
+            <div class="session-card ${bgClass} ${fatigueClass}">
                 <div class="session-header">
                     <div class="s-date-block">
                         <div class="s-date-main">${dateInfo.main}</div>
