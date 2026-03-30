@@ -194,11 +194,9 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFilters('disc-filter', 'disc', 'filter-pill');
     attachFilters('time-filter', 'time', 'time-tab');
 
-    // V44: The Upgraded RPG Engine with a Base Floor (40/100)
     const calcRPG = (logs) => {
         let attr = { Power: 0, Endurance: 0, Technique: 0, Fingers: 0, Headspace: 0, Tenacity: 0 };
         
-        // If there are no logs in this phase, return a baseline shape
         if (logs.length === 0) return { Power: 40, Endurance: 40, Technique: 40, Fingers: 40, Headspace: 40, Tenacity: 40 };
 
         logs.forEach(l => {
@@ -233,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (styleResult === 'worked') attr.Tenacity += 1; 
         });
         
-        // V44 Math: Base floor of 40, max dynamic span of 60.
         const maxVal = Math.max(...Object.values(attr), 1);
         Object.keys(attr).forEach(k => attr[k] = 40 + Math.round((attr[k] / maxVal) * 60));
         return attr;
@@ -270,7 +267,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 peakG = getV(l, 'Grade'); 
             } 
         });
-        document.getElementById('stat-peak').innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : getBaseGrade(peakG));
+        
+        const peakEl = document.getElementById('stat-peak');
+        const cleanPeak = getBaseGrade(peakG);
+        peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
+        
+        // V45: Dynamic Peak Grade Color for Indoor Bouldering
+        if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
+            const conf = AppConfig.grades.bouldsIn;
+            const idx = conf.labels.indexOf(cleanPeak);
+            peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
+        } else {
+            peakEl.style.color = '#fff'; // Reset to white for everything else
+        }
 
         let dayC = {}, timeC = {}, indoorCount = 0;
         currentFilteredLogs.forEach(l => { 
@@ -402,11 +411,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const archEl = document.getElementById('id-arch');
         archEl.innerText = archetype;
 
-        // V44: The Hacked, Cleaned "FIFA" Radar Graph
+        // V45: Adding dynamic percentages to the radar labels!
+        const radarLabels = Object.keys(currAttr).map(k => `${k} ${currAttr[k]}`);
+
         charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
             type: 'radar', 
             data: { 
-                labels: Object.keys(currAttr), 
+                labels: radarLabels, 
                 datasets: [
                     { 
                         label: 'Current Phase',
@@ -433,14 +444,22 @@ document.addEventListener('DOMContentLoaded', () => {
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 plugins: { 
-                    legend: { display: true, position: 'top', labels: { color: '#737373', boxWidth: 12, font: {size: 11} } } 
+                    legend: { display: true, position: 'top', labels: { color: '#737373', boxWidth: 12, font: {size: 11} } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                // V45: Clean tooltip to just show the number without repeating the custom label
+                                return ` ${context.dataset.label}: ${context.raw}`;
+                            }
+                        }
+                    }
                 }, 
                 scales: { 
                     r: { 
                         min: 0, max: 100,
                         ticks: { display: false, stepSize: 20 }, 
                         grid: { color: 'rgba(255,255,255,0.05)' }, 
-                        angleLines: { display: false }, // V44 FIX: Hides the ugly internal spokes!
+                        angleLines: { display: false }, 
                         pointLabels: { color: '#f3f4f6', font: { size: 11, weight: 'bold' } }
                     } 
                 } 
