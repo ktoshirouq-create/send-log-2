@@ -753,7 +753,7 @@ const App = {
             State.sessions = [newSession, ...State.sessions];
         }
 
-        const btn = document.querySelector('.btn-main');
+        const btn = document.getElementById('saveClimbBtn');
         btn.disabled = true;
         btn.innerText = 'Saving...';
         
