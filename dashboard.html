@@ -37,6 +37,7 @@
         .id-val { font-size: 1rem; font-weight: bold; color: #10b981; }
 
         .chart-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; position: relative; }
+        .pyramid-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #171717; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; box-sizing: border-box; font-style: italic; color: #737373; font-size: 0.95rem; line-height: 1.4; z-index: 10; border-radius: 8px; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;}
         
         .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -149,7 +150,7 @@
                 <thead>
                     <tr>
                         <th onclick="Dashboard.sortLogbook('Date')">Date ↕</th>
-                        <th onclick="Dashboard.sortLogbook('Name')">Route ↕</th>
+                        <th onclick="Dashboard.sortLogbook('Name')">Route / Gym ↕</th>
                         <th onclick="Dashboard.sortLogbook('Grade')">Grade ↕</th>
                         <th onclick="Dashboard.sortLogbook('Style')">Style ↕</th>
                         <th onclick="Dashboard.sortLogbook('Burns')">Burns ↕</th>
@@ -161,6 +162,6 @@
         </div>
     </div>
 
-    <script src="dashboard.js?v=37"></script> 
+    <script src="dashboard.js?v=39"></script> 
 </body>
 </html>
