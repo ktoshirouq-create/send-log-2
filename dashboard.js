@@ -1,10 +1,11 @@
-// EXHIBIT D: The Shared Config (Keeps Dashboard & Mobile perfectly synced)
 const AppConfig = {
+    api: "https://script.google.com/macros/s/AKfycbwMh-T7DB7S06_8DB2GC4dniByVHrRSqbODdLRhjciDOXSDL-V4_vzQtRXee2Wmqp9L/exec",
     gyms: ["OKS", "Torshov", "Løkka", "Bryn", "Gneiss", "Other"],
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'],
     styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'worked': 'Worked' },
+    steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     grades: {
         ropes: { labels: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
@@ -13,23 +14,45 @@ const AppConfig = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
-    // V32 FIX: Pointing to the new Master Vaults
-    const allLogs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
-    const allSessions = JSON.parse(localStorage.getItem('crag_sessions_master') || '[]');
+    let allLogs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
+    let allSessions = JSON.parse(localStorage.getItem('crag_sessions_master') || '[]');
     
     let activeDisc = 'All';
-    let activeTime = 'All';
+    let activeTime = '90'; // V33 FIX: Default to 90 Days
     let charts = { pie: null, radar: null, line: null, pyr: null };
     
     Chart.defaults.color = '#737373';
     Chart.defaults.borderColor = '#262626';
 
+    // V33 FIX: Universal Translator for Old (lowercase) and New (TitleCase) Data
+    const getV = (obj, prop) => obj[prop] !== undefined ? obj[prop] : obj[prop.toLowerCase()];
     const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌\s]/g, '');
+    
     const getScaleConfig = (disc) => {
         if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
         if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
         return AppConfig.grades.ropes;
     };
+
+    const formatShortDate = (dStr) => {
+        const clean = dStr ? String(dStr).substring(0, 10) : "";
+        if(!clean) return "";
+        const [y, m, d] = clean.split('-');
+        return `${d} ${AppConfig.months[parseInt(m)-1]}`;
+    };
+
+    // V33 FIX: Self-Healing Sync Routine for wiped phones
+    fetch(AppConfig.api)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                allLogs = data.climbs || [];
+                allSessions = data.sessions || [];
+                localStorage.setItem('crag_climbs_master', JSON.stringify(allLogs));
+                localStorage.setItem('crag_sessions_master', JSON.stringify(allSessions));
+                renderDashboard(); // Seamlessly update screen when cloud data arrives
+            }
+        }).catch(err => console.log("Dashboard background sync failed", err));
 
     const attachFilters = (id, propName, className) => {
         document.querySelectorAll(`#${id} .${className}`).forEach(btn => {
@@ -48,30 +71,40 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDashboard() {
         const now = new Date();
         let filteredLogs = allLogs.filter(l => {
-            if (activeDisc !== 'All' && l.Type !== activeDisc) return false;
+            const type = getV(l, 'Type');
+            if (activeDisc !== 'All' && type !== activeDisc) return false;
             if (activeTime === 'All') return true;
             
-            const logDate = new Date(l.Date);
+            const logDate = new Date(getV(l, 'Date'));
             const diffDays = (now - logDate) / (1000 * 60 * 60 * 24);
             return diffDays <= parseInt(activeTime);
         });
 
         // 1. HERO STATS
         document.getElementById('stat-sends').innerText = filteredLogs.length;
-        const outDays = new Set(filteredLogs.filter(l => String(l.Type).includes('Outdoor')).map(l => l.Date)).size;
+        const outDays = new Set(filteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getV(l, 'Date'))).size;
         document.getElementById('stat-outdoor').innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
         
         let maxScore = 0, peakG = '-';
-        filteredLogs.forEach(l => { if (l.Score && Number(l.Score) > maxScore && l.Style !== 'worked') { maxScore = Number(l.Score); peakG = l.Grade; } });
+        filteredLogs.forEach(l => { 
+            const s = Number(getV(l, 'Score'));
+            if (s && s > maxScore && getV(l, 'Style') !== 'worked') { 
+                maxScore = s; 
+                peakG = getV(l, 'Grade'); 
+            } 
+        });
         document.getElementById('stat-peak').innerText = (filteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : getBaseGrade(peakG));
 
         // 2. CLIMBER IDENTITY
         let dayC = {}, timeC = {}, indoorCount = 0;
         filteredLogs.forEach(l => { 
-            const d = new Date(l.Date).getDay();
-            const dayName = AppConfig.days[d];
-            dayC[dayName] = (dayC[dayName] || 0) + 1; 
-            if (String(l.Type).includes('Indoor')) indoorCount++;
+            const dateStr = getV(l, 'Date');
+            if (dateStr) {
+                const d = new Date(dateStr).getDay();
+                const dayName = AppConfig.days[d];
+                dayC[dayName] = (dayC[dayName] || 0) + 1; 
+            }
+            if (String(getV(l, 'Type')).includes('Indoor')) indoorCount++;
         });
         
         const topDay = Object.keys(dayC).length ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-';
@@ -86,7 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('id-day').innerText = topDay;
         document.getElementById('id-env').innerText = envLabel;
-        document.getElementById('id-arch').innerText = 'Data Miner 🔒'; // Evolving this later!
+        document.getElementById('id-arch').innerText = 'Data Miner 🔒'; 
 
         Object.values(charts).forEach(c => { if(c) c.destroy(); });
 
@@ -105,8 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const conf = getScaleConfig(activeDisc);
             
             filteredLogs.forEach(l => {
-                if (l.Score && l.Style !== 'worked') {
-                    const clean = getBaseGrade(l.Grade);
+                if (getV(l, 'Score') && getV(l, 'Style') !== 'worked') {
+                    const clean = getBaseGrade(getV(l, 'Grade'));
                     grades[clean] = (grades[clean] || 0) + 1;
                 }
             });
@@ -126,37 +159,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 4. CNS PEAK & FATIGUE OVERLAY
-        const sortedCNS = [...filteredLogs].filter(l=>l.Score && l.Style !== 'worked').sort((a,b) => new Date(a.Date) - new Date(b.Date));
+        const sortedCNS = [...filteredLogs].filter(l => getV(l, 'Score') && getV(l, 'Style') !== 'worked').sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date')));
         const cnsData = { labels: ['W4', 'W3', 'W2', 'W1'], peak: [null, null, null, null], grades: ['-','-','-','-'], fatigue: [0,0,0,0] };
-        const weekBins = [[],[],[],[]]; // Oldest to Newest
+        const weekBins = [[],[],[],[]]; 
         const sessionBins = [[],[],[],[]];
 
         sortedCNS.forEach(l => {
-            const diffDays = Math.floor((now - new Date(l.Date)) / (1000 * 60 * 60 * 24));
+            const diffDays = Math.floor((now - new Date(getV(l, 'Date'))) / (1000 * 60 * 60 * 24));
             if (diffDays <= 7) weekBins[3].push(l); 
             else if (diffDays <= 14) weekBins[2].push(l); 
             else if (diffDays <= 21) weekBins[1].push(l); 
             else if (diffDays <= 28) weekBins[0].push(l);
         });
 
-        // Map fatigue from sessions
         allSessions.forEach(s => {
-            const diffDays = Math.floor((now - new Date(s.Date)) / (1000 * 60 * 60 * 24));
-            if (diffDays <= 28 && s.Fatigue) {
+            const diffDays = Math.floor((now - new Date(getV(s, 'Date'))) / (1000 * 60 * 60 * 24));
+            const f = getV(s, 'Fatigue');
+            if (diffDays <= 28 && f) {
                 let binIdx = -1;
                 if (diffDays <= 7) binIdx = 3; else if (diffDays <= 14) binIdx = 2; else if (diffDays <= 21) binIdx = 1; else if (diffDays <= 28) binIdx = 0;
-                sessionBins[binIdx].push(Number(s.Fatigue));
+                sessionBins[binIdx].push(Number(f));
             }
         });
 
         weekBins.forEach((bin, i) => {
             if (bin.length > 0) {
-                const maxLog = bin.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max);
-                cnsData.peak[i] = Number(maxLog.Score); 
-                cnsData.grades[i] = getBaseGrade(maxLog.Grade);
+                const maxLog = bin.reduce((max, cur) => Number(getV(cur, 'Score')) > Number(getV(max, 'Score')) ? cur : max);
+                cnsData.peak[i] = Number(getV(maxLog, 'Score')); 
+                cnsData.grades[i] = getBaseGrade(getV(maxLog, 'Grade'));
             }
             if (sessionBins[i].length > 0) {
-                cnsData.fatigue[i] = sessionBins[i].reduce((a,b)=>a+b, 0) / sessionBins[i].length; // Average fatigue
+                cnsData.fatigue[i] = sessionBins[i].reduce((a,b)=>a+b, 0) / sessionBins[i].length;
             }
         });
 
@@ -186,9 +219,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let aero = 0, ancap = 0, power = 0;
         let grips = { 'Crimps':0, 'Slopers':0, 'Pockets':0, 'Pinches':0, 'Tufas':0, 'Jugs':0 };
         filteredLogs.forEach(l => {
-            const st = (l.ClimStyles || "").toLowerCase();
+            const st = (getV(l, 'ClimStyles') || getV(l, 'climstyles') || "").toLowerCase();
             if(st.includes('endurance')) aero++; else if(st.includes('cruxy')) power++; else if(st.includes('athletic')) ancap++;
-            Object.keys(grips).forEach(g => { if((l.Holds || "").includes(g)) grips[g]++; });
+            Object.keys(grips).forEach(g => { if((getV(l, 'Holds') || "").includes(g)) grips[g]++; });
         });
         if(aero===0 && ancap===0 && power===0) { aero=1; ancap=1; power=1; } 
         charts.pie = new Chart(document.getElementById('energyPieChart'), { type: 'doughnut', data: { labels: ['Aero', 'AnCap', 'Power'], datasets: [{ data: [aero, ancap, power], backgroundColor: ['#2196F3', '#FF9800', '#F44336'], borderColor: '#171717' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
@@ -197,27 +230,42 @@ document.addEventListener('DOMContentLoaded', () => {
         // 6. LISTS
         const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No logs fit this criteria.</div>'; };
         
-        const hof = [...filteredLogs].filter(l => Number(l.Rating) >= 4).sort((a,b)=>(Number(b.Score)||0)-(Number(a.Score)||0)).slice(0,5);
-        renderList('list-fame', hof.map(l => `<div class="list-item"><div><div class="list-main">${l.Name.split('@')[0]}</div><div class="list-sub">${'★'.repeat(l.Rating)}</div></div><div class="list-badge">${getBaseGrade(l.Grade)}</div></div>`).join(''));
+        const hof = [...filteredLogs].filter(l => Number(getV(l, 'Rating')) >= 4).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
+        renderList('list-fame', hof.map(l => {
+            const name = getV(l, 'Name');
+            const cleanName = name ? name.split('@')[0].trim() : "Unknown";
+            return `<div class="list-item"><div><div class="list-main">${cleanName}</div><div class="list-sub">${'★'.repeat(Number(getV(l, 'Rating')))}</div></div><div class="list-badge">${getBaseGrade(getV(l, 'Grade'))}</div></div>`
+        }).join(''));
 
-        const limit = [...filteredLogs].filter(l => (l.Effort||"").includes('Limit') || (l.GradeFeel||"").includes('Hard')).sort((a,b)=>(Number(b.Score)||0)-(Number(a.Score)||0)).slice(0,5);
-        renderList('list-limit', limit.map(l => `<div class="list-item"><div><div class="list-main">${l.Name.split('@')[0]}</div><div class="list-sub">${formatShortDate(l.Date)}</div></div><div class="list-badge" style="color:#ef4444;">${getBaseGrade(l.Grade)}</div></div>`).join(''));
+        const limit = [...filteredLogs].filter(l => (getV(l, 'Effort')||"").includes('Limit') || (getV(l, 'GradeFeel')||"").includes('Hard')).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
+        renderList('list-limit', limit.map(l => {
+            const name = getV(l, 'Name');
+            const cleanName = name ? name.split('@')[0].trim() : "Unknown";
+            return `<div class="list-item"><div><div class="list-main">${cleanName}</div><div class="list-sub">${formatShortDate(getV(l, 'Date'))}</div></div><div class="list-badge" style="color:#ef4444;">${getBaseGrade(getV(l, 'Grade'))}</div></div>`
+        }).join(''));
 
         let steepHTML = '';
         AppConfig.steepness.forEach(st => {
-            const logsForSt = filteredLogs.filter(l => (l.Angle||"").includes(st) && l.Score);
+            const logsForSt = filteredLogs.filter(l => (getV(l, 'Angle')||"").includes(st) && getV(l, 'Score'));
             if(logsForSt.length > 0) {
-                const peak = logsForSt.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max);
-                steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="color:#3b82f6;">${getBaseGrade(peak.Grade)}</div></div>`;
+                const peak = logsForSt.reduce((max, cur) => Number(getV(cur, 'Score')) > Number(getV(max, 'Score')) ? cur : max);
+                steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="color:#3b82f6;">${getBaseGrade(getV(peak, 'Grade'))}</div></div>`;
             } else steepHTML += `<div class="list-item"><div class="list-main" style="color:#555;">${st}</div><div class="list-badge" style="background:transparent; color:#555;">-</div></div>`;
         });
         renderList('list-steepness', steepHTML);
 
         const locs = {};
-        filteredLogs.forEach(l => { let n = l.Name; if(n && n.includes('@')) n = n.split('@')[1].trim(); locs[n] = (locs[n] || 0) + 1; });
+        filteredLogs.forEach(l => { 
+            let n = getV(l, 'Name'); 
+            if(n) {
+                if(n.includes('@')) n = n.split('@')[1].trim(); 
+                locs[n] = (locs[n] || 0) + 1; 
+            }
+        });
         const topLocs = Object.keys(locs).sort((a,b)=>locs[b]-locs[a]).slice(0,5);
         renderList('list-locations', topLocs.map(loc => `<div class="list-item"><div class="list-main">${loc}</div><div class="list-badge" style="color:#fff; background:#333;">${locs[loc]} Session${locs[loc]>1?'s':''}</div></div>`).join(''));
     }
     
+    // Initial Render
     renderDashboard(); 
 });
