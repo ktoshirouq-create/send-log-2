@@ -108,7 +108,7 @@
         .s-tag.warmup-tag { background: rgba(168, 85, 247, 0.1); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.2); } 
         .s-tag.empty-tag { background: transparent; color: var(--text-muted); border: 1px dashed #555; }
 
-        /* UPDATED TO 3 COLUMNS */
+        /* 3 COLUMNS */
         .session-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 16px 10px; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); }
         .s-stat-box { text-align: center; }
         .s-stat-lbl { font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
@@ -199,9 +199,9 @@
 
             <div id="sec-warmup" class="hidden">
                 <div class="pill-row wrap">
-                    <div class="pill" onclick="App.setModalWarmUp('Full')">Full (1hr+)</div>
-                    <div class="pill" onclick="App.setModalWarmUp('Rushed')">Rushed (~30m)</div>
-                    <div class="pill" onclick="App.setModalWarmUp('None')">None (Wall Only)</div>
+                    <div class="pill" onclick="App.setModalWarmUp('Full')">Full</div>
+                    <div class="pill" onclick="App.setModalWarmUp('Rushed')">Rushed</div>
+                    <div class="pill" onclick="App.setModalWarmUp('None')">None</div>
                 </div>
             </div>
 
@@ -348,6 +348,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=47"></script>
+    <script src="app.js?v=49"></script>
 </body>
 </html>
