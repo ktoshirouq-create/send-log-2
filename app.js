@@ -95,11 +95,11 @@ const State = new Proxy({
             setTimeout(() => App.centerActivePills(), 50); 
         }
         
-        // THE FIX: Added all the Advanced Details properties to the UI refresh trigger
+        // THE FIX: Added 'activeGrade' to the watchlist so the UI knows to redraw it!
         const triggersUI = [
             'discipline', 'activeGym', 'activeStyle', 'activeBurns', 'chartMode', 
             'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 
-            'activeClimbStyles', 'activeHolds', 'activeTimeBucket'
+            'activeClimbStyles', 'activeHolds', 'activeTimeBucket', 'activeGrade'
         ];
         
         if (triggersUI.includes(prop)) {
