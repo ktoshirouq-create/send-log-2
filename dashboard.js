@@ -247,7 +247,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.getElementById('id-day').innerText = topDay;
         document.getElementById('id-env').innerText = envLabel;
-        document.getElementById('id-arch').innerText = 'Data Miner 🔒'; 
 
         Object.values(charts).forEach(c => { if(c) c.destroy(); });
 
@@ -339,16 +338,86 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        let aero = 0, ancap = 0, power = 0;
-        let grips = { 'Crimps':0, 'Slopers':0, 'Pockets':0, 'Pinches':0, 'Tufas':0, 'Jugs':0 };
+        // V40: THE RPG STATS ALGORITHM
+        let attr = { Power: 1, Endurance: 1, Technique: 1, Fingers: 1, Headspace: 1, Tenacity: 1 };
+        let flashes = 0, quickSends = 0, projects = 0;
+
         currentFilteredLogs.forEach(l => {
-            const st = String(getV(l, 'ClimStyles') || getV(l, 'climstyles') || "").toLowerCase();
-            if(st.includes('endurance')) aero++; else if(st.includes('cruxy')) power++; else if(st.includes('athletic')) ancap++;
-            Object.keys(grips).forEach(g => { if(String(getV(l, 'Holds') || "").includes(g)) grips[g]++; });
+            const angle = String(getV(l, 'Angle') || "");
+            const styleTag = String(getV(l, 'ClimStyles') || getV(l, 'climstyles') || "").toLowerCase();
+            const holds = String(getV(l, 'Holds') || "");
+            const effort = String(getV(l, 'Effort') || "");
+            const styleResult = String(getV(l, 'Style') || "").toLowerCase();
+            const burns = Number(getV(l, 'Burns')) || 1;
+            const type = String(getV(l, 'Type') || "");
+
+            // Pie Chart Data (Ascent Styles)
+            if (styleResult === 'flash' || styleResult === 'onsight') flashes++;
+            else if (styleResult === 'quick') quickSends++;
+            else if (styleResult === 'project' || styleResult === 'worked') projects++;
+
+            // Spider Web Data (RPG Attributes)
+            if (angle.includes('Overhang') || angle.includes('Roof')) attr.Power += 2;
+            if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
+            if (type.includes('Bouldering')) attr.Power += 1;
+
+            if (styleTag.includes('endurance')) attr.Endurance += 3;
+            if (type.includes('Rope')) attr.Endurance += 1;
+            
+            if (angle.includes('Slab') || angle.includes('Vertical')) attr.Technique += 2;
+            if (styleTag.includes('technical')) attr.Technique += 2;
+            if (holds.includes('Slopers') || holds.includes('Pinches')) attr.Technique += 1;
+
+            if (holds.includes('Crimps') || holds.includes('Pockets')) attr.Fingers += 3;
+
+            if (styleResult === 'flash' || styleResult === 'onsight') attr.Headspace += 3;
+            if (effort.includes('Limit')) attr.Headspace += 2;
+
+            if (styleResult === 'project') attr.Tenacity += 3;
+            if (burns >= 3) attr.Tenacity += 2;
+            if (styleResult === 'worked') attr.Tenacity += 1; 
         });
-        if(aero===0 && ancap===0 && power===0) { aero=1; ancap=1; power=1; } 
-        charts.pie = new Chart(document.getElementById('energyPieChart'), { type: 'doughnut', data: { labels: ['Aero', 'AnCap', 'Power'], datasets: [{ data: [aero, ancap, power], backgroundColor: ['#2196F3', '#FF9800', '#F44336'], borderColor: '#171717' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
-        charts.radar = new Chart(document.getElementById('gripRadarChart'), { type: 'radar', data: { labels: Object.keys(grips), datasets: [{ data: Object.values(grips), borderColor: '#9C27B0', backgroundColor: 'rgba(156, 39, 176, 0.2)' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { r: { ticks: { display: false }, grid: { color: '#333' }, angleLines: { color: '#333' } } } } });
+
+        // Resolve Archetype
+        const maxAttrVal = Math.max(...Object.values(attr));
+        let archetype = "All-Rounder 🃏";
+        if (currentFilteredLogs.length > 0) {
+            const topAttrs = Object.keys(attr).filter(k => attr[k] === maxAttrVal);
+            const archMap = {
+                'Power': 'The Engine 🚂',
+                'Endurance': 'The Juggernaut 🫁',
+                'Technique': 'The Technician 🧗',
+                'Fingers': 'The Vise 🗜️',
+                'Headspace': 'The Zen Master 🧘',
+                'Tenacity': 'The Grinder 😤'
+            };
+            archetype = topAttrs.length > 1 ? 'All-Rounder 🃏' : archMap[topAttrs[0]];
+        }
+        
+        const archEl = document.getElementById('id-arch');
+        archEl.innerText = archetype;
+        archEl.style.color = '#10b981'; // Make it pop
+
+        // Render Pie Chart
+        if(flashes===0 && quickSends===0 && projects===0) { flashes=1; quickSends=1; projects=1; } 
+        charts.pie = new Chart(document.getElementById('stylePieChart'), { 
+            type: 'doughnut', 
+            data: { 
+                labels: ['Flash/Onsight', 'Quick Send', 'Project/Worked'], 
+                datasets: [{ data: [flashes, quickSends, projects], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'], borderColor: '#171717' }] 
+            }, 
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } 
+        });
+
+        // Render RPG Radar Chart
+        charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
+            type: 'radar', 
+            data: { 
+                labels: Object.keys(attr), 
+                datasets: [{ data: Object.values(attr), borderColor: '#9C27B0', backgroundColor: 'rgba(156, 39, 176, 0.2)', pointBackgroundColor: '#9C27B0' }] 
+            }, 
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { r: { ticks: { display: false }, grid: { color: '#333' }, angleLines: { color: '#333' } } } } 
+        });
 
         const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No logs fit this criteria.</div>'; };
         
