@@ -31,7 +31,6 @@ const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffs
 
 const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
 
-// Formats for the Journal (e.g., Main: 25 Mar, Sub: Wednesday)
 const getJournalDateObj = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
@@ -231,25 +230,42 @@ const App = {
     },
     adjBurns: (dir) => { App.haptic(); State.activeBurns = Math.max(1, State.activeBurns + dir); },
     
-    // NEW MODAL LOGIC
+    // MODAL UI STATE MANAGEMENT
     openSessionModal: (sessionId) => {
         App.haptic();
         const s = State.sessions.find(x => String(x.SessionID) === String(sessionId));
         if(!s) return;
         document.getElementById('modalSessionId').value = s.SessionID;
-        document.getElementById('modalFocus').value = s.Focus || "";
-        document.getElementById('modalFatigue').value = s.Fatigue || "";
+        
+        App.setModalFocus(s.Focus || "", true); 
+        App.setModalFatigue(s.Fatigue || "");
+        
         document.getElementById('sessionModal').classList.add('active');
     },
     closeSessionModal: () => {
         App.haptic();
         document.getElementById('sessionModal').classList.remove('active');
     },
+    setModalFocus: (val, init = false) => {
+        if(!init) { App.haptic(); document.getElementById('modalFocus').value = val; }
+        else { document.getElementById('modalFocus').value = val; }
+        
+        document.querySelectorAll('#quickFocusRow .pill').forEach(p => {
+            p.classList.toggle('active', p.innerText.toLowerCase() === String(val).toLowerCase());
+        });
+    },
+    setModalFatigue: (val) => {
+        if(val) App.haptic();
+        document.getElementById('modalFatigueVal').value = val;
+        document.querySelectorAll('#modalFatigueRow .pill').forEach(p => {
+            p.classList.toggle('active', String(p.innerText).startsWith(String(val)));
+        });
+    },
     saveSessionModal: () => {
         App.haptic();
         const sessionId = document.getElementById('modalSessionId').value;
         const focus = document.getElementById('modalFocus').value.trim();
-        const fatigue = document.getElementById('modalFatigue').value.trim();
+        const fatigue = document.getElementById('modalFatigueVal').value;
         
         State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: focus, Fatigue: fatigue, _synced: false} : s);
         SyncManager.pushAll(State.sessions.filter(s => s._synced === false), []);
@@ -329,8 +345,6 @@ const App = {
         if (State.sessions.length === 0) { jList.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">No sessions found. Log a climb to start your journal.</div>'; return; }
 
         const sortedSessions = [...State.sessions].sort((a,b) => new Date(getCleanDate(b.Date)) - new Date(getCleanDate(a.Date)));
-        
-        // Anti-scroll: limit the render
         const visibleSessions = sortedSessions.slice(0, State.journalLimit);
 
         let htmlOut = visibleSessions.map(session => {
@@ -342,6 +356,8 @@ const App = {
             
             let maxSentStr = "-";
             let avgSentStr = "-"; 
+            let maxColor = '#fff';
+            let avgColor = '#fff';
             
             const sends = children.filter(c => c.Style !== 'worked');
             if (sends.length > 0) {
@@ -353,12 +369,28 @@ const App = {
                 const avgScore = Math.round(sends.reduce((sum, c) => sum + Number(c.Score), 0) / sends.length);
                 const avgIdx = sConf.scores.indexOf(sConf.scores.reduce((p, c) => Math.abs(c-avgScore) < Math.abs(p-avgScore) ? c : p));
                 avgSentStr = sConf.labels[avgIdx];
+                
+                // Color Logic
+                if (sessionType.includes('Bouldering') && sConf.colors.length > 0) {
+                    const mIdx = sConf.labels.indexOf(maxSentStr);
+                    if (mIdx > -1) maxColor = sConf.colors[mIdx] || '#fff';
+                    if (avgIdx > -1) avgColor = sConf.colors[avgIdx] || '#fff';
+                } else if (sessionType.includes('Rope')) {
+                    maxColor = 'var(--primary)';
+                    avgColor = 'var(--primary)';
+                }
             }
 
-            // Tags Logic
             const focusTagHtml = session.Focus ? `<div class="s-tag focus-tag" onclick="App.openSessionModal('${session.SessionID}')">${session.Focus}</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}')">+ Focus</div>`;
-            const fatigueTagHtml = session.Fatigue ? `<div class="s-tag fatigue-tag" onclick="App.openSessionModal('${session.SessionID}')">Fatigue: ${session.Fatigue}/10</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}')">+ Fatigue</div>`;
+            const fatigueTagHtml = session.Fatigue ? `<div class="s-tag fatigue-tag" onclick="App.openSessionModal('${session.SessionID}')">Fatigue: ${session.Fatigue}/5</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}')">+ Fatigue</div>`;
             
+            // Fatigue Border Logic
+            let borderStyle = "";
+            if (session.Fatigue) {
+                const fColors = ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'];
+                borderStyle = `border-left: 4px solid ${fColors[session.Fatigue - 1] || '#444'};`;
+            }
+
             const childrenHtml = children.map(l => {
                 let rawGrade = String(l.Grade || "");
                 const cleanDisplayGrade = getBaseGrade(rawGrade); 
@@ -411,7 +443,7 @@ const App = {
             }).join('');
 
             return `
-            <div class="session-card">
+            <div class="session-card" style="${borderStyle}">
                 <div class="session-header">
                     <div class="s-date-block">
                         <div class="s-date-main">${dateInfo.main}</div>
@@ -424,9 +456,9 @@ const App = {
                     ${fatigueTagHtml}
                 </div>
                 <div class="session-stats-grid">
-                    <div class="s-stat-box"><div class="s-stat-lbl">Volume</div><div class="s-stat-val highlight">${totalBurns}</div></div>
-                    <div class="s-stat-box"><div class="s-stat-lbl">Max Sent</div><div class="s-stat-val">${maxSentStr}</div></div>
-                    <div class="s-stat-box"><div class="s-stat-lbl">Avg Sent</div><div class="s-stat-val">${avgSentStr}</div></div>
+                    <div class="s-stat-box"><div class="s-stat-lbl">Volume</div><div class="s-stat-val">${totalBurns}</div></div>
+                    <div class="s-stat-box"><div class="s-stat-lbl">Max Sent</div><div class="s-stat-val" style="color:${maxColor};">${maxSentStr}</div></div>
+                    <div class="s-stat-box"><div class="s-stat-lbl">Avg Sent</div><div class="s-stat-val" style="color:${avgColor};">${avgSentStr}</div></div>
                     <div class="s-stat-box"><div class="s-stat-lbl">Routes</div><div class="s-stat-val">${children.length}</div></div>
                 </div>
                 <button class="session-accordion-btn" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.session-card').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">View ${children.length} Climbs ▾</button>
