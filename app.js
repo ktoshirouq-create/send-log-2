@@ -30,16 +30,17 @@ const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌\s]/g
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 
 const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
+// REVERTED: Took the years back out!
 const formatJournalDate = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
     const dateObj = new Date(y, parseInt(m)-1, d);
-    return `${dayNames[dateObj.getDay()]}, ${d} ${monthNames[parseInt(m)-1]} '${y.substring(2)}`;
+    return `${dayNames[dateObj.getDay()]}, ${d} ${monthNames[parseInt(m)-1]}`;
 };
 const formatShortDate = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
-    return `${d} ${monthNames[parseInt(m)-1]} '${y.substring(2)}`;
+    return `${d} ${monthNames[parseInt(m)-1]}`;
 };
 
 const getScaleConfig = (disc) => {
@@ -95,7 +96,6 @@ const State = new Proxy({
             setTimeout(() => App.centerActivePills(), 50); 
         }
         
-        // THE FIX: Added 'activeGrade' to the watchlist so the UI knows to redraw it!
         const triggersUI = [
             'discipline', 'activeGym', 'activeStyle', 'activeBurns', 'chartMode', 
             'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 
@@ -311,10 +311,20 @@ const App = {
             const totalBurns = children.reduce((sum, c) => sum + (Number(c.Burns) || 1), 0);
             
             let maxSentStr = "-";
+            let avgSentStr = "-"; // NEW: Average logic
+            
             const sends = children.filter(c => c.Style !== 'worked');
             if (sends.length > 0) {
+                // Max Logic
                 const maxSend = sends.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max);
                 maxSentStr = getBaseGrade(maxSend.Grade);
+                
+                // Average Logic
+                const sessionType = sends[0].Type;
+                const sConf = getScaleConfig(sessionType);
+                const avgScore = Math.round(sends.reduce((sum, c) => sum + Number(c.Score), 0) / sends.length);
+                const avgIdx = sConf.scores.indexOf(sConf.scores.reduce((p, c) => Math.abs(c-avgScore) < Math.abs(p-avgScore) ? c : p));
+                avgSentStr = sConf.labels[avgIdx];
             }
 
             const tagText = session.Focus ? session.Focus : '+ Add Focus';
@@ -377,8 +387,9 @@ const App = {
                     <div class="session-tag-btn" onclick="App.updateSessionTag('${session.SessionID}')">${tagText}</div>
                 </div>
                 <div class="session-stats-grid">
-                    <div class="s-stat-box"><div class="s-stat-lbl">Volume</div><div class="s-stat-val highlight">${totalBurns} <span style="font-size:0.7rem; font-weight:400; color:var(--text-muted);">Burns</span></div></div>
+                    <div class="s-stat-box"><div class="s-stat-lbl">Volume</div><div class="s-stat-val highlight">${totalBurns}</div></div>
                     <div class="s-stat-box"><div class="s-stat-lbl">Max Sent</div><div class="s-stat-val">${maxSentStr}</div></div>
+                    <div class="s-stat-box"><div class="s-stat-lbl">Avg Sent</div><div class="s-stat-val">${avgSentStr}</div></div>
                     <div class="s-stat-box"><div class="s-stat-lbl">Routes</div><div class="s-stat-val">${children.length}</div></div>
                 </div>
                 <button class="session-accordion-btn" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.session-card').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">View ${children.length} Climbs ▾</button>
