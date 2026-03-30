@@ -28,10 +28,12 @@ const formatShortDate = (dStr) => {
 const Dashboard = {
     sortCol: 'Date',
     sortAsc: false,
+    logLimit: 50, // V38: Strict cap on rendered rows
     
     sortLogbook: (col) => {
         if (Dashboard.sortCol === col) Dashboard.sortAsc = !Dashboard.sortAsc; 
         else { Dashboard.sortCol = col; Dashboard.sortAsc = false; }
+        Dashboard.logLimit = 50; // Reset limit when sorting
         Dashboard.renderLogbook();
     },
 
@@ -71,7 +73,10 @@ const Dashboard = {
             return;
         }
 
-        tbody.innerHTML = displayData.map(l => {
+        // V38: Pagination slice
+        const paginatedData = displayData.slice(0, Dashboard.logLimit);
+
+        let tableHtml = paginatedData.map(l => {
             const id = getV(l, 'ClimbID') || Math.random().toString(36).substr(2, 9); 
             const name = String(getV(l, 'Name') || "");
             const cleanName = name ? name.split('@')[0].trim() : "Unknown";
@@ -109,6 +114,18 @@ const Dashboard = {
                 </td>
             </tr>`;
         }).join('');
+
+        // V38: Load More Button
+        if (displayData.length > Dashboard.logLimit) {
+            tableHtml += `
+            <tr class="table-row" onclick="Dashboard.logLimit += 50; Dashboard.renderLogbook();">
+                <td colspan="5" style="text-align:center; font-weight:bold; color:var(--primary); padding:20px; letter-spacing:1px; text-transform:uppercase;">
+                    Load More Logs ▾
+                </td>
+            </tr>`;
+        }
+
+        tbody.innerHTML = tableHtml;
     }
 };
 
@@ -126,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     allSessionsMaster = allSessions; 
     
     let activeDisc = 'All';
-    let activeTime = 'All'; 
+    let activeTime = '90'; // V38 FIX: Set default properly back to 90
     let charts = { pie: null, radar: null, line: null, pyr: null };
     
     const getScaleConfig = (disc) => {
@@ -135,7 +152,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return AppConfig.grades.ropes;
     };
 
-    document.getElementById('logSearch').addEventListener('input', Dashboard.renderLogbook);
+    document.getElementById('logSearch').addEventListener('input', () => {
+        Dashboard.logLimit = 50; // Reset limit on search
+        Dashboard.renderLogbook();
+    });
 
     const syncText = document.getElementById('syncStatus');
     syncText.innerText = "(Syncing...)";
@@ -175,9 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     attachFilters('disc-filter', 'disc', 'filter-pill');
     attachFilters('time-filter', 'time', 'time-tab');
-
-    document.querySelectorAll('#time-filter .time-tab').forEach(t => t.classList.remove('active'));
-    document.querySelector('#time-filter .time-tab[data-time="All"]').classList.add('active');
 
     function renderDashboard() {
         const now = new Date();
@@ -236,7 +253,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         Object.values(charts).forEach(c => { if(c) c.destroy(); });
 
-        // V37 FIX: Completely hide the card if "All" is selected
         const pyrCard = document.getElementById('pyramidCard');
         const pyrCanvas = document.getElementById('pyramidChart');
 
