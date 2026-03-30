@@ -24,12 +24,15 @@
         .time-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 3px; background: #10b981; border-radius: 3px 3px 0 0; }
 
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .stat-card { background: #171717; padding: 15px; border-radius: 12px; border: 1px solid #262626; text-align: center; }
+        .stat-card { background: #171717; padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center; }
         .stat-val { font-size: 24px; font-weight: bold; color: #fff; margin-bottom: 5px; }
         .stat-lbl { font-size: 11px; color: #737373; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        .dash-card { background: #171717; padding: 20px; border-radius: 12px; border: 1px solid #262626; margin-bottom: 20px; position: relative; }
-        .section-header { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #737373; margin-bottom: 15px; border-bottom: 1px solid #262626; padding-bottom: 8px; font-weight: bold; }
+        .dash-card { background: #171717; padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 20px rgba(0,0,0,0.2); margin-bottom: 20px; position: relative; }
+        
+        /* V43: Premium Sports App Header Styling */
+        .section-header { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #737373; margin-bottom: 24px; font-weight: bold; position: relative; border-bottom: none; padding-bottom: 0; }
+        .section-header::after { content: ''; position: absolute; left: 0; bottom: -10px; width: 30px; height: 3px; background: #10b981; border-radius: 2px; }
         
         .identity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .identity-card { background: #111; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
@@ -46,7 +49,7 @@
         .list-badge { background: rgba(16,185,129,0.15); color: #10b981; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; }
         .empty-msg { color: #737373; font-style: italic; font-size: 0.9rem; text-align: center; padding: 20px 0; }
 
-        /* V41: TIGHTENED TABLE CSS */
+        /* V43: Polished Table CSS */
         .search-bar { width: 100%; padding: 14px 16px; background: #111; border: 1px solid #333; border-radius: 8px; color: #fff; margin-bottom: 15px; font-size: 0.95rem; box-sizing: border-box; transition: 0.2s; }
         .search-bar:focus { outline: none; border-color: #10b981; box-shadow: 0 0 10px rgba(16,185,129,0.1); }
         
@@ -57,8 +60,12 @@
         .log-table th:hover { color: #10b981; }
         .log-table td { padding: 14px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
         
-        .table-row { cursor: pointer; transition: background 0.2s; }
-        .table-row:hover { background: rgba(255,255,255,0.03); }
+        /* Zebra Striping & Alignment */
+        .log-table tbody tr:nth-child(even) { background-color: rgba(255,255,255,0.02); }
+        .align-right { text-align: right; padding-right: 15px !important; }
+        
+        .table-row { cursor: pointer; transition: background 0.2s; border-left: 2px solid transparent; }
+        .table-row:hover { background: rgba(255,255,255,0.04); }
         .table-row.expanded { background: #111; border-left: 2px solid #10b981; }
         
         .details-row { display: none; background: #0a0a0a; }
@@ -72,14 +79,14 @@
         @media (max-width: 768px) { 
             .grid-2 { grid-template-columns: 1fr; } 
             .log-table th, .log-table td { padding: 12px 4px; font-size: 0.8rem; }
-            .col-style { font-size: 0.7rem; } /* Shrink style column on mobile */
+            .col-style { font-size: 0.7rem; } 
         }
     </style>
 </head>
 <body>
     <div class="header-bar">
-        <h2 style="display:flex; align-items:center; gap:10px;">
-            📊 Nerd Dashboard 
+        <h2 style="display:flex; align-items:center; gap:10px; font-size: 1.2rem;">
+            Nerd Dashboard 
             <span id="syncStatus" style="font-size:10px; color:#10b981; font-weight:normal; letter-spacing:0.5px;"></span>
         </h2>
         <button class="back-btn" onclick="window.location.href='./'">← Back</button>
@@ -129,28 +136,22 @@
         <div class="chart-wrapper" style="height: 250px;"><canvas id="cnsLineChart"></canvas></div>
     </div>
 
-    <div class="grid-2">
-        <div class="dash-card">
-            <div class="section-header">Ascent Styles</div>
-            <div class="chart-wrapper"><canvas id="stylePieChart"></canvas></div>
-        </div>
-        <div class="dash-card">
-            <div class="section-header">Climber Attributes</div>
-            <div class="chart-wrapper"><canvas id="attributeRadarChart"></canvas></div>
-        </div>
+    <div class="dash-card">
+        <div class="section-header">Climber Profile</div>
+        <div class="chart-wrapper" style="height: 300px;"><canvas id="attributeRadarChart"></canvas></div>
     </div>
 
     <div class="grid-2">
         <div class="dash-card"><div class="section-header">The Hall of Fame</div><div id="list-fame"></div></div>
         <div class="dash-card"><div class="section-header">The "Limit" Log</div><div id="list-limit"></div></div>
         <div class="dash-card"><div class="section-header">Peak by Steepness</div><div id="list-steepness"></div></div>
-        <div class="dash-card"><div class="section-header">Top Frequented Locations</div><div id="list-locations"></div></div>
+        <div class="dash-card"><div class="section-header">Top Locations</div><div id="list-locations"></div></div>
     </div>
 
     <div class="dash-card" style="margin-bottom: 40px;">
         <div class="section-header" style="display:flex; justify-content:space-between; align-items:center;">
             <span>Master Logbook</span>
-            <span id="logCount" style="color:#10b981; font-weight:bold;">0 Logs</span>
+            <span id="logCount" style="color:#10b981; font-weight:bold; font-size: 0.9rem;">0 Logs</span>
         </div>
         
         <input type="text" id="logSearch" class="search-bar" placeholder="Search routes, crags, notes, holds...">
@@ -163,7 +164,7 @@
                         <th onclick="Dashboard.sortLogbook('Name')">Route / Gym ↕</th>
                         <th onclick="Dashboard.sortLogbook('Grade')">Grade ↕</th>
                         <th onclick="Dashboard.sortLogbook('Style')" class="col-style">Style ↕</th>
-                        <th onclick="Dashboard.sortLogbook('Burns')">Burns ↕</th>
+                        <th onclick="Dashboard.sortLogbook('Burns')" class="align-right">Burns ↕</th>
                     </tr>
                 </thead>
                 <tbody id="masterLogbookBody">
@@ -172,6 +173,6 @@
         </div>
     </div>
 
-    <script src="dashboard.js?v=41"></script> 
+    <script src="dashboard.js?v=43"></script> 
 </body>
 </html>
