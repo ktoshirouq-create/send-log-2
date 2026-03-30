@@ -72,7 +72,7 @@ const Dashboard = {
         }
 
         tbody.innerHTML = displayData.map(l => {
-            const id = getV(l, 'ClimbID');
+            const id = getV(l, 'ClimbID') || Math.random().toString(36).substr(2, 9); 
             const name = String(getV(l, 'Name') || "");
             const cleanName = name ? name.split('@')[0].trim() : "Unknown";
             const grade = String(getV(l, 'Grade') || "");
@@ -114,11 +114,19 @@ const Dashboard = {
 
 document.addEventListener('DOMContentLoaded', () => {
     let allLogs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
+    if (allLogs.length === 0) {
+        allLogs = JSON.parse(localStorage.getItem('climbingLogs') || localStorage.getItem('climbLogs') || '[]');
+    }
+
     let allSessions = JSON.parse(localStorage.getItem('crag_sessions_master') || '[]');
+    if (allSessions.length === 0) {
+        allSessions = JSON.parse(localStorage.getItem('sessionLogs') || '[]');
+    }
+    
     allSessionsMaster = allSessions; 
     
     let activeDisc = 'All';
-    let activeTime = '90'; 
+    let activeTime = 'All'; 
     let charts = { pie: null, radar: null, line: null, pyr: null };
     
     const getScaleConfig = (disc) => {
@@ -129,19 +137,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('logSearch').addEventListener('input', Dashboard.renderLogbook);
 
-    // V35 FIX: Loading State Indicator
     const syncText = document.getElementById('syncStatus');
-    syncText.innerText = "(Syncing cloud data...)";
+    syncText.innerText = "(Syncing...)";
 
     fetch(AppConfig.api)
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                allLogs = data.climbs || [];
-                allSessions = data.sessions || [];
-                allSessionsMaster = allSessions;
-                localStorage.setItem('crag_climbs_master', JSON.stringify(allLogs));
-                localStorage.setItem('crag_sessions_master', JSON.stringify(allSessions));
+                if (data.climbs && data.climbs.length > 0) {
+                    allLogs = data.climbs;
+                    localStorage.setItem('crag_climbs_master', JSON.stringify(allLogs));
+                }
+                if (data.sessions && data.sessions.length > 0) {
+                    allSessions = data.sessions;
+                    allSessionsMaster = allSessions;
+                    localStorage.setItem('crag_sessions_master', JSON.stringify(allSessions));
+                }
                 syncText.innerText = "(Synced)";
                 setTimeout(() => syncText.innerText = "", 2000);
                 renderDashboard(); 
@@ -165,11 +176,18 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFilters('disc-filter', 'disc', 'filter-pill');
     attachFilters('time-filter', 'time', 'time-tab');
 
+    document.querySelectorAll('#time-filter .time-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector('#time-filter .time-tab[data-time="All"]').classList.add('active');
+
     function renderDashboard() {
         const now = new Date();
         currentFilteredLogs = allLogs.filter(l => {
-            const type = getV(l, 'Type');
-            if (activeDisc !== 'All' && type !== activeDisc) return false;
+            const type = String(getV(l, 'Type') || "");
+            let normalizedType = type;
+            if (type === 'indoor_ropes') normalizedType = 'Indoor Rope Climbing';
+            else if (type === 'indoor_boulders') normalizedType = 'Indoor Bouldering';
+
+            if (activeDisc !== 'All' && normalizedType !== activeDisc) return false;
             if (activeTime === 'All') return true;
             
             const logDate = new Date(getV(l, 'Date'));
@@ -199,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dayName = AppConfig.days[d];
                 dayC[dayName] = (dayC[dayName] || 0) + 1; 
             }
-            if (String(getV(l, 'Type')).includes('Indoor')) indoorCount++;
+            if (String(getV(l, 'Type')).includes('Indoor') || String(getV(l, 'Type')).includes('indoor')) indoorCount++;
         });
         
         const topDay = Object.keys(dayC).length ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-';
@@ -218,15 +236,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         Object.values(charts).forEach(c => { if(c) c.destroy(); });
 
+        // V37 FIX: Completely hide the card if "All" is selected
+        const pyrCard = document.getElementById('pyramidCard');
         const pyrCanvas = document.getElementById('pyramidChart');
-        const pyrOverlay = document.getElementById('pyramidOverlay');
 
         if (activeDisc === 'All' || currentFilteredLogs.length === 0) {
-            pyrCanvas.style.display = 'none';
-            pyrOverlay.style.display = 'flex';
+            pyrCard.style.display = 'none';
         } else {
-            pyrCanvas.style.display = 'block';
-            pyrOverlay.style.display = 'none';
+            pyrCard.style.display = 'block';
             
             const grades = {};
             const conf = getScaleConfig(activeDisc);
@@ -265,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (diffDays <= 28) weekBins[0].push(l);
         });
 
-        allSessions.forEach(s => {
+        allSessionsMaster.forEach(s => {
             const diffDays = Math.floor((now - new Date(getV(s, 'Date'))) / (1000 * 60 * 60 * 24));
             const f = getV(s, 'Fatigue');
             if (diffDays <= 28 && f) {
