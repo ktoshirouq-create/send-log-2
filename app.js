@@ -19,8 +19,6 @@ const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
 const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DISCIPLINES = ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'];
 const DISC_LABELS = ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder'];
-
-// CLEANED: Removed (Send) and (No Send)
 const STYLE_MAP = { 'project': 'Project', 'quick': 'Quick Send', 'flash': 'Flash', 'onsight': 'Onsight', 'worked': 'Worked' };
 
 const STEEPNESS = ['Slab', 'Vertical', 'Overhang', 'Roof'];
@@ -232,34 +230,33 @@ const App = {
     },
     adjBurns: (dir) => { App.haptic(); State.activeBurns = Math.max(1, State.activeBurns + dir); },
     
-    // THE NEW SMART MODAL LOGIC
+    // THE FIX: Modals now remove the `.hidden` class properly
     openSessionModal: (sessionId, mode) => {
         App.haptic();
         const s = State.sessions.find(x => String(x.SessionID) === String(sessionId));
         if(!s) return;
         document.getElementById('modalSessionId').value = s.SessionID;
         
-        // Hide all sections initially
-        document.getElementById('sec-focus').style.display = 'none';
-        document.getElementById('sec-fatigue').style.display = 'none';
-        document.getElementById('sec-warmup').style.display = 'none';
+        // Hide all sections initially by adding the class
+        ['sec-focus', 'sec-fatigue', 'sec-warmup'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
         
-        // Populate hidden trackers so they don't erase existing data
         document.getElementById('modalFocusVal').value = s.Focus || "";
         document.getElementById('modalFatigueVal').value = s.Fatigue || "";
         document.getElementById('modalWarmUpVal').value = s.WarmUp || "";
 
-        // Show the requested section
+        // Reveal only the targeted section
         if (mode === 'focus') {
-            document.getElementById('sec-focus').style.display = 'block';
+            document.getElementById('sec-focus').classList.remove('hidden');
             document.getElementById('modalTitle').innerText = 'Session Focus';
             App.setModalFocus(s.Focus || "", true);
         } else if (mode === 'fatigue') {
-            document.getElementById('sec-fatigue').style.display = 'block';
+            document.getElementById('sec-fatigue').classList.remove('hidden');
             document.getElementById('modalTitle').innerText = 'Session Fatigue';
             App.setModalFatigue(s.Fatigue || "", true);
         } else if (mode === 'warmup') {
-            document.getElementById('sec-warmup').style.display = 'block';
+            document.getElementById('sec-warmup').classList.remove('hidden');
             document.getElementById('modalTitle').innerText = 'Warm-Up';
             App.setModalWarmUp(s.WarmUp || "", true);
         }
@@ -271,7 +268,6 @@ const App = {
         document.getElementById('sessionModal').classList.remove('active');
     },
     
-    // TOGGLE LOGIC: If clicking the same value, deselect it (set to blank)
     setModalFocus: (val, init = false) => {
         if(!init) App.haptic();
         const current = document.getElementById('modalFocusVal').value;
@@ -383,6 +379,7 @@ const App = {
         setTimeout(() => App.centerActivePills(), 10);
     },
 
+    // THE FIX: The highly optimized O(N) Hash Map engine for the Journal
     renderJournal: () => {
         const jList = document.getElementById('journalList');
         if (State.sessions.length === 0) { jList.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">No sessions found. Log a climb to start your journal.</div>'; return; }
@@ -390,8 +387,16 @@ const App = {
         const sortedSessions = [...State.sessions].sort((a,b) => new Date(getCleanDate(b.Date)) - new Date(getCleanDate(a.Date)));
         const visibleSessions = sortedSessions.slice(0, State.journalLimit);
 
+        // Pre-group all climbs into a lightning-fast dictionary
+        const climbsBySession = {};
+        State.climbs.forEach(c => {
+            if (!climbsBySession[c.SessionID]) climbsBySession[c.SessionID] = [];
+            climbsBySession[c.SessionID].push(c);
+        });
+
         let htmlOut = visibleSessions.map(session => {
-            const children = State.climbs.filter(c => String(c.SessionID) === String(session.SessionID)).sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID));
+            const children = climbsBySession[session.SessionID] || [];
+            children.sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID));
             if(children.length === 0) return ''; 
 
             const dateInfo = getJournalDateObj(session.Date);
@@ -415,7 +420,6 @@ const App = {
                 }
             }
             
-            // LOGIC: Calculate Session Discipline for Card Gradient & Subtitle
             let bouldCount = 0; let ropeCount = 0;
             children.forEach(c => {
                 if(c.Type.includes('Bouldering')) bouldCount++;
@@ -424,10 +428,9 @@ const App = {
             
             let domDisc = 'mixed';
             let domLabel = 'Mixed';
-            if (bouldCount > 0 && ropeCount === 0) { domDisc = 'boulder'; domLabel = 'In Boulder'; } // Can be out boulder too, simplifying to the gradient type
+            if (bouldCount > 0 && ropeCount === 0) { domDisc = 'boulder'; domLabel = 'In Boulder'; } 
             else if (ropeCount > 0 && bouldCount === 0) { domDisc = 'rope'; domLabel = 'In Rope'; }
             
-            // Override domLabel specifically if it's outdoor
             if (domDisc !== 'mixed') {
                 if(children[0] && children[0].Type) {
                     const idx = DISCIPLINES.indexOf(children[0].Type);
@@ -440,12 +443,10 @@ const App = {
             else if (domDisc === 'rope') bgGradient = 'linear-gradient(145deg, #0e1e16, #08120d)';
             else if (domDisc === 'mixed') bgGradient = 'linear-gradient(145deg, #121826, #0e1e16)';
 
-            // Tags Logic (Separate triggers)
             const focusTagHtml = session.Focus ? `<div class="s-tag focus-tag" onclick="App.openSessionModal('${session.SessionID}', 'focus')">${session.Focus}</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}', 'focus')">+ Focus</div>`;
             const fatigueTagHtml = session.Fatigue ? `<div class="s-tag fatigue-tag" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">Fatigue: ${session.Fatigue}/10</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">+ Fatigue</div>`;
             const warmupTagHtml = session.WarmUp ? `<div class="s-tag warmup-tag" onclick="App.openSessionModal('${session.SessionID}', 'warmup')">Warm-up: ${session.WarmUp}</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}', 'warmup')">+ Warm-up</div>`;
             
-            // 1-10 Fatigue Border Logic
             let borderStyle = "border-left: 4px solid transparent;";
             if (session.Fatigue) {
                 const fScore = Number(session.Fatigue);
