@@ -95,7 +95,7 @@ const Dashboard = {
                 <td style="font-weight:bold; color:#fff; word-break: break-word;">${cleanName}</td>
                 <td style="font-weight:bold; ${gradeColor}">${grade}</td>
                 <td class="col-style" style="color:#a3a3a3;">${AppConfig.styles[getV(l, 'Style')] || getV(l, 'Style')}</td>
-                <td style="text-align:center;">${getV(l, 'Burns') || 1}</td>
+                <td class="align-right">${getV(l, 'Burns') || 1}</td>
             </tr>
             <tr class="details-row" id="details-${id}">
                 <td colspan="5" style="padding:0;">
@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let activeDisc = 'All';
     let activeTime = '90'; 
-    let charts = { pie: null, radar: null, line: null, pyr: null };
+    let charts = { radar: null, line: null, pyr: null };
     
     const getScaleConfig = (disc) => {
         if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
@@ -194,17 +194,62 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFilters('disc-filter', 'disc', 'filter-pill');
     attachFilters('time-filter', 'time', 'time-tab');
 
+    // V43: The RPG Calculation Engine (Abstracted for reuse)
+    const calcRPG = (logs) => {
+        let attr = { Power: 1, Endurance: 1, Technique: 1, Fingers: 1, Headspace: 1, Tenacity: 1 };
+        logs.forEach(l => {
+            const angle = String(getV(l, 'Angle') || "");
+            const styleTag = String(getV(l, 'ClimStyles') || getV(l, 'climstyles') || "").toLowerCase();
+            const holds = String(getV(l, 'Holds') || "");
+            const effort = String(getV(l, 'Effort') || "");
+            const styleResult = String(getV(l, 'Style') || "").toLowerCase();
+            const burns = Number(getV(l, 'Burns')) || 1;
+            const type = String(getV(l, 'Type') || "");
+
+            if (angle.includes('Overhang') || angle.includes('Roof')) attr.Power += 2;
+            if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
+            if (type.includes('Bouldering')) attr.Power += 1;
+
+            if (styleTag.includes('endurance')) attr.Endurance += 3;
+            if (type.includes('Rope')) attr.Endurance += 1;
+            if (styleResult === 'autobelay') attr.Endurance += 4;
+            
+            if (angle.includes('Slab') || angle.includes('Vertical')) attr.Technique += 2;
+            if (styleTag.includes('technical')) attr.Technique += 2;
+            if (holds.includes('Slopers') || holds.includes('Pinches')) attr.Technique += 1;
+            if (styleResult === 'toprope') { attr.Endurance += 1; attr.Technique += 1; } 
+
+            if (holds.includes('Crimps') || holds.includes('Pockets')) attr.Fingers += 3;
+
+            if (styleResult === 'flash' || styleResult === 'onsight') attr.Headspace += 3;
+            if (effort.includes('Limit')) attr.Headspace += 2;
+
+            if (styleResult === 'project') attr.Tenacity += 3;
+            if (burns >= 3) attr.Tenacity += 2;
+            if (styleResult === 'worked') attr.Tenacity += 1; 
+        });
+        
+        // Normalize to a 100-point shape scale
+        const maxVal = Math.max(...Object.values(attr), 1);
+        Object.keys(attr).forEach(k => attr[k] = Math.round((attr[k] / maxVal) * 100));
+        return attr;
+    };
+
     function renderDashboard() {
         const now = new Date();
-        currentFilteredLogs = allLogs.filter(l => {
+        
+        // V43: We need the All-Time logs for the Ghost shape, filtering ONLY by Discipline
+        const allTimeLogsFiltered = allLogs.filter(l => {
             const type = String(getV(l, 'Type') || "");
             let normalizedType = type;
             if (type === 'indoor_ropes') normalizedType = 'Indoor Rope Climbing';
             else if (type === 'indoor_boulders') normalizedType = 'Indoor Bouldering';
-
             if (activeDisc !== 'All' && normalizedType !== activeDisc) return false;
+            return true;
+        });
+
+        currentFilteredLogs = allTimeLogsFiltered.filter(l => {
             if (activeTime === 'All') return true;
-            
             const logDate = new Date(getV(l, 'Date'));
             const diffDays = (now - logDate) / (1000 * 60 * 60 * 24);
             return diffDays <= parseInt(activeTime);
@@ -240,9 +285,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let envLabel = '-';
         if (currentFilteredLogs.length > 0) {
             const inRatio = indoorCount / currentFilteredLogs.length;
-            if (inRatio >= 0.8) envLabel = 'Gym Rat 🐀';
-            else if (inRatio <= 0.4) envLabel = 'Crag Hound 🐺';
-            else envLabel = 'Weekend Warrior 🏕️';
+            if (inRatio >= 0.8) envLabel = 'Gym Rat';
+            else if (inRatio <= 0.4) envLabel = 'Crag Hound';
+            else envLabel = 'Weekend Warrior';
         }
 
         document.getElementById('id-day').innerText = topDay;
@@ -338,86 +383,64 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // V42: Top Rope & Auto Belay RPG Mapping
-        let attr = { Power: 1, Endurance: 1, Technique: 1, Fingers: 1, Headspace: 1, Tenacity: 1 };
-        let flashes = 0, quickSends = 0, projects = 0, topRopes = 0, autoBelays = 0;
+        // V43: Generate Normalized Data
+        const currAttr = calcRPG(currentFilteredLogs);
+        const baseAttr = calcRPG(allTimeLogsFiltered);
 
-        currentFilteredLogs.forEach(l => {
-            const angle = String(getV(l, 'Angle') || "");
-            const styleTag = String(getV(l, 'ClimStyles') || getV(l, 'climstyles') || "").toLowerCase();
-            const holds = String(getV(l, 'Holds') || "");
-            const effort = String(getV(l, 'Effort') || "");
-            const styleResult = String(getV(l, 'Style') || "").toLowerCase();
-            const burns = Number(getV(l, 'Burns')) || 1;
-            const type = String(getV(l, 'Type') || "");
-
-            // Ascent Styles count
-            if (styleResult === 'flash' || styleResult === 'onsight') flashes++;
-            else if (styleResult === 'quick') quickSends++;
-            else if (styleResult === 'project' || styleResult === 'worked') projects++;
-            else if (styleResult === 'toprope') topRopes++;
-            else if (styleResult === 'autobelay') autoBelays++;
-
-            if (angle.includes('Overhang') || angle.includes('Roof')) attr.Power += 2;
-            if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
-            if (type.includes('Bouldering')) attr.Power += 1;
-
-            if (styleTag.includes('endurance')) attr.Endurance += 3;
-            if (type.includes('Rope')) attr.Endurance += 1;
-            if (styleResult === 'autobelay') attr.Endurance += 4; // Auto Belay is an Endurance nuke
-            
-            if (angle.includes('Slab') || angle.includes('Vertical')) attr.Technique += 2;
-            if (styleTag.includes('technical')) attr.Technique += 2;
-            if (holds.includes('Slopers') || holds.includes('Pinches')) attr.Technique += 1;
-            if (styleResult === 'toprope') { attr.Endurance += 1; attr.Technique += 1; } // Small physical points, 0 Headspace
-
-            if (holds.includes('Crimps') || holds.includes('Pockets')) attr.Fingers += 3;
-
-            if (styleResult === 'flash' || styleResult === 'onsight') attr.Headspace += 3;
-            if (effort.includes('Limit')) attr.Headspace += 2;
-
-            if (styleResult === 'project') attr.Tenacity += 3;
-            if (burns >= 3) attr.Tenacity += 2;
-            if (styleResult === 'worked') attr.Tenacity += 1; 
-        });
-
-        const maxAttrVal = Math.max(...Object.values(attr));
-        let archetype = "All-Rounder 🃏";
+        let archetype = "All-Rounder";
         if (currentFilteredLogs.length > 0) {
-            const topAttrs = Object.keys(attr).filter(k => attr[k] === maxAttrVal);
             const archMap = {
-                'Power': 'The Engine 🚂',
-                'Endurance': 'The Juggernaut 🫁',
-                'Technique': 'The Technician 🧗',
-                'Fingers': 'The Vise 🗜️',
-                'Headspace': 'The Zen Master 🧘',
-                'Tenacity': 'The Grinder 😤'
+                'Power': 'The Engine', 'Endurance': 'The Juggernaut', 'Technique': 'The Technician',
+                'Fingers': 'The Vise', 'Headspace': 'The Zen Master', 'Tenacity': 'The Grinder'
             };
-            archetype = topAttrs.length > 1 ? 'All-Rounder 🃏' : archMap[topAttrs[0]];
+            const topAttrs = Object.keys(currAttr).filter(k => currAttr[k] === 100);
+            archetype = topAttrs.length > 1 ? 'All-Rounder' : archMap[topAttrs[0]];
         }
         
         const archEl = document.getElementById('id-arch');
         archEl.innerText = archetype;
-        archEl.style.color = '#10b981'; 
 
-        // V42: Added Top Rope (Purple) and Auto Belay (Cyan) slices to pie chart
-        if(flashes===0 && quickSends===0 && projects===0 && topRopes===0 && autoBelays===0) { flashes=1; quickSends=1; projects=1; } 
-        charts.pie = new Chart(document.getElementById('stylePieChart'), { 
-            type: 'doughnut', 
-            data: { 
-                labels: ['Flash/Onsight', 'Quick Send', 'Project/Worked', 'Top Rope', 'Auto Belay'], 
-                datasets: [{ data: [flashes, quickSends, projects, topRopes, autoBelays], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#06b6d4'], borderColor: '#171717' }] 
-            }, 
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } 
-        });
-
+        // V43: The "Haaland" Overlapping Profile Radar
         charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
             type: 'radar', 
             data: { 
-                labels: Object.keys(attr), 
-                datasets: [{ data: Object.values(attr), borderColor: '#9C27B0', backgroundColor: 'rgba(156, 39, 176, 0.2)', pointBackgroundColor: '#9C27B0' }] 
+                labels: Object.keys(currAttr), 
+                datasets: [
+                    { 
+                        label: 'Current Phase',
+                        data: Object.values(currAttr), 
+                        borderColor: '#10b981', 
+                        backgroundColor: 'rgba(16, 185, 129, 0.4)', 
+                        pointBackgroundColor: '#10b981',
+                        pointRadius: 0,
+                        borderWidth: 2
+                    },
+                    { 
+                        label: 'All-Time Base',
+                        data: Object.values(baseAttr), 
+                        borderColor: 'rgba(255,255,255,0.2)', 
+                        backgroundColor: 'rgba(255,255,255,0.05)', 
+                        pointRadius: 0,
+                        borderWidth: 1,
+                        borderDash: [5, 5]
+                    }
+                ] 
             }, 
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { r: { ticks: { display: false }, grid: { color: '#333' }, angleLines: { color: '#333' } } } } 
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                plugins: { 
+                    legend: { display: true, position: 'top', labels: { color: '#737373', boxWidth: 10, font: {size: 10} } } 
+                }, 
+                scales: { 
+                    r: { 
+                        min: 0, max: 100,
+                        ticks: { display: false, stepSize: 20 }, 
+                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        angleLines: { color: 'rgba(255,255,255,0.05)' },
+                        pointLabels: { color: '#a3a3a3', font: { size: 11, weight: 'bold' } }
+                    } 
+                } 
+            } 
         });
 
         const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No logs fit this criteria.</div>'; };
