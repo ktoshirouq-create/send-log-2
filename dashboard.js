@@ -28,12 +28,12 @@ const formatShortDate = (dStr) => {
 const Dashboard = {
     sortCol: 'Date',
     sortAsc: false,
-    logLimit: 50, 
+    logLimit: 10, // V41 FIX: 10 logs per page initially
     
     sortLogbook: (col) => {
         if (Dashboard.sortCol === col) Dashboard.sortAsc = !Dashboard.sortAsc; 
         else { Dashboard.sortCol = col; Dashboard.sortAsc = false; }
-        Dashboard.logLimit = 50; 
+        Dashboard.logLimit = 10; 
         Dashboard.renderLogbook();
     },
 
@@ -92,10 +92,10 @@ const Dashboard = {
             return `
             <tr class="table-row" id="row-${id}" onclick="Dashboard.toggleRow('${id}')">
                 <td style="color:#a3a3a3;">${formatShortDate(getV(l, 'Date'))}</td>
-                <td style="font-weight:bold; color:#fff;">${cleanName}</td>
+                <td style="font-weight:bold; color:#fff; word-break: break-word;">${cleanName}</td>
                 <td style="font-weight:bold; ${gradeColor}">${grade}</td>
-                <td style="color:#a3a3a3;">${AppConfig.styles[getV(l, 'Style')] || getV(l, 'Style')}</td>
-                <td>${getV(l, 'Burns') || 1}</td>
+                <td class="col-style" style="color:#a3a3a3;">${AppConfig.styles[getV(l, 'Style')] || getV(l, 'Style')}</td>
+                <td style="text-align:center;">${getV(l, 'Burns') || 1}</td>
             </tr>
             <tr class="details-row" id="details-${id}">
                 <td colspan="5" style="padding:0;">
@@ -116,8 +116,8 @@ const Dashboard = {
 
         if (displayData.length > Dashboard.logLimit) {
             tableHtml += `
-            <tr class="table-row" onclick="Dashboard.logLimit += 50; Dashboard.renderLogbook();">
-                <td colspan="5" style="text-align:center; font-weight:bold; color:var(--primary); padding:20px; letter-spacing:1px; text-transform:uppercase;">
+            <tr class="table-row" onclick="Dashboard.logLimit += 10; Dashboard.renderLogbook();">
+                <td colspan="5" style="text-align:center; font-weight:bold; color:var(--primary); padding:15px; letter-spacing:1px; text-transform:uppercase;">
                     Load More Logs ▾
                 </td>
             </tr>`;
@@ -151,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     document.getElementById('logSearch').addEventListener('input', () => {
-        Dashboard.logLimit = 50; 
+        Dashboard.logLimit = 10; 
         Dashboard.renderLogbook();
     });
 
@@ -338,7 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // V40: THE RPG STATS ALGORITHM
         let attr = { Power: 1, Endurance: 1, Technique: 1, Fingers: 1, Headspace: 1, Tenacity: 1 };
         let flashes = 0, quickSends = 0, projects = 0;
 
@@ -351,12 +350,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const burns = Number(getV(l, 'Burns')) || 1;
             const type = String(getV(l, 'Type') || "");
 
-            // Pie Chart Data (Ascent Styles)
             if (styleResult === 'flash' || styleResult === 'onsight') flashes++;
             else if (styleResult === 'quick') quickSends++;
             else if (styleResult === 'project' || styleResult === 'worked') projects++;
 
-            // Spider Web Data (RPG Attributes)
             if (angle.includes('Overhang') || angle.includes('Roof')) attr.Power += 2;
             if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
             if (type.includes('Bouldering')) attr.Power += 1;
@@ -378,7 +375,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (styleResult === 'worked') attr.Tenacity += 1; 
         });
 
-        // Resolve Archetype
         const maxAttrVal = Math.max(...Object.values(attr));
         let archetype = "All-Rounder 🃏";
         if (currentFilteredLogs.length > 0) {
@@ -396,9 +392,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const archEl = document.getElementById('id-arch');
         archEl.innerText = archetype;
-        archEl.style.color = '#10b981'; // Make it pop
+        archEl.style.color = '#10b981'; 
 
-        // Render Pie Chart
         if(flashes===0 && quickSends===0 && projects===0) { flashes=1; quickSends=1; projects=1; } 
         charts.pie = new Chart(document.getElementById('stylePieChart'), { 
             type: 'doughnut', 
@@ -409,7 +404,6 @@ document.addEventListener('DOMContentLoaded', () => {
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } 
         });
 
-        // Render RPG Radar Chart
         charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
             type: 'radar', 
             data: { 
