@@ -39,7 +39,10 @@
         
         .btn-main { background: var(--primary); color: #000; border: none; padding: 16px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.05rem; cursor: pointer; margin-top: 25px; transition: all 0.3s; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-main:active { transform: scale(0.97); }
-        .btn-main:disabled { cursor: not-allowed; opacity: 0.7; }
+        
+        /* V57: Gray out disabled button specifically */
+        .btn-main:disabled { background: #333 !important; color: #737373 !important; cursor: not-allowed; box-shadow: none; transform: none; }
+        
         .dash-btn { background: #1e1e1e; border: 1px solid var(--primary); color: var(--primary); margin-top: 0; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(16,185,129,0.1); }
 
         .pill-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; scroll-snap-type: x mandatory; scrollbar-width: none; margin-bottom: 15px; }
@@ -70,14 +73,13 @@
         .burn-btn:active { background: #333; transform: scale(0.95); }
         .burns-val { font-size: 1.2rem; font-weight: 700; color: #fff; width: 30px; text-align: center; }
 
-        /* LOG / SESSION CARDS */
+        /* LOG CARDS */
         .log-card { background: var(--dark); border-radius: 10px; border: 1px solid var(--border); margin-bottom: 8px; overflow: hidden; transition: 0.3s; }
         .log-summary { display: flex; align-items: center; padding: 14px 16px; cursor: pointer; user-select: none; }
         .log-summary:active { background: #111; }
         .log-date { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); width: 55px; flex-shrink: 0; }
         .log-info { flex: 1; min-width: 0; padding: 0 10px; display: flex; flex-direction: column; justify-content: center; }
         .log-name { font-weight: 600; font-size: 0.95rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .log-crag { font-size: 0.75rem; color: #a3a3a3; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .log-grade { font-size: 1.1rem; font-weight: 700; text-align: right; white-space: nowrap; flex-shrink: 0; }
         .log-grade.rp { color: var(--primary); }
         .log-grade.fl { color: var(--flash); }
@@ -92,7 +94,7 @@
         .log-del-btn { width: 100%; margin-top: 16px; padding: 12px; background: rgba(239, 68, 68, 0.05); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
         .log-del-btn:active { background: rgba(239, 68, 68, 0.15); }
 
-        /* SESSION SPECIFIC CSS */
+        /* SESSION CARDS */
         .session-card { border-radius: var(--radius); margin-bottom: 20px; box-shadow: 0 8px 25px rgba(0,0,0,0.6); overflow: hidden; transition: 0.3s; }
         .session-header { padding: 16px 16px 8px 16px; display: flex; justify-content: space-between; align-items: flex-start; }
         .s-date-block { display: flex; flex-direction: column; }
@@ -119,16 +121,7 @@
         .session-card.expanded .session-children { display: block; animation: fadeIn 0.2s ease; }
 
         .load-more-btn { background: transparent; color: var(--text-muted); border: 1px solid var(--border); padding: 14px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; margin-top: 10px; text-transform: uppercase; }
-        /* V52: EXTRACTED UTILITY CLASSES */
-        .bg-boulder { background: linear-gradient(145deg, #121826, #0a0d14) !important; }
-        .bg-rope { background: linear-gradient(145deg, #0e1e16, #08120d) !important; }
-        .bg-mixed { background: linear-gradient(145deg, #121826, #0e1e16) !important; }
-
-        .f-tier-1 { border-left: 4px solid #22c55e !important; }
-        .f-tier-2 { border-left: 4px solid #84cc16 !important; }
-        .f-tier-3 { border-left: 4px solid #eab308 !important; }
-        .f-tier-4 { border-left: 4px solid #f97316 !important; }
-        .f-tier-5 { border-left: 4px solid #ef4444 !important; }
+        
         /* SMART MODAL */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 3000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); opacity: 0; pointer-events: none; transition: 0.3s; }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
@@ -158,6 +151,17 @@
         .xp-bar-fill { height: 100%; background: var(--primary); width: 0%; border-radius: 6px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s, box-shadow 0.3s; box-shadow: 0 0 10px rgba(16,185,129,0.5); }
 
         .flex { display: flex; gap: 10px; } .flex > div { flex: 1; } .hidden { display: none !important; }
+
+        /* UTILITY CLASSES */
+        .bg-boulder { background: linear-gradient(145deg, #121826, #0a0d14) !important; }
+        .bg-rope { background: linear-gradient(145deg, #0e1e16, #08120d) !important; }
+        .bg-mixed { background: linear-gradient(145deg, #121826, #0e1e16) !important; }
+
+        .f-tier-1 { border-left: 4px solid #22c55e !important; }
+        .f-tier-2 { border-left: 4px solid #84cc16 !important; }
+        .f-tier-3 { border-left: 4px solid #eab308 !important; }
+        .f-tier-4 { border-left: 4px solid #f97316 !important; }
+        .f-tier-5 { border-left: 4px solid #ef4444 !important; }
     </style>
 </head>
 <body>
@@ -239,8 +243,8 @@
                     </div>
                     <div id="input-outdoor" class="hidden">
                         <div class="flex">
-                            <div><label>Route Name</label><input type="text" id="input-name" placeholder="Silence"></div>
-                            <div><label>Crag</label><input type="text" id="input-crag" placeholder="Flatanger"></div>
+                            <div><label>Route Name</label><input type="text" id="input-name" placeholder="Silence" oninput="App.validateForm()"></div>
+                            <div><label>Crag</label><input type="text" id="input-crag" placeholder="Flatanger" oninput="App.validateForm()"></div>
                         </div>
                     </div>
                     
@@ -259,7 +263,7 @@
                         </div>
                     </div>
                     
-                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('+') ? 'Hide Details' : '+ Add Details'; App.haptic();">+ Add Details</div>
+                    <div class="advanced-toggle" onclick="document.getElementById('advanced-content').classList.toggle('hidden'); this.innerText = this.innerText.includes('Add') ? '- Hide Details' : '+ Add Details'; App.haptic();">+ Add Details</div>
                     
                     <div id="advanced-content" class="hidden">
                         
@@ -355,6 +359,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=51"></script>
+    <script src="app.js?v=57"></script>
 </body>
 </html>
