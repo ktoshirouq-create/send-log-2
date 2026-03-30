@@ -119,7 +119,16 @@
         .session-card.expanded .session-children { display: block; animation: fadeIn 0.2s ease; }
 
         .load-more-btn { background: transparent; color: var(--text-muted); border: 1px solid var(--border); padding: 14px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; margin-top: 10px; text-transform: uppercase; }
-        
+        /* V52: EXTRACTED UTILITY CLASSES */
+        .bg-boulder { background: linear-gradient(145deg, #121826, #0a0d14) !important; }
+        .bg-rope { background: linear-gradient(145deg, #0e1e16, #08120d) !important; }
+        .bg-mixed { background: linear-gradient(145deg, #121826, #0e1e16) !important; }
+
+        .f-tier-1 { border-left: 4px solid #22c55e !important; }
+        .f-tier-2 { border-left: 4px solid #84cc16 !important; }
+        .f-tier-3 { border-left: 4px solid #eab308 !important; }
+        .f-tier-4 { border-left: 4px solid #f97316 !important; }
+        .f-tier-5 { border-left: 4px solid #ef4444 !important; }
         /* SMART MODAL */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 3000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); opacity: 0; pointer-events: none; transition: 0.3s; }
         .modal-overlay.active { opacity: 1; pointer-events: all; }
