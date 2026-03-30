@@ -4,10 +4,10 @@ const AppConfig = {
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'],
-    styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'worked': 'Worked' },
+    styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     grades: {
-        ropes: { labels: ["5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
+        ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
@@ -17,7 +17,7 @@ let currentFilteredLogs = [];
 let allSessionsMaster = [];
 
 const getV = (obj, prop) => obj[prop] !== undefined ? obj[prop] : obj[prop.toLowerCase()];
-const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌\s]/g, '');
+const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
 const formatShortDate = (dStr) => {
     const clean = dStr ? String(dStr).substring(0, 10) : "";
     if(!clean) return "";
@@ -28,7 +28,7 @@ const formatShortDate = (dStr) => {
 const Dashboard = {
     sortCol: 'Date',
     sortAsc: false,
-    logLimit: 10, // V41 FIX: 10 logs per page initially
+    logLimit: 10, 
     
     sortLogbook: (col) => {
         if (Dashboard.sortCol === col) Dashboard.sortAsc = !Dashboard.sortAsc; 
@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let maxScore = 0, peakG = '-';
         currentFilteredLogs.forEach(l => { 
             const s = Number(getV(l, 'Score'));
-            if (s && s > maxScore && getV(l, 'Style') !== 'worked') { 
+            if (s && s > maxScore && getV(l, 'Style') !== 'worked' && getV(l, 'Style') !== 'toprope' && getV(l, 'Style') !== 'autobelay') { 
                 maxScore = s; 
                 peakG = getV(l, 'Grade'); 
             } 
@@ -262,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const conf = getScaleConfig(activeDisc);
             
             currentFilteredLogs.forEach(l => {
-                if (getV(l, 'Score') && getV(l, 'Style') !== 'worked') {
+                if (getV(l, 'Score') && getV(l, 'Style') !== 'worked' && getV(l, 'Style') !== 'toprope' && getV(l, 'Style') !== 'autobelay') {
                     const clean = getBaseGrade(getV(l, 'Grade'));
                     grades[clean] = (grades[clean] || 0) + 1;
                 }
@@ -282,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        const sortedCNS = [...currentFilteredLogs].filter(l => getV(l, 'Score') && getV(l, 'Style') !== 'worked').sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date')));
+        const sortedCNS = [...currentFilteredLogs].filter(l => getV(l, 'Score') && getV(l, 'Style') !== 'worked' && getV(l, 'Style') !== 'toprope' && getV(l, 'Style') !== 'autobelay').sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date')));
         const cnsData = { labels: ['W4', 'W3', 'W2', 'W1'], peak: [null, null, null, null], grades: ['-','-','-','-'], fatigue: [0,0,0,0] };
         const weekBins = [[],[],[],[]]; 
         const sessionBins = [[],[],[],[]];
@@ -338,8 +338,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // V42: Top Rope & Auto Belay RPG Mapping
         let attr = { Power: 1, Endurance: 1, Technique: 1, Fingers: 1, Headspace: 1, Tenacity: 1 };
-        let flashes = 0, quickSends = 0, projects = 0;
+        let flashes = 0, quickSends = 0, projects = 0, topRopes = 0, autoBelays = 0;
 
         currentFilteredLogs.forEach(l => {
             const angle = String(getV(l, 'Angle') || "");
@@ -350,9 +351,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const burns = Number(getV(l, 'Burns')) || 1;
             const type = String(getV(l, 'Type') || "");
 
+            // Ascent Styles count
             if (styleResult === 'flash' || styleResult === 'onsight') flashes++;
             else if (styleResult === 'quick') quickSends++;
             else if (styleResult === 'project' || styleResult === 'worked') projects++;
+            else if (styleResult === 'toprope') topRopes++;
+            else if (styleResult === 'autobelay') autoBelays++;
 
             if (angle.includes('Overhang') || angle.includes('Roof')) attr.Power += 2;
             if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
@@ -360,10 +364,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (styleTag.includes('endurance')) attr.Endurance += 3;
             if (type.includes('Rope')) attr.Endurance += 1;
+            if (styleResult === 'autobelay') attr.Endurance += 4; // Auto Belay is an Endurance nuke
             
             if (angle.includes('Slab') || angle.includes('Vertical')) attr.Technique += 2;
             if (styleTag.includes('technical')) attr.Technique += 2;
             if (holds.includes('Slopers') || holds.includes('Pinches')) attr.Technique += 1;
+            if (styleResult === 'toprope') { attr.Endurance += 1; attr.Technique += 1; } // Small physical points, 0 Headspace
 
             if (holds.includes('Crimps') || holds.includes('Pockets')) attr.Fingers += 3;
 
@@ -394,12 +400,13 @@ document.addEventListener('DOMContentLoaded', () => {
         archEl.innerText = archetype;
         archEl.style.color = '#10b981'; 
 
-        if(flashes===0 && quickSends===0 && projects===0) { flashes=1; quickSends=1; projects=1; } 
+        // V42: Added Top Rope (Purple) and Auto Belay (Cyan) slices to pie chart
+        if(flashes===0 && quickSends===0 && projects===0 && topRopes===0 && autoBelays===0) { flashes=1; quickSends=1; projects=1; } 
         charts.pie = new Chart(document.getElementById('stylePieChart'), { 
             type: 'doughnut', 
             data: { 
-                labels: ['Flash/Onsight', 'Quick Send', 'Project/Worked'], 
-                datasets: [{ data: [flashes, quickSends, projects], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'], borderColor: '#171717' }] 
+                labels: ['Flash/Onsight', 'Quick Send', 'Project/Worked', 'Top Rope', 'Auto Belay'], 
+                datasets: [{ data: [flashes, quickSends, projects, topRopes, autoBelays], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#a855f7', '#06b6d4'], borderColor: '#171717' }] 
             }, 
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } 
         });
