@@ -1,4 +1,4 @@
-const CACHE_NAME = 'crag-logger-v40';
+const CACHE_NAME = 'crag-logger-v41';
 const ASSETS = [
   '/',
   '/index.html',
