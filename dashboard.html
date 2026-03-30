@@ -47,7 +47,6 @@
         .list-badge { background: rgba(16,185,129,0.15); color: #10b981; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; }
         .empty-msg { color: #737373; font-style: italic; font-size: 0.9rem; text-align: center; padding: 20px 0; }
 
-        /* V34: MASTER LOGBOOK CSS */
         .search-bar { width: 100%; padding: 14px 16px; background: #111; border: 1px solid #333; border-radius: 8px; color: #fff; margin-bottom: 15px; font-size: 0.95rem; box-sizing: border-box; transition: 0.2s; }
         .search-bar:focus { outline: none; border-color: #10b981; box-shadow: 0 0 10px rgba(16,185,129,0.1); }
         
@@ -75,7 +74,10 @@
 </head>
 <body>
     <div class="header-bar">
-        <h2>📊 Nerd Dashboard</h2>
+        <h2 style="display:flex; align-items:center; gap:10px;">
+            📊 Nerd Dashboard 
+            <span id="syncStatus" style="font-size:10px; color:#10b981; font-weight:normal; letter-spacing:0.5px;"></span>
+        </h2>
         <button class="back-btn" onclick="window.location.href='./'">← Back</button>
     </div>
 
@@ -98,7 +100,7 @@
     <div class="stats-grid">
         <div class="stat-card"><div class="stat-val" id="stat-sends">0</div><div class="stat-lbl">Total Sends</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-outdoor">0</div><div class="stat-lbl">Outdoor Days</div></div>
-        <div class="stat-card"><div class="stat-val" id="stat-peak">Mix</div><div class="stat-lbl">Peak Grade</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-peak">-</div><div class="stat-lbl">Peak Grade</div></div>
     </div>
 
     <div class="dash-card">
@@ -161,6 +163,6 @@
         </div>
     </div>
 
-    <script src="dashboard.js?v=34"></script> 
+    <script src="dashboard.js?v=35"></script> 
 </body>
 </html>
