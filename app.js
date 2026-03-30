@@ -463,7 +463,6 @@ const App = {
     
     renderDashboard: () => { App.renderDashboardCharts(); App.renderDashboardLogs(); },
 
-    // EXHIBIT A: Restored Full Chart Aesthetics
     renderDashboardCharts: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
         const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
@@ -522,11 +521,33 @@ const App = {
         });
     },
 
-    // EXHIBIT C: Crash-proof Log Render
+    // EXHIBIT C: Restored 60-Day Filter and Toggles
     renderDashboardLogs: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
         const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
-        let displayLogs = State.listMode === 'top10' ? viewLogs.sort((a,b) => Number(b.Score) - Number(a.Score)).slice(0, 10) : viewLogs.sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID)).slice(0, 10);
+        
+        // HIGHLIGHT FIX
+        document.getElementById('listToggleTop').className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
+        document.getElementById('listToggleRecent').className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
+        
+        let displayLogs = [];
+        const titleEl = document.getElementById('logListTitle');
+        
+        // 60-DAY MATH RESTORED
+        if (State.listMode === 'top10') {
+            titleEl.innerText = 'Last 60 Days';
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+            sixtyDaysAgo.setHours(0,0,0,0);
+            displayLogs = viewLogs.filter(l => {
+                const logDate = new Date(l.cleanDate);
+                logDate.setHours(0,0,0,0);
+                return logDate >= sixtyDaysAgo;
+            }).sort((a,b) => Number(b.Score) - Number(a.Score)).slice(0, 10);
+        } else {
+            titleEl.innerText = 'Recent Logs';
+            displayLogs = viewLogs.sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID)).slice(0, 10);
+        }
         
         document.getElementById('xpContainer').classList.toggle('hidden', State.listMode !== 'top10' || displayLogs.length === 0);
         if (State.listMode === 'top10' && displayLogs.length > 0) {
