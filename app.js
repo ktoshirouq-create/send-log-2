@@ -20,7 +20,6 @@ const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 const DISCIPLINES = ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'];
 const DISC_LABELS = ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder'];
 
-// CLEANED: "Quick Send" is now just "Send"
 const STYLE_MAP = { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'worked': 'Worked' };
 
 const STEEPNESS = ['Slab', 'Vertical', 'Overhang', 'Roof'];
@@ -267,7 +266,6 @@ const App = {
         document.getElementById('sessionModal').classList.remove('active');
     },
     
-    // THE FIX: Strict checking so it doesn't highlight everything when blank
     setModalFocus: (val, init = false) => {
         if(!init) App.haptic();
         const current = document.getElementById('modalFocusVal').value;
@@ -340,7 +338,6 @@ const App = {
             return `<div class="pill ${isActive ? 'active' : ''}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
         }).join('');
 
-        // CLEANED: "Send" is now explicitly the label
         const styles = (isOut && isRope) ? [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['onsight', 'Onsight'], ['worked', 'Worked']] : [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['worked', 'Worked']];
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = 'quick';
         
