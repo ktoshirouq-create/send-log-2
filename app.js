@@ -36,7 +36,6 @@ const formatJournalDate = (dStr) => {
     const dateObj = new Date(y, parseInt(m)-1, d);
     return `${dayNames[dateObj.getDay()]}, ${d} ${monthNames[parseInt(m)-1]} '${y.substring(2)}`;
 };
-
 const formatShortDate = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
@@ -96,7 +95,14 @@ const State = new Proxy({
             setTimeout(() => App.centerActivePills(), 50); 
         }
         
-        if (['discipline', 'activeGym', 'activeStyle', 'activeBurns', 'chartMode'].includes(prop)) {
+        // THE FIX: Added all the Advanced Details properties to the UI refresh trigger
+        const triggersUI = [
+            'discipline', 'activeGym', 'activeStyle', 'activeBurns', 'chartMode', 
+            'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 
+            'activeClimbStyles', 'activeHolds', 'activeTimeBucket'
+        ];
+        
+        if (triggersUI.includes(prop)) {
             App.renderUI();
         }
 
@@ -119,7 +125,6 @@ const SyncManager = {
         if (!navigator.onLine) return setTimeout(() => b.forEach(i => i.classList.remove('syncing')), 1000);
         
         fetch(API_URL).then(res => res.json()).then(data => {
-            // Once the Google Sheet script fixes the 2026 bugs, the local app pulls them down here!
             const cloudClimbs = data.climbs || [];
             const cloudSessions = data.sessions || [];
             
@@ -286,7 +291,6 @@ const App = {
 
         document.getElementById('chartToggle').innerHTML = `<div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='max';">Max Peak</div><div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" onclick="App.haptic(); State.chartMode='avg';">Avg (Top 10)</div>`;
 
-        // RE-ADDED LOGIC TO UN-STICK THE UI!
         if (State.view === 'dash') App.renderDashboard();
         if (State.view === 'journal') App.renderJournal();
 
