@@ -16,7 +16,7 @@ const GRADES = {
 
 const GYMS = ["OKS", "Torshov", "Løkka", "Bryn", "Gneiss", "Other"];
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DISCIPLINES = ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'];
 const DISC_LABELS = ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder'];
 const STYLE_MAP = { 'project': 'Project (Send)', 'quick': 'Quick Send', 'flash': 'Flash', 'onsight': 'Onsight', 'worked': 'Worked (No Send)' };
@@ -30,13 +30,18 @@ const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌\s]/g
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 
 const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
-// REVERTED: Took the years back out!
-const formatJournalDate = (dStr) => {
+
+// Formats for the Journal (e.g., Main: 25 Mar, Sub: Wednesday)
+const getJournalDateObj = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
     const dateObj = new Date(y, parseInt(m)-1, d);
-    return `${dayNames[dateObj.getDay()]}, ${d} ${monthNames[parseInt(m)-1]}`;
+    return {
+        main: `${d} ${monthNames[parseInt(m)-1]}`,
+        sub: dayNames[dateObj.getDay()]
+    };
 };
+
 const formatShortDate = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
@@ -69,7 +74,7 @@ const State = new Proxy({
     view: 'log', discipline: initDisc, activeGrade: { text: initConf.labels[4] || initConf.labels[0], score: initConf.scores[4] || initConf.scores[0] },
     activeStyle: initStyle, activeBurns: 1, activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
-    activeTimeBucket: '', climbs: safeClimbs, sessions: safeSessions
+    activeTimeBucket: '', climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
 }, {
     set(target, prop, value) {
         if (prop === 'discipline' && target.discipline !== value) {
@@ -108,9 +113,11 @@ const State = new Proxy({
 
         if (prop === 'listMode' && target.view === 'dash') App.renderDashboardLogs();
         
-        if (prop === 'climbs' || prop === 'sessions') {
-            localStorage.setItem('v38_climbs', JSON.stringify(target.climbs));
-            localStorage.setItem('v38_sessions', JSON.stringify(target.sessions)); 
+        if (prop === 'climbs' || prop === 'sessions' || prop === 'journalLimit') {
+            if (prop !== 'journalLimit') {
+                localStorage.setItem('v38_climbs', JSON.stringify(target.climbs));
+                localStorage.setItem('v38_sessions', JSON.stringify(target.sessions)); 
+            }
             if (target.view === 'dash') App.renderDashboard();
             if (target.view === 'journal') App.renderJournal();
         }
@@ -223,12 +230,32 @@ const App = {
         else if (category === 'steepness') State.activeSteepness = State.activeSteepness.includes(val) ? State.activeSteepness.filter(x => x !== val) : [...State.activeSteepness, val];
     },
     adjBurns: (dir) => { App.haptic(); State.activeBurns = Math.max(1, State.activeBurns + dir); },
-    updateSessionTag: (sessionId) => {
-        const tag = prompt("Enter Session Focus (e.g., Limit, Rehab, Endurance):");
-        if(tag !== null) {
-            State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: tag, _synced: false} : s);
-            SyncManager.pushAll(State.sessions.filter(s => s._synced === false), []);
-        }
+    
+    // NEW MODAL LOGIC
+    openSessionModal: (sessionId) => {
+        App.haptic();
+        const s = State.sessions.find(x => String(x.SessionID) === String(sessionId));
+        if(!s) return;
+        document.getElementById('modalSessionId').value = s.SessionID;
+        document.getElementById('modalFocus').value = s.Focus || "";
+        document.getElementById('modalFatigue').value = s.Fatigue || "";
+        document.getElementById('sessionModal').classList.add('active');
+    },
+    closeSessionModal: () => {
+        App.haptic();
+        document.getElementById('sessionModal').classList.remove('active');
+    },
+    saveSessionModal: () => {
+        App.haptic();
+        const sessionId = document.getElementById('modalSessionId').value;
+        const focus = document.getElementById('modalFocus').value.trim();
+        const fatigue = document.getElementById('modalFatigue').value.trim();
+        
+        State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: focus, Fatigue: fatigue, _synced: false} : s);
+        SyncManager.pushAll(State.sessions.filter(s => s._synced === false), []);
+        
+        App.closeSessionModal();
+        App.toast("Session Updated");
     },
 
     renderUI: () => {
@@ -302,24 +329,25 @@ const App = {
         if (State.sessions.length === 0) { jList.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">No sessions found. Log a climb to start your journal.</div>'; return; }
 
         const sortedSessions = [...State.sessions].sort((a,b) => new Date(getCleanDate(b.Date)) - new Date(getCleanDate(a.Date)));
+        
+        // Anti-scroll: limit the render
+        const visibleSessions = sortedSessions.slice(0, State.journalLimit);
 
-        jList.innerHTML = sortedSessions.map(session => {
+        let htmlOut = visibleSessions.map(session => {
             const children = State.climbs.filter(c => String(c.SessionID) === String(session.SessionID)).sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID));
             if(children.length === 0) return ''; 
 
-            const sessionDateDisplay = formatJournalDate(session.Date);
+            const dateInfo = getJournalDateObj(session.Date);
             const totalBurns = children.reduce((sum, c) => sum + (Number(c.Burns) || 1), 0);
             
             let maxSentStr = "-";
-            let avgSentStr = "-"; // NEW: Average logic
+            let avgSentStr = "-"; 
             
             const sends = children.filter(c => c.Style !== 'worked');
             if (sends.length > 0) {
-                // Max Logic
                 const maxSend = sends.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max);
                 maxSentStr = getBaseGrade(maxSend.Grade);
                 
-                // Average Logic
                 const sessionType = sends[0].Type;
                 const sConf = getScaleConfig(sessionType);
                 const avgScore = Math.round(sends.reduce((sum, c) => sum + Number(c.Score), 0) / sends.length);
@@ -327,7 +355,9 @@ const App = {
                 avgSentStr = sConf.labels[avgIdx];
             }
 
-            const tagText = session.Focus ? session.Focus : '+ Add Focus';
+            // Tags Logic
+            const focusTagHtml = session.Focus ? `<div class="s-tag focus-tag" onclick="App.openSessionModal('${session.SessionID}')">${session.Focus}</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}')">+ Focus</div>`;
+            const fatigueTagHtml = session.Fatigue ? `<div class="s-tag fatigue-tag" onclick="App.openSessionModal('${session.SessionID}')">Fatigue: ${session.Fatigue}/10</div>` : `<div class="s-tag empty-tag" onclick="App.openSessionModal('${session.SessionID}')">+ Fatigue</div>`;
             
             const childrenHtml = children.map(l => {
                 let rawGrade = String(l.Grade || "");
@@ -383,8 +413,15 @@ const App = {
             return `
             <div class="session-card">
                 <div class="session-header">
-                    <div class="session-title">📅 ${sessionDateDisplay} <span style="font-size:0.8rem; color:var(--text-muted); font-weight:400;">@ ${session.Location}</span></div>
-                    <div class="session-tag-btn" onclick="App.updateSessionTag('${session.SessionID}')">${tagText}</div>
+                    <div class="s-date-block">
+                        <div class="s-date-main">${dateInfo.main}</div>
+                        <div class="s-date-sub">${dateInfo.sub}</div>
+                    </div>
+                    <div class="s-loc">@ ${session.Location}</div>
+                </div>
+                <div class="s-tags-row">
+                    ${focusTagHtml}
+                    ${fatigueTagHtml}
                 </div>
                 <div class="session-stats-grid">
                     <div class="s-stat-box"><div class="s-stat-lbl">Volume</div><div class="s-stat-val highlight">${totalBurns}</div></div>
@@ -398,6 +435,12 @@ const App = {
                 </div>
             </div>`;
         }).join('');
+        
+        if (sortedSessions.length > State.journalLimit) {
+            htmlOut += `<button class="load-more-btn" onclick="App.haptic(); State.journalLimit += 15;">Load Older Sessions ▾</button>`;
+        }
+        
+        jList.innerHTML = htmlOut;
     },
     
     renderDashboard: () => {
