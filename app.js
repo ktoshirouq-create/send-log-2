@@ -15,14 +15,12 @@ const AppConfig = {
     holds: ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs'],
     rpes: ['Breezy', 'Solid', 'Limit'],
     grades: {
-        // V42: Expanded to 5a
         ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
 };
 
-// V42: Regex updated to strip TR and AB emojis
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
@@ -63,7 +61,7 @@ let initConf = getScaleConfig(initDisc);
 
 const State = new Proxy({
     view: 'log', discipline: initDisc, 
-    activeGrade: { text: initConf.labels[8] || initConf.labels[0], score: initConf.scores[8] || initConf.scores[0] }, // Default around 6b
+    activeGrade: { text: initConf.labels[8] || initConf.labels[0], score: initConf.scores[8] || initConf.scores[0] },
     activeStyle: initStyle, activeBurns: 1, activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
     activeTimeBucket: '', climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
@@ -166,7 +164,8 @@ const App = {
     chart: null,
     isSaving: false,
     init: () => {
-        if (window.Chart) { Chart.defaults.color = '#737373'; Chart.defaults.borderColor = '#262626'; }
+        // Premium Chart Defaults
+        if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
         App.renderUI();
         SyncManager.trigger(); 
         window.addEventListener('online', SyncManager.trigger);
@@ -320,7 +319,6 @@ const App = {
             return `<div class="pill ${String(g) === String(State.activeGrade.text) ? 'active' : ''}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
         }).join('');
 
-        // V42 FIX: Inject Top Rope and Auto Belay where appropriate
         let styles = [];
         if (isRope) {
             if (isOut) styles = [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['onsight', 'Onsight'], ['toprope', 'Top Rope'], ['worked', 'Worked']];
@@ -391,7 +389,7 @@ const App = {
 
     renderJournal: () => {
         const jList = document.getElementById('journalList');
-        if (State.sessions.length === 0) { jList.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">No logs found.</div>'; return; }
+        if (State.sessions.length === 0) { jList.innerHTML = '<div class="empty-msg">No logs found.</div>'; return; }
         const visibleSessions = [...State.sessions].sort((a,b) => new Date(getCleanDate(b.Date)) - new Date(getCleanDate(a.Date))).slice(0, State.journalLimit);
         const climbsBySession = {};
         State.climbs.forEach(c => { if (!climbsBySession[c.SessionID]) climbsBySession[c.SessionID] = []; climbsBySession[c.SessionID].push(c); });
@@ -435,7 +433,7 @@ const App = {
                 }
 
                 return `
-                <div class="log-card" style="border-color: rgba(255,255,255,0.05); background: rgba(0,0,0,0.2);">
+                <div class="log-card">
                     <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.session-children .log-card').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">
                         <div class="log-info" style="padding-left:0;"><div class="log-name">${l.Name.split(' @ ')[0]}${l._synced === false ? ' ☁️✕' : ''}</div></div>
                         <div class="log-grade ${isF ? 'fl' : (isFail ? 'fail' : 'rp')}" style="${inlineColor}">${getBadge(l.Type, rawGrade)}${rawGrade}</div>
@@ -516,20 +514,27 @@ const App = {
         if (State.chartMode === 'max') {
             let g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, 'rgba(16, 185, 129, 0.25)'); g.addColorStop(1, 'transparent');
             dSet = [
-                { label: 'Max Redpoint', data: cD.rp, borderColor: '#10b981', backgroundColor: g, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#10b981', spanGaps: true }, 
-                { label: 'Flash/Onsight', data: cD.fl, borderColor: '#db2777', borderDash: [5,5], tension: 0.4, fill: false, pointRadius: 5, pointBackgroundColor: '#db2777', spanGaps: true }
+                { label: 'Max Redpoint', data: cD.rp, borderColor: '#10b981', backgroundColor: g, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#121212', pointBorderWidth: 2, spanGaps: true }, 
+                { label: 'Flash/Onsight', data: cD.fl, borderColor: '#db2777', borderDash: [5,5], tension: 0.4, fill: false, pointRadius: 5, pointBackgroundColor: '#121212', pointBorderWidth: 2, spanGaps: true }
             ];
             toolC = chartCtx => chartCtx.datasetIndex === 0 ? ` Redpoint: ${cD.rpG[chartCtx.dataIndex]}` : ` Flash: ${cD.flG[chartCtx.dataIndex]}`;
         } else {
             let gA = ctx.createLinearGradient(0, 0, 0, 300); gA.addColorStop(0, 'rgba(59, 130, 246, 0.35)'); gA.addColorStop(1, 'transparent');
-            dSet = [{ label: 'Top 10 Average', data: cD.avg, borderColor: '#3b82f6', backgroundColor: gA, tension: 0.4, fill: true, pointRadius: 6, pointBackgroundColor: '#3b82f6', spanGaps: true }];
+            dSet = [{ label: 'Top 10 Average', data: cD.avg, borderColor: '#3b82f6', backgroundColor: gA, tension: 0.4, fill: true, pointRadius: 6, pointBackgroundColor: '#121212', pointBorderWidth: 2, spanGaps: true }];
             toolC = chartCtx => ` Power Avg: ${cD.avgG[chartCtx.dataIndex]}`;
         }
         
         App.chart = new Chart(ctx, { 
             type: 'line', 
             data: { labels: cD.lbl, datasets: dSet },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: toolC } } }, scales: { y: { ticks: { callback: v => conf.labels[v] || "" } }, x: { grid: { display: false } } } }
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: toolC } } }, 
+                scales: { 
+                    y: { ticks: { callback: v => conf.labels[v] || "", font: { weight: '600' } }, grid: { display: false, drawBorder: false } }, 
+                    x: { grid: { display: false }, ticks: { font: { weight: '600' } } } 
+                } 
+            }
         });
     },
 
@@ -570,7 +575,7 @@ const App = {
             document.getElementById('xpBarFill').style.width = `${pct}%`;
         }
 
-        document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div style="text-align:center; padding:20px; color:var(--text-muted);">No logs.</div>' : displayLogs.map(l => {
+        document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : displayLogs.map(l => {
             const rawGrade = String(l.Grade || "");
             const isF = rawGrade.includes('⚡') || rawGrade.includes('💎'), isFail = l.Style === 'worked';
             let inlineColor = '';
@@ -580,7 +585,7 @@ const App = {
             }
 
             return `
-            <div class="log-card" style="border-color: rgba(255,255,255,0.05); background: rgba(0,0,0,0.2);">
+            <div class="log-card">
                 <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">
                     <div class="log-date" style="width: 50px;">${formatShortDate(l.cleanDate)}</div>
                     <div class="log-info" style="padding-left:0;"><div class="log-name">${l.Name.split(' @ ')[0]}</div></div>
@@ -609,7 +614,6 @@ const App = {
         const climbDateStr = State.activeDate;
         let s = State.activeGrade.score, g = State.activeGrade.text;
         
-        // V42 FIX: TR and AB assign emojis and Zero points
         if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
         else if (State.activeStyle === 'onsight') { s += 10; g += " 💎"; }
         else if (State.activeStyle === 'quick') g += " 🚀";
