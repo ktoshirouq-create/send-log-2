@@ -55,13 +55,11 @@ let deletedSessions = JSON.parse(localStorage.getItem('crag_deleted_sessions') |
 let safeClimbs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
 let safeSessions = JSON.parse(localStorage.getItem('crag_sessions_master') || '[]');
 
-// V61 Memory Initialization
 let initDisc = localStorage.getItem('lastDiscipline') || 'Indoor Rope Climbing';
 let initStyle = localStorage.getItem('lastStyle') || 'quick';
 let initGym = localStorage.getItem('lastGym') || 'OKS';
 let initConf = getScaleConfig(initDisc);
 
-// V61 Failsafe: Ensure remembered grade exists in the active scale
 let savedGrade = localStorage.getItem('lastGradeText');
 let gIdx = savedGrade ? initConf.labels.indexOf(savedGrade) : -1;
 if (gIdx === -1) gIdx = initConf.labels.length > 8 ? 8 : 0;
@@ -77,7 +75,6 @@ const State = new Proxy({
         let oldVal = target[prop];
         target[prop] = value;
         
-        // V61 Memory Hooks
         if (prop === 'discipline') localStorage.setItem('lastDiscipline', value);
         if (prop === 'activeGym') localStorage.setItem('lastGym', value);
         if (prop === 'activeStyle') localStorage.setItem('lastStyle', value);
@@ -178,8 +175,6 @@ const App = {
     isSaving: false,
     init: () => {
         if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
-        
-        // V61 Memory Hook for Outdoor Crag
         document.getElementById('input-crag').value = localStorage.getItem('lastCrag') || '';
         
         App.renderUI();
@@ -438,10 +433,12 @@ const App = {
             const fScore = Number(session.Fatigue);
             let fClass = fScore ? `f-tier-${Math.ceil(fScore/2)}` : '';
 
+            // V63 Flat List Engine 
             const childrenHtml = children.map(l => {
                 const rawGrade = String(l.Grade || "");
                 const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
                 const isFail = l.Style === 'worked';
+                const perfClass = isF ? 'fl' : (isFail ? 'fail' : 'rp');
                 let inlineColor = '';
                 if (l.Type === 'Indoor Bouldering') {
                     const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(rawGrade));
@@ -449,9 +446,9 @@ const App = {
                 }
 
                 return `
-                <div class="log-card">
-                    <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.session-children .log-card').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">
-                        <div class="log-info" style="padding-left:0;"><div class="log-name">${l.Name.split(' @ ')[0]}${l._synced === false ? ' ☁️✕' : ''}</div></div>
+                <div class="log-entry ${perfClass}">
+                    <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.session-children .log-entry').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">
+                        <div class="log-info" style="padding-left:10px;"><div class="log-name">${l.Name.split(' @ ')[0]}${l._synced === false ? ' ☁️✕' : ''}</div></div>
                         <div class="log-grade ${isF ? 'fl' : (isFail ? 'fail' : 'rp')}" style="${inlineColor}">${getBadge(l.Type, rawGrade)}${rawGrade}</div>
                     </div>
                     <div class="log-details">
@@ -472,7 +469,7 @@ const App = {
                     <div class="s-loc">@ ${session.Location} &nbsp;&bull;&nbsp; <span style="color:#a3a3a3;">${domLabel}</span></div>
                 </div>
                 <div class="s-tags-row">
-                    <div class="s-tag ${session.Focus ? 'focus-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'focus')">${session.Focus || '+ Focus'}</div>
+                    <div class="s-tag ${session.Focus ? 'focus-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'focus')">${session.Focus ? 'Focus: '+session.Focus : '+ Focus'}</div>
                     <div class="s-tag ${session.Fatigue ? 'fatigue-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">${session.Fatigue ? 'Fatigue: '+session.Fatigue : '+ Fatigue'}</div>
                     <div class="s-tag ${session.WarmUp ? 'warmup-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'warmup')">${session.WarmUp ? 'Warm-up: '+session.WarmUp : '+ Warm-up'}</div>
                 </div>
@@ -591,9 +588,11 @@ const App = {
             document.getElementById('xpBarFill').style.width = `${pct}%`;
         }
 
-        document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : displayLogs.map(l => {
+        // V63 Flat List Engine for Dashboard
+        document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
             const rawGrade = String(l.Grade || "");
             const isF = rawGrade.includes('⚡') || rawGrade.includes('💎'), isFail = l.Style === 'worked';
+            const perfClass = isF ? 'fl' : (isFail ? 'fail' : 'rp');
             let inlineColor = '';
             if (l.Type === 'Indoor Bouldering') {
                 const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(rawGrade));
@@ -601,9 +600,9 @@ const App = {
             }
 
             return `
-            <div class="log-card">
+            <div class="log-entry ${perfClass}">
                 <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">
-                    <div class="log-date" style="width: 50px;">${formatShortDate(l.cleanDate)}</div>
+                    <div class="log-date" style="width: 50px; padding-left:10px;">${formatShortDate(l.cleanDate)}</div>
                     <div class="log-info" style="padding-left:0;"><div class="log-name">${l.Name.split(' @ ')[0]}</div></div>
                     <div class="log-grade ${isF ? 'fl' : (isFail ? 'fail' : 'rp')}" style="${inlineColor}">${getBadge(l.Type, rawGrade)}${rawGrade}</div>
                 </div>
@@ -616,7 +615,7 @@ const App = {
                     <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete Entry</button>
                 </div>
             </div>`;
-        }).join('');
+        }).join('') + `</div>`;
     },
     
     logClimb: () => {
@@ -625,14 +624,13 @@ const App = {
         if (isOut && (!outN || !outC)) return;
         
         App.isSaving = true; 
-
-        // V61 Memory Hook for Outdoor Crag saving
         if (isOut) localStorage.setItem('lastCrag', outC);
 
         const n = isOut ? `${outN} @ ${outC}` : State.activeGym;
         const climbDateStr = State.activeDate;
         let s = State.activeGrade.score, g = State.activeGrade.text;
         
+        // V63: Emojis are perfectly intact
         if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
         else if (State.activeStyle === 'onsight') { s += 10; g += " 💎"; }
         else if (State.activeStyle === 'quick') g += " 🚀";
