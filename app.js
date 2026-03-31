@@ -264,14 +264,42 @@ const App = {
         document.getElementById('modalFocusVal').value = newVal;
         document.querySelectorAll('#sec-focus .pill').forEach(p => { p.classList.toggle('active', newVal !== "" && p.innerText === newVal); });
     },
+    
+    // NEW FATIGUE SLIDER LOGIC
+    handleFatigueClick: (e) => {
+        const track = document.getElementById('fatigue-track');
+        const rect = track.getBoundingClientRect();
+        let percent = (e.clientX - rect.left) / rect.width;
+        percent = Math.max(0, Math.min(1, percent));
+        let val = Math.round(percent * 9) + 1; 
+        App.setModalFatigue(val);
+    },
     setModalFatigue: (val, init = false) => {
-        if(!init) App.haptic();
+        if(!init && val !== "") App.haptic();
         const current = String(document.getElementById('modalFatigueVal').value);
         const strVal = String(val);
         const newVal = (!init && current === strVal) ? "" : strVal;
         document.getElementById('modalFatigueVal').value = newVal;
-        document.querySelectorAll('#sec-fatigue .pill').forEach(p => { p.classList.toggle('active', newVal !== "" && p.innerText === newVal); });
+        
+        const out = document.getElementById('fatigue-output');
+        const fill = document.getElementById('fatigue-fill');
+        const thumb = document.getElementById('fatigue-thumb');
+        
+        if (newVal === "") {
+            out.innerText = "- / 10";
+            out.style.color = "#737373";
+            fill.style.width = "0%";
+            thumb.style.display = "none";
+        } else {
+            out.innerText = `${newVal} / 10`;
+            out.style.color = "var(--primary)";
+            const pct = ((Number(newVal) - 1) / 9) * 100;
+            fill.style.width = `${pct}%`;
+            thumb.style.left = `${pct}%`;
+            thumb.style.display = "block";
+        }
     },
+
     setModalWarmUp: (val, init = false) => {
         if(!init) App.haptic();
         const current = document.getElementById('modalWarmUpVal').value;
