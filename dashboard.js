@@ -16,7 +16,6 @@ const AppConfig = {
 let currentFilteredLogs = [];
 let allSessionsMaster = [];
 
-// V49 Fix: Ironclad robust getter. Case insensitive matching.
 const getV = (obj, prop) => {
     if (!obj) return undefined;
     if (obj[prop] !== undefined) return obj[prop];
@@ -25,7 +24,6 @@ const getV = (obj, prop) => {
     return matchedKey ? obj[matchedKey] : undefined;
 };
 
-// V49 Fix: XSS Sanitization function
 const escapeHTML = (str) => {
     if (!str) return "";
     return String(str)
@@ -96,7 +94,7 @@ const Dashboard = {
             return searchString.includes(q);
         });
 
-        document.getElementById('logCount').innerText = `${displayData.length} Logs`;
+        document.getElementById('logCount').innerText = `${displayData.length} LOGS`;
 
         displayData.sort((a, b) => {
             let valA, valB;
@@ -121,14 +119,13 @@ const Dashboard = {
         let tableHtml = paginatedData.map(l => {
             const id = getV(l, 'ClimbID') || Math.random().toString(36).substr(2, 9); 
             const name = String(getV(l, 'Name') || "");
-            // V49 Fix: Run name and notes through escapeHTML
             const cleanName = escapeHTML(name ? name.split('@')[0].trim() : "Unknown");
             const cleanNotes = escapeHTML(getV(l, 'Notes'));
             
             const grade = String(getV(l, 'Grade') || "");
             const isF = grade.includes('⚡') || grade.includes('💎');
             const isFail = getV(l, 'Style') === 'worked';
-            let gradeColor = isF ? 'color: var(--flash);' : (isFail ? 'color: #f59e0b;' : 'color: var(--primary);');
+            let gradeColor = isF ? 'color: #10b981;' : (isFail ? 'color: #f59e0b;' : 'color: #fff;');
             
             const sessionID = getV(l, 'SessionID');
             const session = allSessionsMaster.find(s => getV(s, 'SessionID') === sessionID);
@@ -137,11 +134,11 @@ const Dashboard = {
 
             return `
             <tr class="table-row" id="row-${id}" onclick="Dashboard.toggleRow('${id}')">
-                <td style="color:#a3a3a3;">${formatShortDate(getV(l, 'Date'))}</td>
-                <td style="font-weight:bold; color:#fff; word-break: break-word;">${cleanName}</td>
-                <td style="font-weight:bold; ${gradeColor}">${grade}</td>
+                <td style="color:#a3a3a3; font-weight: 500;">${formatShortDate(getV(l, 'Date'))}</td>
+                <td style="font-weight:600; color:#e5e5e5; word-break: break-word;">${cleanName}</td>
+                <td style="font-weight:700; ${gradeColor}">${grade}</td>
                 <td class="col-style" style="color:#a3a3a3;">${AppConfig.styles[getV(l, 'Style')] || getV(l, 'Style')}</td>
-                <td class="align-right">${getV(l, 'Burns') || 1}</td>
+                <td class="align-right" style="color: #a3a3a3; font-weight: 600;">${getV(l, 'Burns') || 1}</td>
             </tr>
             <tr class="details-row" id="details-${id}">
                 <td colspan="5" style="padding:0;">
@@ -163,7 +160,7 @@ const Dashboard = {
         if (displayData.length > Dashboard.logLimit) {
             tableHtml += `
             <tr class="table-row" onclick="Dashboard.logLimit += 10; Dashboard.renderLogbook();">
-                <td colspan="5" style="text-align:center; font-weight:bold; color:var(--primary); padding:15px; letter-spacing:1px; text-transform:uppercase;">
+                <td colspan="5" style="text-align:center; font-weight:700; color:#fff; padding:18px; letter-spacing:1px; text-transform:uppercase;">
                     Load More Logs ▾
                 </td>
             </tr>`;
@@ -202,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const syncText = document.getElementById('syncStatus');
-    syncText.innerText = "(Syncing...)";
+    syncText.innerText = "(Syncing)";
 
     fetch(AppConfig.api)
         .then(res => res.json())
@@ -217,13 +214,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     allSessionsMaster = allSessions;
                     localStorage.setItem('crag_sessions_master', JSON.stringify(allSessions));
                 }
-                syncText.innerText = "(Synced)";
-                setTimeout(() => syncText.innerText = "", 2000);
+                syncText.innerText = "● LIVE";
+                setTimeout(() => syncText.innerText = "", 3000);
                 renderDashboard(); 
             }
         }).catch(err => {
             console.log("Dashboard background sync failed", err);
-            syncText.innerText = "(Offline Mode)";
+            syncText.innerText = "○ OFFLINE";
+            syncText.style.color = "#737373";
         });
 
     const attachFilters = (id, propName, className) => {
@@ -242,7 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const calcRPG = (logs) => {
         let attr = { Power: 0, Endurance: 0, Technique: 0, Fingers: 0, Headspace: 0, Tenacity: 0 };
-        
         if (logs.length === 0) return { Power: 40, Endurance: 40, Technique: 40, Fingers: 40, Headspace: 40, Tenacity: 40 };
 
         logs.forEach(l => {
@@ -308,7 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return diffDays <= parseInt(activeTime);
         });
 
-        // V49 Fix: The O(n) Single-Pass Engine
         let maxScore = 0, peakG = '-';
         let dayC = {}, indoorCount = 0;
         const gradesForPyramid = {};
@@ -325,19 +321,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const angleStr = String(getV(l, 'Angle') || "");
             let nameStr = String(getV(l, 'Name') || "");
 
-            // 1. Peak Calculation
             if (isSend && s > maxScore) { 
                 maxScore = s; 
                 peakG = gradeStr; 
             } 
 
-            // 2. Pyramid Aggregation
             if (isSend) {
                 const clean = getBaseGrade(gradeStr);
                 gradesForPyramid[clean] = (gradesForPyramid[clean] || 0) + 1;
             }
 
-            // 3. Days & Environment Calculation
             if (dateStr) {
                 const d = new Date(dateStr).getDay();
                 const dayName = AppConfig.days[d];
@@ -345,7 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             if (typeStr.includes('indoor')) indoorCount++;
 
-            // 4. Steepness Peak Tracking
             AppConfig.steepness.forEach(st => {
                 if (angleStr.includes(st) && isSend) {
                     if (!steepnessPeaks[st] || s > Number(getV(steepnessPeaks[st], 'Score'))) {
@@ -354,14 +346,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
-            // 5. Locations Aggregation
             if(nameStr) {
                 if(nameStr.includes('@')) nameStr = nameStr.split('@')[1].trim(); 
                 if (nameStr) locs[nameStr] = (locs[nameStr] || 0) + 1; 
             }
         });
 
-        // Setup DOM stats based on the single pass
         document.getElementById('stat-sends').innerText = currentFilteredLogs.length;
         const outDays = new Set(currentFilteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getV(l, 'Date'))).size;
         document.getElementById('stat-outdoor').innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
@@ -402,15 +392,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const conf = getScaleConfig(activeDisc);
             const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
             const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
+            
+            // Custom Bar Colors (Sleek right-side rounding)
             const pyrColors = sortedGrades.map(g => {
                 const idx = conf.labels.indexOf(g);
-                return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : '#10b981';
+                return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
             });
 
             charts.pyr = new Chart(pyrCanvas, {
                 type: 'bar',
-                data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: 4 }] },
-                options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { display: false } } }
+                data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
+                    plugins: { legend: { display: false } }, 
+                    scales: { 
+                        x: { display: false },
+                        y: { ticks: { color: '#a3a3a3', font: { weight: '600' } }, grid: { display: false, drawBorder: false } }
+                    } 
+                }
             });
         }
 
@@ -448,16 +447,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        let gL = document.getElementById('cnsLineChart').getContext('2d').createLinearGradient(0,0,0,300); 
-        gL.addColorStop(0, 'rgba(0,188,212,0.4)'); gL.addColorStop(1, 'transparent');
+        let gL = document.getElementById('cnsLineChart').getContext('2d').createLinearGradient(0,0,0,250); 
+        gL.addColorStop(0, 'rgba(16, 185, 129, 0.4)'); gL.addColorStop(1, 'transparent');
         
         charts.line = new Chart(document.getElementById('cnsLineChart'), {
             type: 'line', 
             data: { 
                 labels: cnsData.labels, 
                 datasets: [
-                    { type: 'line', label: 'Peak Send', data: cnsData.peak, borderColor: '#00BCD4', backgroundColor: gL, fill: true, tension: 0.4, spanGaps: true, yAxisID: 'y' },
-                    { type: 'bar', label: 'Avg Fatigue', data: cnsData.fatigue, backgroundColor: 'rgba(239, 68, 68, 0.3)', borderRadius: 4, yAxisID: 'y1' }
+                    { type: 'line', label: 'Peak Send', data: cnsData.peak, borderColor: '#10b981', backgroundColor: gL, fill: true, tension: 0.4, spanGaps: true, pointBackgroundColor: '#121212', pointBorderWidth: 2, yAxisID: 'y' },
+                    { type: 'bar', label: 'Avg Fatigue', data: cnsData.fatigue, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 4, yAxisID: 'y1' }
                 ] 
             },
             options: { 
@@ -465,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 scales: { 
                     y: { display: false, position: 'left' }, 
                     y1: { display: false, position: 'right', min: 0, max: 10 },
-                    x: { grid: { display: false } } 
+                    x: { grid: { display: false }, ticks: { color: '#737373', font: { weight: '600' } } } 
                 } 
             }
         });
@@ -497,24 +496,28 @@ document.addEventListener('DOMContentLoaded', () => {
                         backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true
                     },
                     { 
-                        label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.3)', 
-                        backgroundColor: 'rgba(255,255,255,0.05)', pointRadius: 0, borderWidth: 2, borderDash: [5, 5], fill: true
+                        label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.15)', 
+                        backgroundColor: 'rgba(255,255,255,0.02)', pointRadius: 0, borderWidth: 2, borderDash: [4, 4], fill: true
                     }
                 ] 
             }, 
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 plugins: { 
-                    legend: { display: true, position: 'top', labels: { color: '#737373', boxWidth: 12, font: {size: 11} } },
+                    legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } },
                     tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } }
                 }, 
                 scales: { 
-                    r: { min: 0, max: 100, ticks: { display: false, stepSize: 20 }, grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, pointLabels: { color: '#10b981', font: { size: 11, weight: 'bold' } } } 
+                    r: { 
+                        min: 0, max: 100, ticks: { display: false, stepSize: 20 }, 
+                        grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, 
+                        pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } // Fix for green fatigue
+                    } 
                 } 
             } 
         });
 
-        const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No logs fit this criteria.</div>'; };
+        const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No data available for this phase.</div>'; };
         
         const hof = [...currentFilteredLogs].filter(l => Number(getV(l, 'Rating')) >= 4).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
         renderList('list-fame', hof.map(l => {
@@ -527,14 +530,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList('list-limit', limit.map(l => {
             const name = String(getV(l, 'Name') || "");
             const cleanName = escapeHTML(name ? name.split('@')[0].trim() : "Unknown");
-            return `<div class="list-item"><div><div class="list-main">${cleanName}</div><div class="list-sub">${formatShortDate(getV(l, 'Date'))}</div></div><div class="list-badge" style="color:#ef4444;">${getBaseGrade(getV(l, 'Grade'))}</div></div>`
+            return `<div class="list-item"><div><div class="list-main">${cleanName}</div><div class="list-sub">${formatShortDate(getV(l, 'Date'))}</div></div><div class="list-badge" style="background: rgba(239,68,68,0.15); color:#ef4444;">${getBaseGrade(getV(l, 'Grade'))}</div></div>`
         }).join(''));
 
         let steepHTML = '';
         AppConfig.steepness.forEach(st => {
             const peakLog = steepnessPeaks[st];
             if(peakLog) {
-                steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="color:#3b82f6;">${getBaseGrade(getV(peakLog, 'Grade'))}</div></div>`;
+                steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="background: rgba(59,130,246,0.15); color:#3b82f6;">${getBaseGrade(getV(peakLog, 'Grade'))}</div></div>`;
             } else {
                 steepHTML += `<div class="list-item"><div class="list-main" style="color:#555;">${st}</div><div class="list-badge" style="background:transparent; color:#555;">-</div></div>`;
             }
@@ -542,7 +545,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderList('list-steepness', steepHTML);
 
         const topLocs = Object.keys(locs).sort((a,b)=>locs[b]-locs[a]).slice(0,5);
-        renderList('list-locations', topLocs.map(loc => `<div class="list-item"><div class="list-main">${escapeHTML(loc)}</div><div class="list-badge" style="color:#fff; background:#333;">${locs[loc]} Session${locs[loc]>1?'s':''}</div></div>`).join(''));
+        renderList('list-locations', topLocs.map(loc => `<div class="list-item"><div class="list-main">${escapeHTML(loc)}</div><div class="list-badge">${locs[loc]} Session${locs[loc]>1?'s':''}</div></div>`).join(''));
         
         Dashboard.renderLogbook();
     }
