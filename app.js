@@ -228,6 +228,29 @@ const App = {
     },
     adjBurns: (dir) => { App.haptic(); State.activeBurns = Math.max(1, State.activeBurns + dir); },
     
+    // UI Updates for Segmented Controls
+    updateSegmentedHighlight: (containerId, val) => {
+        setTimeout(() => {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const items = Array.from(container.querySelectorAll('.seg-item'));
+            const highlight = container.querySelector('.seg-highlight');
+            let found = false;
+            
+            items.forEach(item => {
+                const isActive = item.getAttribute('data-val') === val;
+                item.classList.toggle('active', isActive);
+                if (isActive) {
+                    highlight.style.width = `${item.offsetWidth}px`;
+                    highlight.style.transform = `translateX(${item.offsetLeft}px)`;
+                    highlight.style.opacity = 1;
+                    found = true;
+                }
+            });
+            if(!found) highlight.style.opacity = 0;
+        }, 10); // Small timeout allows modal to display before calculating offsets
+    },
+
     openSessionModal: (sessionId, mode) => {
         App.haptic();
         const s = State.sessions.find(x => String(x.SessionID) === String(sessionId));
@@ -257,15 +280,16 @@ const App = {
         App.haptic();
         document.getElementById('sessionModal').classList.remove('active');
     },
+    
     setModalFocus: (val, init = false) => {
         if(!init) App.haptic();
         const current = document.getElementById('modalFocusVal').value;
         const newVal = (!init && current === val) ? "" : val;
         document.getElementById('modalFocusVal').value = newVal;
-        document.querySelectorAll('#sec-focus .pill').forEach(p => { p.classList.toggle('active', newVal !== "" && p.innerText === newVal); });
+        App.updateSegmentedHighlight('focus-segmented', newVal);
     },
     
-    // NEW FATIGUE SLIDER LOGIC
+    // FATIGUE SLIDER LOGIC
     handleFatigueClick: (e) => {
         const track = document.getElementById('fatigue-track');
         const rect = track.getBoundingClientRect();
@@ -305,8 +329,9 @@ const App = {
         const current = document.getElementById('modalWarmUpVal').value;
         const newVal = (!init && current === val) ? "" : val;
         document.getElementById('modalWarmUpVal').value = newVal;
-        document.querySelectorAll('#sec-warmup .pill').forEach(p => { p.classList.toggle('active', newVal !== "" && p.innerText === newVal); });
+        App.updateSegmentedHighlight('warmup-segmented', newVal);
     },
+    
     saveSessionModal: () => {
         App.haptic();
         const sessionId = document.getElementById('modalSessionId').value;
@@ -461,7 +486,7 @@ const App = {
             const fScore = Number(session.Fatigue);
             let fClass = fScore ? `f-tier-${Math.ceil(fScore/2)}` : '';
 
-            // V63 Flat List Engine 
+            // V64 Flat List Engine 
             const childrenHtml = children.map(l => {
                 const rawGrade = String(l.Grade || "");
                 const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
@@ -616,7 +641,7 @@ const App = {
             document.getElementById('xpBarFill').style.width = `${pct}%`;
         }
 
-        // V63 Flat List Engine for Dashboard
+        // V64 Flat List Engine for Dashboard
         document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
             const rawGrade = String(l.Grade || "");
             const isF = rawGrade.includes('⚡') || rawGrade.includes('💎'), isFail = l.Style === 'worked';
@@ -658,7 +683,6 @@ const App = {
         const climbDateStr = State.activeDate;
         let s = State.activeGrade.score, g = State.activeGrade.text;
         
-        // V63: Emojis are perfectly intact
         if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
         else if (State.activeStyle === 'onsight') { s += 10; g += " 💎"; }
         else if (State.activeStyle === 'quick') g += " 🚀";
