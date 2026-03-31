@@ -16,7 +16,26 @@ const AppConfig = {
 let currentFilteredLogs = [];
 let allSessionsMaster = [];
 
-const getV = (obj, prop) => obj[prop] !== undefined ? obj[prop] : obj[prop.toLowerCase()];
+// V49 Fix: Ironclad robust getter. Case insensitive matching.
+const getV = (obj, prop) => {
+    if (!obj) return undefined;
+    if (obj[prop] !== undefined) return obj[prop];
+    const lowerProp = prop.toLowerCase();
+    const matchedKey = Object.keys(obj).find(k => k.toLowerCase() === lowerProp);
+    return matchedKey ? obj[matchedKey] : undefined;
+};
+
+// V49 Fix: XSS Sanitization function
+const escapeHTML = (str) => {
+    if (!str) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+};
+
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
 const formatShortDate = (dStr) => {
     const clean = dStr ? String(dStr).substring(0, 10) : "";
@@ -25,7 +44,6 @@ const formatShortDate = (dStr) => {
     return `${d} ${AppConfig.months[parseInt(m)-1]}`;
 };
 
-// V47: Final Locked-In Archetype Dictionary
 const ArchetypeDefs = {
     'The Caveman': "You are a dynamic powerhouse. You treat every route like a board climb, favoring explosive movement, big deadpoints, and campus beta. While others waste time analyzing micro-beta, you prefer to just drag yourself up the wall like a caveman. Subtlety is a suggestion; raw pulling power is your weapon of choice.",
     'The Juggernaut': "You win through sheer attrition. You don't need to campus the crux when you have the stamina to hang on terrible holds for five minutes to map out the sequence. You are a slow-moving, unstoppable force built for long, sustained walls.",
@@ -103,7 +121,10 @@ const Dashboard = {
         let tableHtml = paginatedData.map(l => {
             const id = getV(l, 'ClimbID') || Math.random().toString(36).substr(2, 9); 
             const name = String(getV(l, 'Name') || "");
-            const cleanName = name ? name.split('@')[0].trim() : "Unknown";
+            // V49 Fix: Run name and notes through escapeHTML
+            const cleanName = escapeHTML(name ? name.split('@')[0].trim() : "Unknown");
+            const cleanNotes = escapeHTML(getV(l, 'Notes'));
+            
             const grade = String(getV(l, 'Grade') || "");
             const isF = grade.includes('⚡') || grade.includes('💎');
             const isFail = getV(l, 'Style') === 'worked';
@@ -133,7 +154,7 @@ const Dashboard = {
                             <div><div class="d-lbl">Session Fatigue</div><div class="d-val" style="color:#fb923c;">${fatigue}</div></div>
                             <div><div class="d-lbl">Session Focus</div><div class="d-val" style="color:#60a5fa;">${focus}</div></div>
                         </div>
-                        ${getV(l, 'Notes') ? `<div class="d-notes">"${getV(l, 'Notes')}"</div>` : ''}
+                        ${cleanNotes ? `<div class="d-notes">"${cleanNotes}"</div>` : ''}
                     </div>
                 </td>
             </tr>`;
@@ -219,7 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFilters('disc-filter', 'disc', 'filter-pill');
     attachFilters('time-filter', 'time', 'time-tab');
 
-    // V47: Smart "Industry Standard" Logic Engine
     const calcRPG = (logs) => {
         let attr = { Power: 0, Endurance: 0, Technique: 0, Fingers: 0, Headspace: 0, Tenacity: 0 };
         
@@ -227,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         logs.forEach(l => {
             const angle = String(getV(l, 'Angle') || "");
-            const styleTag = String(getV(l, 'ClimStyles') || getV(l, 'climstyles') || "").toLowerCase();
+            const styleTag = String(getV(l, 'ClimStyles') || "").toLowerCase();
             const holds = String(getV(l, 'Holds') || "");
             const effort = String(getV(l, 'Effort') || "");
             const styleResult = String(getV(l, 'Style') || "").toLowerCase();
@@ -236,35 +256,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const isOutdoor = type.toLowerCase().includes('outdoor');
             const score = Number(getV(l, 'Score')) || 0;
 
-            // Power (The Caveman)
             if (angle.includes('Overhang') || angle.includes('Roof')) attr.Power += 2;
             if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
             if (type.includes('Bouldering')) attr.Power += 1;
 
-            // Endurance (The Juggernaut)
             if (type.includes('Rope')) attr.Endurance += 1;
             if (styleTag.includes('endurance') || styleTag.includes('volume')) attr.Endurance += 3;
             if ((styleResult === 'toprope' || styleResult === 'autobelay') && (styleTag.includes('endurance') || styleTag.includes('volume'))) attr.Endurance += 3;
 
-            // Technique (The Technician)
             if (angle.includes('Slab') || angle.includes('Vertical')) attr.Technique += 2;
             if (holds.includes('Slopers') || holds.includes('Pinches') || holds.includes('Volumes')) attr.Technique += 2;
             if (styleResult === 'onsight') attr.Technique += 2;
 
-            // Fingers (The Scalpel)
             if (holds.includes('Crimps') || holds.includes('Pockets')) {
                 attr.Fingers += 2;
-                if (angle.includes('Overhang') || angle.includes('Roof')) attr.Fingers += 2; // Overhang Tax
-                if (isOutdoor) attr.Fingers += 1; // Real rock
-                if (score > 600) attr.Fingers += 1; // High grade bump
+                if (angle.includes('Overhang') || angle.includes('Roof')) attr.Fingers += 2; 
+                if (isOutdoor) attr.Fingers += 1; 
+                if (score > 600) attr.Fingers += 1; 
             }
 
-            // Headspace (The Assassin)
             if (styleResult === 'flash' || styleResult === 'onsight') attr.Headspace += 3;
             if (effort.includes('Limit')) attr.Headspace += 2;
             if (isOutdoor && type.includes('Rope')) attr.Headspace += 2; 
 
-            // Tenacity (The Pitbull)
             if (styleResult === 'project' || styleResult === 'worked') attr.Tenacity += 3;
             if (burns >= 3) attr.Tenacity += 1;
             if (burns >= 5) attr.Tenacity += 2;
@@ -294,18 +308,63 @@ document.addEventListener('DOMContentLoaded', () => {
             return diffDays <= parseInt(activeTime);
         });
 
+        // V49 Fix: The O(n) Single-Pass Engine
+        let maxScore = 0, peakG = '-';
+        let dayC = {}, indoorCount = 0;
+        const gradesForPyramid = {};
+        const locs = {};
+        const steepnessPeaks = { 'Slab': null, 'Vertical': null, 'Overhang': null, 'Roof': null };
+
+        currentFilteredLogs.forEach(l => { 
+            const s = Number(getV(l, 'Score'));
+            const style = String(getV(l, 'Style') || "").toLowerCase();
+            const isSend = s && style !== 'worked' && style !== 'toprope' && style !== 'autobelay';
+            const gradeStr = String(getV(l, 'Grade') || "");
+            const typeStr = String(getV(l, 'Type') || "").toLowerCase();
+            const dateStr = getV(l, 'Date');
+            const angleStr = String(getV(l, 'Angle') || "");
+            let nameStr = String(getV(l, 'Name') || "");
+
+            // 1. Peak Calculation
+            if (isSend && s > maxScore) { 
+                maxScore = s; 
+                peakG = gradeStr; 
+            } 
+
+            // 2. Pyramid Aggregation
+            if (isSend) {
+                const clean = getBaseGrade(gradeStr);
+                gradesForPyramid[clean] = (gradesForPyramid[clean] || 0) + 1;
+            }
+
+            // 3. Days & Environment Calculation
+            if (dateStr) {
+                const d = new Date(dateStr).getDay();
+                const dayName = AppConfig.days[d];
+                dayC[dayName] = (dayC[dayName] || 0) + 1; 
+            }
+            if (typeStr.includes('indoor')) indoorCount++;
+
+            // 4. Steepness Peak Tracking
+            AppConfig.steepness.forEach(st => {
+                if (angleStr.includes(st) && isSend) {
+                    if (!steepnessPeaks[st] || s > Number(getV(steepnessPeaks[st], 'Score'))) {
+                        steepnessPeaks[st] = l;
+                    }
+                }
+            });
+
+            // 5. Locations Aggregation
+            if(nameStr) {
+                if(nameStr.includes('@')) nameStr = nameStr.split('@')[1].trim(); 
+                if (nameStr) locs[nameStr] = (locs[nameStr] || 0) + 1; 
+            }
+        });
+
+        // Setup DOM stats based on the single pass
         document.getElementById('stat-sends').innerText = currentFilteredLogs.length;
         const outDays = new Set(currentFilteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getV(l, 'Date'))).size;
         document.getElementById('stat-outdoor').innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
-        
-        let maxScore = 0, peakG = '-';
-        currentFilteredLogs.forEach(l => { 
-            const s = Number(getV(l, 'Score'));
-            if (s && s > maxScore && getV(l, 'Style') !== 'worked' && getV(l, 'Style') !== 'toprope' && getV(l, 'Style') !== 'autobelay') { 
-                maxScore = s; 
-                peakG = getV(l, 'Grade'); 
-            } 
-        });
         
         const peakEl = document.getElementById('stat-peak');
         const cleanPeak = getBaseGrade(peakG);
@@ -319,19 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
             peakEl.style.color = '#fff';
         }
 
-        let dayC = {}, timeC = {}, indoorCount = 0;
-        currentFilteredLogs.forEach(l => { 
-            const dateStr = getV(l, 'Date');
-            if (dateStr) {
-                const d = new Date(dateStr).getDay();
-                const dayName = AppConfig.days[d];
-                dayC[dayName] = (dayC[dayName] || 0) + 1; 
-            }
-            if (String(getV(l, 'Type')).includes('Indoor') || String(getV(l, 'Type')).includes('indoor')) indoorCount++;
-        });
-        
         const topDay = Object.keys(dayC).length ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-';
-        
         let envLabel = '-';
         if (currentFilteredLogs.length > 0) {
             const inRatio = indoorCount / currentFilteredLogs.length;
@@ -352,19 +399,9 @@ document.addEventListener('DOMContentLoaded', () => {
             pyrCard.style.display = 'none';
         } else {
             pyrCard.style.display = 'block';
-            
-            const grades = {};
             const conf = getScaleConfig(activeDisc);
-            
-            currentFilteredLogs.forEach(l => {
-                if (getV(l, 'Score') && getV(l, 'Style') !== 'worked' && getV(l, 'Style') !== 'toprope' && getV(l, 'Style') !== 'autobelay') {
-                    const clean = getBaseGrade(getV(l, 'Grade'));
-                    grades[clean] = (grades[clean] || 0) + 1;
-                }
-            });
-            
-            const sortedGrades = Object.keys(grades).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
-            const pyrData = sortedGrades.map(g => grades[g]);
+            const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
+            const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
             const pyrColors = sortedGrades.map(g => {
                 const idx = conf.labels.indexOf(g);
                 return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : '#10b981';
@@ -438,7 +475,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let archetype = "The All-Rounder";
         if (currentFilteredLogs.length > 0) {
-            // V47: Mapped to the new Dictionary
             const archMap = {
                 'Power': 'The Caveman', 'Endurance': 'The Juggernaut', 'Technique': 'The Technician',
                 'Fingers': 'The Scalpel', 'Headspace': 'The Assassin', 'Tenacity': 'The Pitbull'
@@ -447,10 +483,8 @@ document.addEventListener('DOMContentLoaded', () => {
             archetype = topAttrs.length > 1 ? 'The All-Rounder' : archMap[topAttrs[0]];
         }
         
-        const archEl = document.getElementById('id-arch');
-        archEl.innerText = archetype;
+        document.getElementById('id-arch').innerText = archetype;
 
-        // V47: Formatted as a stacked array to make the % stand out clean on its own line
         const radarLabels = Object.keys(currAttr).map(k => [k.toUpperCase(), currAttr[k].toString()]);
 
         charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
@@ -459,24 +493,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 labels: radarLabels, 
                 datasets: [
                     { 
-                        label: 'Current Phase',
-                        data: Object.values(currAttr), 
-                        borderColor: '#10b981', 
-                        backgroundColor: 'rgba(16, 185, 129, 0.4)', 
-                        pointBackgroundColor: '#10b981',
-                        pointRadius: 0,
-                        borderWidth: 2,
-                        fill: true
+                        label: 'Current Phase', data: Object.values(currAttr), borderColor: '#10b981', 
+                        backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true
                     },
                     { 
-                        label: 'All-Time Base',
-                        data: Object.values(baseAttr), 
-                        borderColor: 'rgba(255,255,255,0.3)', 
-                        backgroundColor: 'rgba(255,255,255,0.05)', 
-                        pointRadius: 0,
-                        borderWidth: 2,
-                        borderDash: [5, 5],
-                        fill: true
+                        label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.3)', 
+                        backgroundColor: 'rgba(255,255,255,0.05)', pointRadius: 0, borderWidth: 2, borderDash: [5, 5], fill: true
                     }
                 ] 
             }, 
@@ -487,13 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } }
                 }, 
                 scales: { 
-                    r: { 
-                        min: 0, max: 100,
-                        ticks: { display: false, stepSize: 20 }, 
-                        grid: { color: 'rgba(255,255,255,0.05)' }, 
-                        angleLines: { display: false }, 
-                        pointLabels: { color: '#10b981', font: { size: 11, weight: 'bold' } }
-                    } 
+                    r: { min: 0, max: 100, ticks: { display: false, stepSize: 20 }, grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, pointLabels: { color: '#10b981', font: { size: 11, weight: 'bold' } } } 
                 } 
             } 
         });
@@ -503,37 +519,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const hof = [...currentFilteredLogs].filter(l => Number(getV(l, 'Rating')) >= 4).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
         renderList('list-fame', hof.map(l => {
             const name = String(getV(l, 'Name') || "");
-            const cleanName = name ? name.split('@')[0].trim() : "Unknown";
+            const cleanName = escapeHTML(name ? name.split('@')[0].trim() : "Unknown");
             return `<div class="list-item"><div><div class="list-main">${cleanName}</div><div class="list-sub">${'★'.repeat(Number(getV(l, 'Rating')))}</div></div><div class="list-badge">${getBaseGrade(getV(l, 'Grade'))}</div></div>`
         }).join(''));
 
         const limit = [...currentFilteredLogs].filter(l => String(getV(l, 'Effort')||"").includes('Limit') || String(getV(l, 'GradeFeel')||"").includes('Hard')).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
         renderList('list-limit', limit.map(l => {
             const name = String(getV(l, 'Name') || "");
-            const cleanName = name ? name.split('@')[0].trim() : "Unknown";
+            const cleanName = escapeHTML(name ? name.split('@')[0].trim() : "Unknown");
             return `<div class="list-item"><div><div class="list-main">${cleanName}</div><div class="list-sub">${formatShortDate(getV(l, 'Date'))}</div></div><div class="list-badge" style="color:#ef4444;">${getBaseGrade(getV(l, 'Grade'))}</div></div>`
         }).join(''));
 
         let steepHTML = '';
         AppConfig.steepness.forEach(st => {
-            const logsForSt = currentFilteredLogs.filter(l => String(getV(l, 'Angle')||"").includes(st) && getV(l, 'Score'));
-            if(logsForSt.length > 0) {
-                const peak = logsForSt.reduce((max, cur) => Number(getV(cur, 'Score')) > Number(getV(max, 'Score')) ? cur : max);
-                steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="color:#3b82f6;">${getBaseGrade(getV(peak, 'Grade'))}</div></div>`;
-            } else steepHTML += `<div class="list-item"><div class="list-main" style="color:#555;">${st}</div><div class="list-badge" style="background:transparent; color:#555;">-</div></div>`;
+            const peakLog = steepnessPeaks[st];
+            if(peakLog) {
+                steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="color:#3b82f6;">${getBaseGrade(getV(peakLog, 'Grade'))}</div></div>`;
+            } else {
+                steepHTML += `<div class="list-item"><div class="list-main" style="color:#555;">${st}</div><div class="list-badge" style="background:transparent; color:#555;">-</div></div>`;
+            }
         });
         renderList('list-steepness', steepHTML);
 
-        const locs = {};
-        currentFilteredLogs.forEach(l => { 
-            let n = String(getV(l, 'Name') || ""); 
-            if(n) {
-                if(n.includes('@')) n = n.split('@')[1].trim(); 
-                if (n) locs[n] = (locs[n] || 0) + 1; 
-            }
-        });
         const topLocs = Object.keys(locs).sort((a,b)=>locs[b]-locs[a]).slice(0,5);
-        renderList('list-locations', topLocs.map(loc => `<div class="list-item"><div class="list-main">${loc}</div><div class="list-badge" style="color:#fff; background:#333;">${locs[loc]} Session${locs[loc]>1?'s':''}</div></div>`).join(''));
+        renderList('list-locations', topLocs.map(loc => `<div class="list-item"><div class="list-main">${escapeHTML(loc)}</div><div class="list-badge" style="color:#fff; background:#333;">${locs[loc]} Session${locs[loc]>1?'s':''}</div></div>`).join(''));
         
         Dashboard.renderLogbook();
     }
