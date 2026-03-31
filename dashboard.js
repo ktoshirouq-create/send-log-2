@@ -57,11 +57,10 @@ const Dashboard = {
     sortAsc: false,
     logLimit: 10, 
     
-    // V64: The Haptic Engine
     haptic: () => { if (navigator.vibrate) navigator.vibrate(40); },
     
     sortLogbook: (col) => {
-        Dashboard.haptic(); // Tactile confirmation for sorting
+        Dashboard.haptic();
         if (Dashboard.sortCol === col) Dashboard.sortAsc = !Dashboard.sortAsc; 
         else { Dashboard.sortCol = col; Dashboard.sortAsc = false; }
         Dashboard.logLimit = 10; 
@@ -69,14 +68,14 @@ const Dashboard = {
     },
 
     toggleRow: (id) => {
-        Dashboard.haptic(); // Tactile confirmation for expanding a row
+        Dashboard.haptic();
         const row = document.getElementById(`row-${id}`);
         const details = document.getElementById(`details-${id}`);
         if(row && details) { row.classList.toggle('expanded'); details.classList.toggle('active'); }
     },
 
     openArchetypeModal: () => {
-        Dashboard.haptic(); // Tactile confirmation for the modal
+        Dashboard.haptic();
         const archText = document.getElementById('id-arch').innerText;
         const cleanArch = archText.replace(/[^a-zA-Z\s\-]/g, '').trim(); 
         const desc = ArchetypeDefs[cleanArch] || ArchetypeDefs['The All-Rounder'];
@@ -87,7 +86,7 @@ const Dashboard = {
     },
     
     closeArchetypeModal: () => {
-        Dashboard.haptic(); // Tactile confirmation for closing the modal
+        Dashboard.haptic();
         document.getElementById('archetypeModal').classList.remove('active');
     },
 
@@ -130,9 +129,16 @@ const Dashboard = {
             const cleanNotes = escapeHTML(getV(l, 'Notes'));
             
             const grade = String(getV(l, 'Grade') || "");
-            const isF = grade.includes('⚡') || grade.includes('💎');
-            const isFail = getV(l, 'Style') === 'worked';
-            let gradeColor = isF ? 'color: #10b981;' : (isFail ? 'color: #f59e0b;' : 'color: #fff;');
+            
+            // V65: Discipline Color Dot Mapping
+            const type = String(getV(l, 'Type') || "");
+            let dotColor = '#737373';
+            if (type === 'Indoor Rope Climbing') dotColor = '#10b981'; // Emerald Green
+            else if (type === 'Indoor Bouldering') dotColor = '#3b82f6'; // Electric Blue
+            else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316'; // Sunset Orange
+            else if (type === 'Outdoor Bouldering') dotColor = '#a855f7'; // Amethyst Purple
+            
+            const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
             
             const sessionID = getV(l, 'SessionID');
             const session = allSessionsMaster.find(s => getV(s, 'SessionID') === sessionID);
@@ -142,8 +148,8 @@ const Dashboard = {
             return `
             <tr class="table-row" id="row-${id}" onclick="Dashboard.toggleRow('${id}')">
                 <td style="color:#a3a3a3; font-weight: 500;">${formatShortDate(getV(l, 'Date'))}</td>
-                <td style="font-weight:600; color:#e5e5e5; word-break: break-word;">${cleanName}</td>
-                <td style="font-weight:700; ${gradeColor}">${grade}</td>
+                <td style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
+                <td style="font-weight:700; color:#fff;">${grade}</td>
                 <td class="col-style" style="color:#a3a3a3;">${AppConfig.styles[getV(l, 'Style')] || getV(l, 'Style')}</td>
                 <td class="align-right" style="color: #a3a3a3; font-weight: 600;">${getV(l, 'Burns') || 1}</td>
             </tr>
@@ -236,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const attachFilters = (id, propName, className) => {
         document.querySelectorAll(`#${id} .${className}`).forEach(btn => {
             btn.addEventListener('click', (e) => {
-                Dashboard.haptic(); // Tactile confirmation for filters
+                Dashboard.haptic(); 
                 document.querySelectorAll(`#${id} .${className}`).forEach(p => p.classList.remove('active'));
                 e.target.classList.add('active');
                 if (propName === 'disc') activeDisc = e.target.getAttribute('data-filter');
@@ -378,7 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
             peakEl.style.color = '#fff';
         }
 
-        const topDay = Object.keys(dayC).length ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-';
+        const topDay = Object.keys(dayC).length ? Object.keys(dayC).length > 0 ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-' : '-';
         let envLabel = '-';
         if (currentFilteredLogs.length > 0) {
             const inRatio = indoorCount / currentFilteredLogs.length;
