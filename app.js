@@ -55,20 +55,33 @@ let deletedSessions = JSON.parse(localStorage.getItem('crag_deleted_sessions') |
 let safeClimbs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
 let safeSessions = JSON.parse(localStorage.getItem('crag_sessions_master') || '[]');
 
+// V61 Memory Initialization
 let initDisc = localStorage.getItem('lastDiscipline') || 'Indoor Rope Climbing';
 let initStyle = localStorage.getItem('lastStyle') || 'quick';
+let initGym = localStorage.getItem('lastGym') || 'OKS';
 let initConf = getScaleConfig(initDisc);
+
+// V61 Failsafe: Ensure remembered grade exists in the active scale
+let savedGrade = localStorage.getItem('lastGradeText');
+let gIdx = savedGrade ? initConf.labels.indexOf(savedGrade) : -1;
+if (gIdx === -1) gIdx = initConf.labels.length > 8 ? 8 : 0;
 
 const State = new Proxy({
     view: 'log', discipline: initDisc, 
-    activeGrade: { text: initConf.labels[8] || initConf.labels[0], score: initConf.scores[8] || initConf.scores[0] },
-    activeStyle: initStyle, activeBurns: 1, activeDate: getLocalISO(), activeGym: 'OKS', chartMode: 'max', listMode: 'top10',
+    activeGrade: { text: initConf.labels[gIdx], score: initConf.scores[gIdx] },
+    activeStyle: initStyle, activeBurns: 1, activeDate: getLocalISO(), activeGym: initGym, chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
     activeTimeBucket: '', climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
 }, {
     set(target, prop, value) {
         let oldVal = target[prop];
         target[prop] = value;
+        
+        // V61 Memory Hooks
+        if (prop === 'discipline') localStorage.setItem('lastDiscipline', value);
+        if (prop === 'activeGym') localStorage.setItem('lastGym', value);
+        if (prop === 'activeStyle') localStorage.setItem('lastStyle', value);
+        if (prop === 'activeGrade') localStorage.setItem('lastGradeText', value.text);
         
         if (prop === 'discipline' && oldVal !== value) {
             const conf = getScaleConfig(value);
@@ -164,8 +177,11 @@ const App = {
     chart: null,
     isSaving: false,
     init: () => {
-        // Premium Chart Defaults
         if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
+        
+        // V61 Memory Hook for Outdoor Crag
+        document.getElementById('input-crag').value = localStorage.getItem('lastCrag') || '';
+        
         App.renderUI();
         SyncManager.trigger(); 
         window.addEventListener('online', SyncManager.trigger);
@@ -609,6 +625,9 @@ const App = {
         if (isOut && (!outN || !outC)) return;
         
         App.isSaving = true; 
+
+        // V61 Memory Hook for Outdoor Crag saving
+        if (isOut) localStorage.setItem('lastCrag', outC);
 
         const n = isOut ? `${outN} @ ${outC}` : State.activeGym;
         const climbDateStr = State.activeDate;
