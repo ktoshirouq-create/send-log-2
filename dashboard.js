@@ -57,7 +57,11 @@ const Dashboard = {
     sortAsc: false,
     logLimit: 10, 
     
+    // V64: The Haptic Engine
+    haptic: () => { if (navigator.vibrate) navigator.vibrate(40); },
+    
     sortLogbook: (col) => {
+        Dashboard.haptic(); // Tactile confirmation for sorting
         if (Dashboard.sortCol === col) Dashboard.sortAsc = !Dashboard.sortAsc; 
         else { Dashboard.sortCol = col; Dashboard.sortAsc = false; }
         Dashboard.logLimit = 10; 
@@ -65,12 +69,14 @@ const Dashboard = {
     },
 
     toggleRow: (id) => {
+        Dashboard.haptic(); // Tactile confirmation for expanding a row
         const row = document.getElementById(`row-${id}`);
         const details = document.getElementById(`details-${id}`);
         if(row && details) { row.classList.toggle('expanded'); details.classList.toggle('active'); }
     },
 
     openArchetypeModal: () => {
+        Dashboard.haptic(); // Tactile confirmation for the modal
         const archText = document.getElementById('id-arch').innerText;
         const cleanArch = archText.replace(/[^a-zA-Z\s\-]/g, '').trim(); 
         const desc = ArchetypeDefs[cleanArch] || ArchetypeDefs['The All-Rounder'];
@@ -81,6 +87,7 @@ const Dashboard = {
     },
     
     closeArchetypeModal: () => {
+        Dashboard.haptic(); // Tactile confirmation for closing the modal
         document.getElementById('archetypeModal').classList.remove('active');
     },
 
@@ -159,7 +166,7 @@ const Dashboard = {
 
         if (displayData.length > Dashboard.logLimit) {
             tableHtml += `
-            <tr class="table-row" onclick="Dashboard.logLimit += 10; Dashboard.renderLogbook();">
+            <tr class="table-row" onclick="Dashboard.haptic(); Dashboard.logLimit += 10; Dashboard.renderLogbook();">
                 <td colspan="5" style="text-align:center; font-weight:700; color:#fff; padding:18px; letter-spacing:1px; text-transform:uppercase;">
                     Load More Logs ▾
                 </td>
@@ -171,6 +178,8 @@ const Dashboard = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
+
     let allLogs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
     if (allLogs.length === 0) {
         allLogs = JSON.parse(localStorage.getItem('climbingLogs') || localStorage.getItem('climbLogs') || '[]');
@@ -227,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const attachFilters = (id, propName, className) => {
         document.querySelectorAll(`#${id} .${className}`).forEach(btn => {
             btn.addEventListener('click', (e) => {
+                Dashboard.haptic(); // Tactile confirmation for filters
                 document.querySelectorAll(`#${id} .${className}`).forEach(p => p.classList.remove('active'));
                 e.target.classList.add('active');
                 if (propName === 'disc') activeDisc = e.target.getAttribute('data-filter');
@@ -393,7 +403,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
             const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
             
-            // Custom Bar Colors (Sleek right-side rounding)
             const pyrColors = sortedGrades.map(g => {
                 const idx = conf.labels.indexOf(g);
                 return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
@@ -511,7 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     r: { 
                         min: 0, max: 100, ticks: { display: false, stepSize: 20 }, 
                         grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, 
-                        pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } // Fix for green fatigue
+                        pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } 
                     } 
                 } 
             } 
