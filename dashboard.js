@@ -25,6 +25,17 @@ const formatShortDate = (dStr) => {
     return `${d} ${AppConfig.months[parseInt(m)-1]}`;
 };
 
+// V47: Final Locked-In Archetype Dictionary
+const ArchetypeDefs = {
+    'The Caveman': "You are a dynamic powerhouse. You treat every route like a board climb, favoring explosive movement, big deadpoints, and campus beta. While others waste time analyzing micro-beta, you prefer to just drag yourself up the wall like a caveman. Subtlety is a suggestion; raw pulling power is your weapon of choice.",
+    'The Juggernaut': "You win through sheer attrition. You don't need to campus the crux when you have the stamina to hang on terrible holds for five minutes to map out the sequence. You are a slow-moving, unstoppable force built for long, sustained walls.",
+    'The Technician': "You climb with your brain and your feet. You thrive on vertical faces and slabs, relying on high steps, drop knees, and impeccable balance to float up routes. You make climbing look easy, even when it's desperately insecure.",
+    'The Scalpel': "Your tendon strength is surgical. You slice through crux sequences by locking down on credit-card crimps and mono pockets that would terrify a normal climber. The smaller and sharper the hold, the more in control you become.",
+    'The Assassin': "Ice water runs in your veins. You approach intimidating lines and outdoor runouts with a quiet, deadly efficiency. You bypass the mental panic that shuts down other climbers, treating high-stakes, fear-inducing moves as just another calculated equation to solve.",
+    'The Pitbull': "You don't just climb a route; you wear it down. You are fueled by pure grit, logging endless burns and breaking projects into microscopic, repeatable beta. The word 'quit' isn't in your vocabulary—you will happily sacrifice skin and sanity on the exact same sequence until it goes.",
+    'The All-Rounder': "A rare breed. Your stat polygon is perfectly balanced. You can pull on a roof, balance on a slab, and hold on through a deep pump. The ultimate climbing chameleon."
+};
+
 const Dashboard = {
     sortCol: 'Date',
     sortAsc: false,
@@ -41,6 +52,20 @@ const Dashboard = {
         const row = document.getElementById(`row-${id}`);
         const details = document.getElementById(`details-${id}`);
         if(row && details) { row.classList.toggle('expanded'); details.classList.toggle('active'); }
+    },
+
+    openArchetypeModal: () => {
+        const archText = document.getElementById('id-arch').innerText;
+        const cleanArch = archText.replace(/[^a-zA-Z\s\-]/g, '').trim(); 
+        const desc = ArchetypeDefs[cleanArch] || ArchetypeDefs['The All-Rounder'];
+        
+        document.getElementById('archModalTitle').innerText = cleanArch;
+        document.getElementById('archModalDesc').innerText = desc;
+        document.getElementById('archetypeModal').classList.add('active');
+    },
+    
+    closeArchetypeModal: () => {
+        document.getElementById('archetypeModal').classList.remove('active');
     },
 
     renderLogbook: () => {
@@ -194,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFilters('disc-filter', 'disc', 'filter-pill');
     attachFilters('time-filter', 'time', 'time-tab');
 
+    // V47: Smart "Industry Standard" Logic Engine
     const calcRPG = (logs) => {
         let attr = { Power: 0, Endurance: 0, Technique: 0, Fingers: 0, Headspace: 0, Tenacity: 0 };
         
@@ -207,28 +233,41 @@ document.addEventListener('DOMContentLoaded', () => {
             const styleResult = String(getV(l, 'Style') || "").toLowerCase();
             const burns = Number(getV(l, 'Burns')) || 1;
             const type = String(getV(l, 'Type') || "");
+            const isOutdoor = type.toLowerCase().includes('outdoor');
+            const score = Number(getV(l, 'Score')) || 0;
 
+            // Power (The Caveman)
             if (angle.includes('Overhang') || angle.includes('Roof')) attr.Power += 2;
             if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
             if (type.includes('Bouldering')) attr.Power += 1;
 
-            if (styleTag.includes('endurance')) attr.Endurance += 3;
+            // Endurance (The Juggernaut)
             if (type.includes('Rope')) attr.Endurance += 1;
-            if (styleResult === 'autobelay') attr.Endurance += 4;
-            
+            if (styleTag.includes('endurance') || styleTag.includes('volume')) attr.Endurance += 3;
+            if ((styleResult === 'toprope' || styleResult === 'autobelay') && (styleTag.includes('endurance') || styleTag.includes('volume'))) attr.Endurance += 3;
+
+            // Technique (The Technician)
             if (angle.includes('Slab') || angle.includes('Vertical')) attr.Technique += 2;
-            if (styleTag.includes('technical')) attr.Technique += 2;
-            if (holds.includes('Slopers') || holds.includes('Pinches')) attr.Technique += 1;
-            if (styleResult === 'toprope') { attr.Endurance += 1; attr.Technique += 1; } 
+            if (holds.includes('Slopers') || holds.includes('Pinches') || holds.includes('Volumes')) attr.Technique += 2;
+            if (styleResult === 'onsight') attr.Technique += 2;
 
-            if (holds.includes('Crimps') || holds.includes('Pockets')) attr.Fingers += 3;
+            // Fingers (The Scalpel)
+            if (holds.includes('Crimps') || holds.includes('Pockets')) {
+                attr.Fingers += 2;
+                if (angle.includes('Overhang') || angle.includes('Roof')) attr.Fingers += 2; // Overhang Tax
+                if (isOutdoor) attr.Fingers += 1; // Real rock
+                if (score > 600) attr.Fingers += 1; // High grade bump
+            }
 
+            // Headspace (The Assassin)
             if (styleResult === 'flash' || styleResult === 'onsight') attr.Headspace += 3;
             if (effort.includes('Limit')) attr.Headspace += 2;
+            if (isOutdoor && type.includes('Rope')) attr.Headspace += 2; 
 
-            if (styleResult === 'project') attr.Tenacity += 3;
-            if (burns >= 3) attr.Tenacity += 2;
-            if (styleResult === 'worked') attr.Tenacity += 1; 
+            // Tenacity (The Pitbull)
+            if (styleResult === 'project' || styleResult === 'worked') attr.Tenacity += 3;
+            if (burns >= 3) attr.Tenacity += 1;
+            if (burns >= 5) attr.Tenacity += 2;
         });
         
         const maxVal = Math.max(...Object.values(attr), 1);
@@ -272,13 +311,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const cleanPeak = getBaseGrade(peakG);
         peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
         
-        // V45: Dynamic Peak Grade Color for Indoor Bouldering
         if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
             const conf = AppConfig.grades.bouldsIn;
             const idx = conf.labels.indexOf(cleanPeak);
             peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
         } else {
-            peakEl.style.color = '#fff'; // Reset to white for everything else
+            peakEl.style.color = '#fff';
         }
 
         let dayC = {}, timeC = {}, indoorCount = 0;
@@ -398,21 +436,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const currAttr = calcRPG(currentFilteredLogs);
         const baseAttr = calcRPG(allTimeLogsFiltered);
 
-        let archetype = "All-Rounder";
+        let archetype = "The All-Rounder";
         if (currentFilteredLogs.length > 0) {
+            // V47: Mapped to the new Dictionary
             const archMap = {
-                'Power': 'The Engine', 'Endurance': 'The Juggernaut', 'Technique': 'The Technician',
-                'Fingers': 'The Vise', 'Headspace': 'The Zen Master', 'Tenacity': 'The Grinder'
+                'Power': 'The Caveman', 'Endurance': 'The Juggernaut', 'Technique': 'The Technician',
+                'Fingers': 'The Scalpel', 'Headspace': 'The Assassin', 'Tenacity': 'The Pitbull'
             };
             const topAttrs = Object.keys(currAttr).filter(k => currAttr[k] === 100);
-            archetype = topAttrs.length > 1 ? 'All-Rounder' : archMap[topAttrs[0]];
+            archetype = topAttrs.length > 1 ? 'The All-Rounder' : archMap[topAttrs[0]];
         }
         
         const archEl = document.getElementById('id-arch');
         archEl.innerText = archetype;
 
-        // V45: Adding dynamic percentages to the radar labels!
-        const radarLabels = Object.keys(currAttr).map(k => `${k} ${currAttr[k]}`);
+        // V47: Formatted as a stacked array to make the % stand out clean on its own line
+        const radarLabels = Object.keys(currAttr).map(k => [k.toUpperCase(), currAttr[k].toString()]);
 
         charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
             type: 'radar', 
@@ -445,14 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 responsive: true, maintainAspectRatio: false, 
                 plugins: { 
                     legend: { display: true, position: 'top', labels: { color: '#737373', boxWidth: 12, font: {size: 11} } },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                // V45: Clean tooltip to just show the number without repeating the custom label
-                                return ` ${context.dataset.label}: ${context.raw}`;
-                            }
-                        }
-                    }
+                    tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } }
                 }, 
                 scales: { 
                     r: { 
@@ -460,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ticks: { display: false, stepSize: 20 }, 
                         grid: { color: 'rgba(255,255,255,0.05)' }, 
                         angleLines: { display: false }, 
-                        pointLabels: { color: '#f3f4f6', font: { size: 11, weight: 'bold' } }
+                        pointLabels: { color: '#10b981', font: { size: 11, weight: 'bold' } }
                     } 
                 } 
             } 
