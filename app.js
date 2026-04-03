@@ -475,16 +475,29 @@ const App = {
                 } else if (maxSend.Type.includes('Rope')) maxColor = 'var(--primary)';
             }
             
+            // SMART SESSION LABEL ENGINE
             let domDisc = 'bg-mixed', domLabel = 'Mixed';
-            const bC = children.filter(c => c.Type.includes('Bouldering')).length;
-            const rC = children.filter(c => c.Type.includes('Rope')).length;
-            if (bC > 0 && rC === 0) { domDisc = 'bg-boulder'; domLabel = 'In Boulder'; } 
-            else if (rC > 0 && bC === 0) { domDisc = 'bg-rope'; domLabel = 'In Rope'; }
+            const allTypes = [...new Set(children.map(c => c.Type))];
+            if (allTypes.length === 1) {
+                const typeStr = allTypes[0];
+                domDisc = typeStr.includes('Bouldering') ? 'bg-boulder' : 'bg-rope';
+                const idx = AppConfig.disciplines.indexOf(typeStr);
+                domLabel = idx > -1 ? AppConfig.discLabels[idx] : 'Mixed';
+            } else {
+                const rC = children.filter(c => c.Type.includes('Rope')).length;
+                const bC = children.filter(c => c.Type.includes('Bouldering')).length;
+                if (bC > 0 && rC === 0) domDisc = 'bg-boulder';
+                else if (rC > 0 && bC === 0) domDisc = 'bg-rope';
+                
+                const isAllOut = children.every(c => c.Type.includes('Outdoor'));
+                if (isAllOut) domLabel = 'Out Mixed';
+                else if (children.every(c => c.Type.includes('Indoor'))) domLabel = 'In Mixed';
+            }
 
             const fScore = Number(session.Fatigue);
             let fClass = fScore ? `f-tier-${Math.ceil(fScore/2)}` : '';
 
-            // V66 Flat List Engine 
+            // V67 Flat List Engine 
             const childrenHtml = children.map(l => {
                 const rawGrade = String(l.Grade || "");
                 const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
@@ -639,7 +652,7 @@ const App = {
             document.getElementById('xpBarFill').style.width = `${pct}%`;
         }
 
-        // V66 Flat List Engine for Dashboard
+        // V67 Flat List Engine for Dashboard
         document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
             const rawGrade = String(l.Grade || "");
             const isF = rawGrade.includes('⚡') || rawGrade.includes('💎'), isFail = l.Style === 'worked';
@@ -689,7 +702,7 @@ const App = {
         else if (State.activeStyle === 'toprope') { g += " 🪢"; s = 0; }
         else if (State.activeStyle === 'autobelay') { g += " 🔄"; s = 0; }
         
-        // V66 Smart Outdoor Session Logic
+        // V67 Smart Outdoor Session Logic
         const sessionID = isOut ? `${climbDateStr}_Outdoor` : `${climbDateStr}_${State.activeGym.replace(/[^a-zA-Z0-9\s]/g, '').trim()}`;
         
         let existingSession = State.sessions.find(s => s.SessionID === sessionID);
