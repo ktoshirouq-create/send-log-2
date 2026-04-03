@@ -228,7 +228,6 @@ const App = {
     },
     adjBurns: (dir) => { App.haptic(); State.activeBurns = Math.max(1, State.activeBurns + dir); },
     
-    // UI Updates for Segmented Controls
     updateSegmentedHighlight: (containerId, val) => {
         setTimeout(() => {
             const container = document.getElementById(containerId);
@@ -248,7 +247,7 @@ const App = {
                 }
             });
             if(!found) highlight.style.opacity = 0;
-        }, 10); // Small timeout allows modal to display before calculating offsets
+        }, 10);
     },
 
     openSessionModal: (sessionId, mode) => {
@@ -289,7 +288,6 @@ const App = {
         App.updateSegmentedHighlight('focus-segmented', newVal);
     },
     
-    // FATIGUE SLIDER LOGIC
     handleFatigueClick: (e) => {
         const track = document.getElementById('fatigue-track');
         const rect = track.getBoundingClientRect();
@@ -486,7 +484,7 @@ const App = {
             const fScore = Number(session.Fatigue);
             let fClass = fScore ? `f-tier-${Math.ceil(fScore/2)}` : '';
 
-            // V64 Flat List Engine 
+            // V66 Flat List Engine 
             const childrenHtml = children.map(l => {
                 const rawGrade = String(l.Grade || "");
                 const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
@@ -641,7 +639,7 @@ const App = {
             document.getElementById('xpBarFill').style.width = `${pct}%`;
         }
 
-        // V64 Flat List Engine for Dashboard
+        // V66 Flat List Engine for Dashboard
         document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
             const rawGrade = String(l.Grade || "");
             const isF = rawGrade.includes('⚡') || rawGrade.includes('💎'), isFail = l.Style === 'worked';
@@ -691,10 +689,20 @@ const App = {
         else if (State.activeStyle === 'toprope') { g += " 🪢"; s = 0; }
         else if (State.activeStyle === 'autobelay') { g += " 🔄"; s = 0; }
         
-        const sessionID = `${climbDateStr}_${(isOut ? outC : State.activeGym).replace(/[^a-zA-Z0-9\s]/g, '').trim()}`;
-        if (!State.sessions.find(s => s.SessionID === sessionID)) {
+        // V66 Smart Outdoor Session Logic
+        const sessionID = isOut ? `${climbDateStr}_Outdoor` : `${climbDateStr}_${State.activeGym.replace(/[^a-zA-Z0-9\s]/g, '').trim()}`;
+        
+        let existingSession = State.sessions.find(s => s.SessionID === sessionID);
+        if (!existingSession) {
             const newS = { SessionID: sessionID, Date: climbDateStr, Location: isOut ? outC : State.activeGym, Focus: "", Fatigue: "", WarmUp: "", Notes: "", _synced: false };
             State.sessions = [newS, ...State.sessions];
+        } else if (isOut) {
+            let locs = existingSession.Location.split(' / ');
+            if (!locs.includes(outC)) {
+                existingSession.Location = [...locs, outC].join(' / ');
+                existingSession._synced = false;
+                State.sessions = [...State.sessions]; // Trigger proxy paint
+            }
         }
 
         const btn = document.getElementById('saveClimbBtn');
