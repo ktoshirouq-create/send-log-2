@@ -44,10 +44,19 @@ const getScaleConfig = (disc) => {
     return AppConfig.grades.ropes;
 };
 
-const getBadge = (type, gradeText) => {
-    if (type !== 'Indoor Bouldering') return '';
-    const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(gradeText));
-    return idx > -1 ? `<span class="boulder-dot" style="background:${AppConfig.grades.bouldsIn.colors[idx]};"></span>` : '';
+// TYPOGRAPHIC BADGES TO REPLACE EMOJIS
+const getStyleBadge = (style) => {
+    const map = {
+        'onsight': { text: 'OS', cls: 'badge-fl' },
+        'flash': { text: 'FL', cls: 'badge-fl' },
+        'quick': { text: 'RP', cls: 'badge-rp' },
+        'project': { text: 'PR', cls: 'badge-ghost' },
+        'worked': { text: 'WK', cls: 'badge-ghost' },
+        'toprope': { text: 'TR', cls: 'badge-ghost' },
+        'autobelay': { text: 'AB', cls: 'badge-ghost' }
+    };
+    const b = map[style] || { text: 'RP', cls: 'badge-rp' };
+    return `<span class="micro-badge ${b.cls}">${b.text}</span>`;
 };
 
 let deletedClimbs = JSON.parse(localStorage.getItem('crag_deleted_climbs') || '[]');
@@ -67,7 +76,7 @@ if (gIdx === -1) gIdx = initConf.labels.length > 8 ? 8 : 0;
 const State = new Proxy({
     view: 'log', discipline: initDisc, 
     activeGrade: { text: initConf.labels[gIdx], score: initConf.scores[gIdx] },
-    activeStyle: initStyle, activeBurns: 1, activeHighPoint: 50, activeDate: getLocalISO(), activeGym: initGym, chartMode: 'max', listMode: 'top10',
+    activeStyle: initStyle, activeBurns: '-', activeHighPoint: 50, activeDate: getLocalISO(), activeGym: initGym, chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
     activeTimeBucket: '', climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
 }, {
@@ -174,6 +183,7 @@ const App = {
     chart: null,
     isSaving: false,
     isDraggingHP: false,
+    isDraggingFatigue: false,
     
     init: () => {
         if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
@@ -229,9 +239,17 @@ const App = {
         else if (category === 'hold') State.activeHolds = State.activeHolds.includes(val) ? State.activeHolds.filter(x => x !== val) : [...State.activeHolds, val];
         else if (category === 'steepness') State.activeSteepness = State.activeSteepness.includes(val) ? State.activeSteepness.filter(x => x !== val) : [...State.activeSteepness, val];
     },
-    adjBurns: (dir) => { App.haptic(); State.activeBurns = Math.max(1, State.activeBurns + dir); },
+    adjBurns: (dir) => { 
+        App.haptic(); 
+        if (State.activeBurns === '-') {
+            State.activeBurns = dir > 0 ? 1 : '-';
+        } else {
+            let newVal = State.activeBurns + dir;
+            State.activeBurns = newVal < 1 ? '-' : newVal;
+        }
+    },
 
-    // HIGH POINT SCRUBBER LOGIC
+    // CONTINUOUS SCRUBBER LOGIC (High Point + Fatigue)
     handleHPSlide: (e) => {
         if (!App.isDraggingHP && e.type !== 'click' && e.type !== 'touchstart') return;
         const track = document.getElementById('hp-track');
@@ -240,8 +258,9 @@ const App = {
         let percent = (clientX - rect.left) / rect.width;
         percent = Math.max(0, Math.min(1, percent));
         let val = Math.round(percent * 100);
+        if (val === 100) val = 99; // 99% cap for incomplete routes
         
-        if (Math.abs(val - State.activeHighPoint) >= 5 || val === 0 || val === 100) {
+        if (Math.abs(val - State.activeHighPoint) >= 5 || val === 0 || val === 99) {
             if(Math.abs(val - State.activeHighPoint) >= 10) App.haptic(); 
             State.activeHighPoint = val;
             document.getElementById('hp-output').innerText = `${val}%`;
@@ -249,19 +268,42 @@ const App = {
             document.getElementById('hp-thumb').style.left = `${val}%`;
         }
     },
+    handleFatigueSlide: (e) => {
+        if (!App.isDraggingFatigue && e.type !== 'click' && e.type !== 'touchstart') return;
+        const track = document.getElementById('fatigue-track');
+        const rect = track.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        let percent = (clientX - rect.left) / rect.width;
+        percent = Math.max(0, Math.min(1, percent));
+        let val = Math.round(percent * 9) + 1; 
+        App.setModalFatigue(val);
+    },
     initScrubber: () => {
-        const cont = document.getElementById('hp-track-container');
-        if(!cont) return;
-        const startDrag = (e) => { App.isDraggingHP = true; App.handleHPSlide(e); };
-        const endDrag = () => { App.isDraggingHP = false; };
+        // High Point
+        const hpCont = document.getElementById('hp-track-container');
+        if(hpCont) {
+            const startHP = (e) => { App.isDraggingHP = true; App.handleHPSlide(e); };
+            const endHP = () => { App.isDraggingHP = false; };
+            hpCont.addEventListener('mousedown', startHP);
+            document.addEventListener('mousemove', (e) => { if(App.isDraggingHP) App.handleHPSlide(e); });
+            document.addEventListener('mouseup', endHP);
+            hpCont.addEventListener('touchstart', startHP, {passive: true});
+            document.addEventListener('touchmove', (e) => { if(App.isDraggingHP) App.handleHPSlide(e); }, {passive: true});
+            document.addEventListener('touchend', endHP);
+        }
         
-        cont.addEventListener('mousedown', startDrag);
-        document.addEventListener('mousemove', (e) => { if(App.isDraggingHP) App.handleHPSlide(e); });
-        document.addEventListener('mouseup', endDrag);
-        
-        cont.addEventListener('touchstart', startDrag, {passive: true});
-        document.addEventListener('touchmove', (e) => { if(App.isDraggingHP) App.handleHPSlide(e); }, {passive: true});
-        document.addEventListener('touchend', endDrag);
+        // Fatigue
+        const fatCont = document.getElementById('fatigue-track-container');
+        if(fatCont) {
+            const startFat = (e) => { App.isDraggingFatigue = true; App.handleFatigueSlide(e); };
+            const endFat = () => { App.isDraggingFatigue = false; };
+            fatCont.addEventListener('mousedown', startFat);
+            document.addEventListener('mousemove', (e) => { if(App.isDraggingFatigue) App.handleFatigueSlide(e); });
+            document.addEventListener('mouseup', endFat);
+            fatCont.addEventListener('touchstart', startFat, {passive: true});
+            document.addEventListener('touchmove', (e) => { if(App.isDraggingFatigue) App.handleFatigueSlide(e); }, {passive: true});
+            document.addEventListener('touchend', endFat);
+        }
     },
 
     updateSegmentedHighlight: (containerId, val) => {
@@ -306,6 +348,8 @@ const App = {
         } else if (mode === 'warmup') {
             document.getElementById('sec-warmup').classList.remove('hidden');
             App.setModalWarmUp(s.WarmUp || "", true);
+        } else if (mode === 'notes') {
+            setTimeout(() => document.getElementById('modalNotesVal').focus(), 300);
         }
         document.getElementById('sessionModal').classList.add('active');
     },
@@ -322,19 +366,14 @@ const App = {
         App.updateSegmentedHighlight('focus-segmented', newVal);
     },
     
-    handleFatigueClick: (e) => {
-        const track = document.getElementById('fatigue-track');
-        const rect = track.getBoundingClientRect();
-        let percent = (e.clientX - rect.left) / rect.width;
-        percent = Math.max(0, Math.min(1, percent));
-        let val = Math.round(percent * 9) + 1; 
-        App.setModalFatigue(val);
-    },
     setModalFatigue: (val, init = false) => {
-        if(!init && val !== "") App.haptic();
         const current = String(document.getElementById('modalFatigueVal').value);
         const strVal = String(val);
         const newVal = (!init && current === strVal) ? "" : strVal;
+        
+        // Apply haptic tick if crossing a whole number
+        if (!init && current !== newVal && newVal !== "") App.haptic();
+        
         document.getElementById('modalFatigueVal').value = newVal;
         
         const out = document.getElementById('fatigue-output');
@@ -429,8 +468,8 @@ const App = {
         document.getElementById('styleSelector').innerHTML = styles.map(s => {
             return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
                 if(['flash', 'onsight', 'toprope', 'autobelay'].includes('${s[0]}')){ State.activeBurns = 1; }
-                else if('${s[0]}' === 'quick' && State.activeBurns === 1){ State.activeBurns = 2; }
-                else if(['project', 'worked'].includes('${s[0]}') && State.activeBurns < 3){ State.activeBurns = 3; }
+                else if('${s[0]}' === 'quick' && (State.activeBurns === 1 || State.activeBurns === '-')){ State.activeBurns = 2; }
+                else if(['project', 'worked'].includes('${s[0]}')){ State.activeBurns = '-'; }
             ">${s[1]}</div>`;
         }).join('');
 
@@ -505,10 +544,11 @@ const App = {
             children.sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID));
             if(children.length === 0) return ''; 
             const dateInfo = getJournalDateObj(session.Date);
-            const totalBurns = children.reduce((sum, c) => sum + (Number(c.Burns) || 1), 0);
             
             let maxSentStr = "-", maxColor = '#fff';
-            const sends = children.filter(c => c.Style !== 'worked' && c.Style !== 'toprope' && c.Style !== 'autobelay');
+            const sends = children.filter(c => !['worked', 'toprope', 'autobelay', 'project'].includes(c.Style));
+            const projects = children.filter(c => ['worked', 'toprope', 'autobelay', 'project'].includes(c.Style));
+            
             if (sends.length > 0) {
                 const maxSend = sends.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max);
                 maxSentStr = getBaseGrade(maxSend.Grade);
@@ -537,32 +577,33 @@ const App = {
                 else if (children.every(c => c.Type.includes('Indoor'))) domLabel = 'In Mixed';
             }
 
-            // GHOST CARDS IN FLATTENED LIST ENGINE
+            // FLATTENED LIST ENGINE WITH GHOST STATE & MICRO-BADGES
             const childrenHtml = children.map(l => {
                 const rawGrade = String(l.Grade || "");
-                const isGhost = l.Style === 'worked' || l.Style === 'toprope';
-                const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
+                const cleanGrade = getBaseGrade(rawGrade);
+                const isGhost = l.Style === 'worked' || l.Style === 'toprope' || l.Style === 'project' || l.Style === 'autobelay';
+                const isF = l.Style === 'flash' || l.Style === 'onsight';
                 const perfClass = isGhost ? 'ghost' : (isF ? 'fl' : 'rp');
                 
                 let inlineColor = '';
                 if (!isGhost && l.Type === 'Indoor Bouldering') {
-                    const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(rawGrade));
+                    const idx = AppConfig.grades.bouldsIn.labels.indexOf(cleanGrade);
                     if (idx > -1) inlineColor = `color: ${AppConfig.grades.bouldsIn.colors[idx]} !important;`;
                 }
 
                 return `
                 <div class="log-entry ${perfClass}">
                     <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.session-children .log-entry').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">
-                        <div class="log-info" style="padding-left:10px;">
-                            <div class="log-name" style="${isGhost ? 'color: #888;' : ''}">${l.Name.split(' @ ')[0]}${l._synced === false ? ' ☁️✕' : ''}</div>
+                        <div class="log-info">
+                            <div class="log-name">${l.Name.split(' @ ')[0]}${l._synced === false ? ' ☁️✕' : ''}</div>
                         </div>
                         ${isGhost && l.HighPoint !== undefined ? `<div class="log-ghost-tag">High Point: ${l.HighPoint}%</div>` : ''}
-                        <div class="log-grade ${perfClass}" style="${inlineColor}">${!isGhost ? getBadge(l.Type, rawGrade) : ''}${rawGrade}</div>
+                        <div class="log-grade ${perfClass}" style="${inlineColor}">${getStyleBadge(l.Style)}${cleanGrade}</div>
                     </div>
                     <div class="log-details">
                         <div class="log-details-grid">
                             <div class="log-meta-item">STYLE<div class="log-meta-val">${AppConfig.styles[l.Style] || l.Style}</div></div>
-                            <div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns || 1}</div></div>
+                            ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
                         </div>
                         ${l.Notes ? `<div class="log-notes-box">"${l.Notes}"</div>` : ''}
                         <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete Entry</button>
@@ -580,11 +621,13 @@ const App = {
                     <div class="s-tag ${session.Focus ? 'focus-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'focus')">${session.Focus ? 'Focus: '+session.Focus : '+ Focus'}</div>
                     <div class="s-tag ${session.Fatigue ? 'fatigue-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">${session.Fatigue ? 'Fatigue: '+session.Fatigue : '+ Fatigue'}</div>
                     <div class="s-tag ${session.WarmUp ? 'warmup-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'warmup')">${session.WarmUp ? 'Warm-up: '+session.WarmUp : '+ Warm-up'}</div>
+                    <div class="s-tag ${session.Notes ? 'note-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'notes')">${session.Notes ? '📝 Note Added' : '+ Note'}</div>
                 </div>
                 
                 <div class="s-flat-stats">
-                    <span>${children.length} Routes</span><span>&bull;</span>
-                    <span>${totalBurns} Burns</span><span>&bull;</span>
+                    <span>${sends.length} Send${sends.length !== 1 ? 's' : ''}</span>
+                    ${projects.length > 0 ? `<span>&bull;</span><span>${projects.length} Project${projects.length > 1 ? 's' : ''}</span>` : ''}
+                    <span>&bull;</span>
                     <span>Max: <span style="color:${maxColor};">${maxSentStr}</span></span>
                 </div>
                 ${session.Notes ? `<div class="s-session-notes">"${session.Notes}"</div>` : ''}
@@ -618,13 +661,13 @@ const App = {
             const [y, mo] = m.split('-').map(Number);
             const mL = viewLogs.filter(l => l.cleanDate.substring(0,7) === m);
             if (State.chartMode === 'max') {
-                const rpL = mL.filter(l => !String(l.Grade||"").includes('⚡') && !String(l.Grade||"").includes('💎'));
-                const flL = mL.filter(l => String(l.Grade||"").includes('⚡') || String(l.Grade||"").includes('💎'));
+                const rpL = mL.filter(l => l.Style !== 'flash' && l.Style !== 'onsight');
+                const flL = mL.filter(l => l.Style === 'flash' || l.Style === 'onsight');
                 const maxRp = rpL.length ? rpL.reduce((p, c) => Number(c.Score) > Number(p.Score) ? c : p) : null;
                 const maxFl = flL.length ? flL.reduce((p, c) => Number(c.Score) > Number(p.Score) ? c : p) : null;
                 cD.rp.push(maxRp ? getScoreIndex(Number(maxRp.Score), false) : null);
                 cD.fl.push(maxFl ? getScoreIndex(Number(maxFl.Score), true) : null);
-                cD.rpG.push(maxRp ? maxRp.Grade : ""); cD.flG.push(maxFl ? maxFl.Grade : "");
+                cD.rpG.push(maxRp ? getBaseGrade(maxRp.Grade) : ""); cD.flG.push(maxFl ? getBaseGrade(maxFl.Grade) : "");
             } else {
                 const top10 = mL.sort((a,b) => Number(b.Score) - Number(a.Score)).slice(0, 10);
                 const avS = Math.round(top10.reduce((s, l) => s + Number(l.Score), 0) / top10.length);
@@ -700,26 +743,26 @@ const App = {
         }
 
         document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
-            const rawGrade = String(l.Grade || "");
-            const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
+            const cleanGrade = getBaseGrade(String(l.Grade || ""));
+            const isF = l.Style === 'flash' || l.Style === 'onsight';
             const perfClass = isF ? 'fl' : 'rp';
             let inlineColor = '';
             if (l.Type === 'Indoor Bouldering') {
-                const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(rawGrade));
+                const idx = AppConfig.grades.bouldsIn.labels.indexOf(cleanGrade);
                 if (idx > -1) inlineColor = `color: ${AppConfig.grades.bouldsIn.colors[idx]} !important;`;
             }
 
             return `
             <div class="log-entry ${perfClass}">
                 <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">
-                    <div class="log-date" style="width: 50px; padding-left:10px;">${formatShortDate(l.cleanDate)}</div>
-                    <div class="log-info" style="padding-left:0;"><div class="log-name">${l.Name.split(' @ ')[0]}</div></div>
-                    <div class="log-grade ${perfClass}" style="${inlineColor}">${getBadge(l.Type, rawGrade)}${rawGrade}</div>
+                    <div class="log-date">${formatShortDate(l.cleanDate)}</div>
+                    <div class="log-info"><div class="log-name">${l.Name.split(' @ ')[0]}</div></div>
+                    <div class="log-grade ${perfClass}" style="${inlineColor}">${getStyleBadge(l.Style)}${cleanGrade}</div>
                 </div>
                 <div class="log-details">
                     <div class="log-details-grid">
                         <div class="log-meta-item">STYLE<div class="log-meta-val">${AppConfig.styles[l.Style] || l.Style}</div></div>
-                        <div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns || 1}</div></div>
+                        ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
                     </div>
                     ${l.Notes ? `<div class="log-notes-box">"${l.Notes}"</div>` : ''}
                     <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete Entry</button>
@@ -738,15 +781,14 @@ const App = {
 
         const n = isOut ? `${outN} @ ${outC}` : State.activeGym;
         const climbDateStr = State.activeDate;
-        let s = State.activeGrade.score, g = State.activeGrade.text;
+        let s = State.activeGrade.score;
+        const g = State.activeGrade.text; 
         
-        if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; g += " ⚡"; } 
-        else if (State.activeStyle === 'onsight') { s += 10; g += " 💎"; }
-        else if (State.activeStyle === 'quick') g += " 🚀";
-        else if (State.activeStyle === 'project') g += " 🛠️";
-        else if (State.activeStyle === 'worked') { g += " ❌"; s = 0; }
-        else if (State.activeStyle === 'toprope') { g += " 🪢"; s = 0; }
-        else if (State.activeStyle === 'autobelay') { g += " 🔄"; s = 0; }
+        if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; } 
+        else if (State.activeStyle === 'onsight') { s += 10; }
+        else if (State.activeStyle === 'worked') { s = 0; }
+        else if (State.activeStyle === 'toprope') { s = 0; }
+        else if (State.activeStyle === 'autobelay') { s = 0; }
         
         const sessionID = isOut ? `${climbDateStr}_Outdoor` : `${climbDateStr}_${State.activeGym.replace(/[^a-zA-Z0-9\s]/g, '').trim()}`;
         
@@ -768,7 +810,7 @@ const App = {
         
         const climb = { 
             ClimbID: String(Date.now()), SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Grade: g, Score: s, Style: State.activeStyle, 
-            Burns: State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE, GradeFeel: State.activeGradeFeel,
+            Burns: State.activeBurns === '-' ? '' : State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE, GradeFeel: State.activeGradeFeel,
             Rating: State.activeRating || "", Holds: State.activeHolds.join(', '), ClimStyles: State.activeClimbStyles.join(', '),
             Notes: document.getElementById('input-notes').value.trim(), _synced: false 
         };
@@ -784,7 +826,7 @@ const App = {
         SyncManager.pushAll(State.sessions.filter(s => !s._synced), [climb]); 
         
         State.activeRating = 0; State.activeGradeFeel = ''; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
-        State.activeBurns = ['flash', 'onsight', 'toprope', 'autobelay'].includes(State.activeStyle) ? 1 : (State.activeStyle === 'quick' ? 2 : 3);
+        State.activeBurns = ['flash', 'onsight', 'toprope', 'autobelay'].includes(State.activeStyle) ? 1 : (State.activeStyle === 'quick' ? 2 : '-');
         State.activeHighPoint = 50;
         
         setTimeout(() => {
