@@ -67,7 +67,7 @@ if (gIdx === -1) gIdx = initConf.labels.length > 8 ? 8 : 0;
 const State = new Proxy({
     view: 'log', discipline: initDisc, 
     activeGrade: { text: initConf.labels[gIdx], score: initConf.scores[gIdx] },
-    activeStyle: initStyle, activeBurns: 1, activeDate: getLocalISO(), activeGym: initGym, chartMode: 'max', listMode: 'top10',
+    activeStyle: initStyle, activeBurns: 1, activeHighPoint: 50, activeDate: getLocalISO(), activeGym: initGym, chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
     activeTimeBucket: '', climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
 }, {
@@ -173,10 +173,13 @@ const SyncManager = {
 const App = {
     chart: null,
     isSaving: false,
+    isDraggingHP: false,
+    
     init: () => {
         if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
         document.getElementById('input-crag').value = localStorage.getItem('lastCrag') || '';
         
+        App.initScrubber();
         App.renderUI();
         SyncManager.trigger(); 
         window.addEventListener('online', SyncManager.trigger);
@@ -227,7 +230,40 @@ const App = {
         else if (category === 'steepness') State.activeSteepness = State.activeSteepness.includes(val) ? State.activeSteepness.filter(x => x !== val) : [...State.activeSteepness, val];
     },
     adjBurns: (dir) => { App.haptic(); State.activeBurns = Math.max(1, State.activeBurns + dir); },
-    
+
+    // HIGH POINT SCRUBBER LOGIC
+    handleHPSlide: (e) => {
+        if (!App.isDraggingHP && e.type !== 'click' && e.type !== 'touchstart') return;
+        const track = document.getElementById('hp-track');
+        const rect = track.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        let percent = (clientX - rect.left) / rect.width;
+        percent = Math.max(0, Math.min(1, percent));
+        let val = Math.round(percent * 100);
+        
+        if (Math.abs(val - State.activeHighPoint) >= 5 || val === 0 || val === 100) {
+            if(Math.abs(val - State.activeHighPoint) >= 10) App.haptic(); 
+            State.activeHighPoint = val;
+            document.getElementById('hp-output').innerText = `${val}%`;
+            document.getElementById('hp-fill').style.width = `${val}%`;
+            document.getElementById('hp-thumb').style.left = `${val}%`;
+        }
+    },
+    initScrubber: () => {
+        const cont = document.getElementById('hp-track-container');
+        if(!cont) return;
+        const startDrag = (e) => { App.isDraggingHP = true; App.handleHPSlide(e); };
+        const endDrag = () => { App.isDraggingHP = false; };
+        
+        cont.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', (e) => { if(App.isDraggingHP) App.handleHPSlide(e); });
+        document.addEventListener('mouseup', endDrag);
+        
+        cont.addEventListener('touchstart', startDrag, {passive: true});
+        document.addEventListener('touchmove', (e) => { if(App.isDraggingHP) App.handleHPSlide(e); }, {passive: true});
+        document.addEventListener('touchend', endDrag);
+    },
+
     updateSegmentedHighlight: (containerId, val) => {
         setTimeout(() => {
             const container = document.getElementById(containerId);
@@ -259,18 +295,16 @@ const App = {
         document.getElementById('modalFocusVal').value = s.Focus || "";
         document.getElementById('modalFatigueVal').value = s.Fatigue || "";
         document.getElementById('modalWarmUpVal').value = s.WarmUp || "";
+        document.getElementById('modalNotesVal').value = s.Notes || "";
 
         if (mode === 'focus') {
             document.getElementById('sec-focus').classList.remove('hidden');
-            document.getElementById('modalTitle').innerText = 'Session Focus';
             App.setModalFocus(s.Focus || "", true);
         } else if (mode === 'fatigue') {
             document.getElementById('sec-fatigue').classList.remove('hidden');
-            document.getElementById('modalTitle').innerText = 'Session Fatigue';
             App.setModalFatigue(s.Fatigue || "", true);
         } else if (mode === 'warmup') {
             document.getElementById('sec-warmup').classList.remove('hidden');
-            document.getElementById('modalTitle').innerText = 'Warm-Up';
             App.setModalWarmUp(s.WarmUp || "", true);
         }
         document.getElementById('sessionModal').classList.add('active');
@@ -336,7 +370,9 @@ const App = {
         const focus = document.getElementById('modalFocusVal').value;
         const fatigue = document.getElementById('modalFatigueVal').value;
         const warmup = document.getElementById('modalWarmUpVal').value;
-        State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: focus, Fatigue: fatigue, WarmUp: warmup, _synced: false} : s);
+        const notes = document.getElementById('modalNotesVal').value.trim();
+        
+        State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: focus, Fatigue: fatigue, WarmUp: warmup, Notes: notes, _synced: false} : s);
         SyncManager.pushAll(State.sessions.filter(s => s._synced === false), []);
         App.closeSessionModal();
     },
@@ -434,6 +470,13 @@ const App = {
         syncMulti('#holdsSelector', State.activeHolds);
         syncSingle('#chartToggle', State.chartMode);
 
+        // CONDITIONAL HIGH POINT UI
+        if (['worked', 'toprope'].includes(State.activeStyle)) {
+            document.getElementById('highPointContainer').classList.remove('hidden');
+        } else {
+            document.getElementById('highPointContainer').classList.add('hidden');
+        }
+
         ['morn', 'aft', 'eve'].forEach(id => {
             const el = document.getElementById(`time-${id}`);
             if (el) el.classList.toggle('active', State.activeTimeBucket === el.innerText);
@@ -442,6 +485,7 @@ const App = {
         document.getElementById('feel-hard').classList.toggle('active', State.activeGradeFeel === 'Hard');
         const stars = document.getElementById('starRating').children;
         for(let i=0; i<stars.length; i++) stars[i].className = i < State.activeRating ? 'active' : '';
+        
         const bCont = document.getElementById('burns-container');
         if (['flash', 'onsight'].includes(State.activeStyle)) bCont.classList.add('hidden');
         else bCont.classList.remove('hidden');
@@ -475,7 +519,6 @@ const App = {
                 } else if (maxSend.Type.includes('Rope')) maxColor = 'var(--primary)';
             }
             
-            // SMART SESSION LABEL ENGINE
             let domDisc = 'bg-mixed', domLabel = 'Mixed';
             const allTypes = [...new Set(children.map(c => c.Type))];
             if (allTypes.length === 1) {
@@ -494,17 +537,15 @@ const App = {
                 else if (children.every(c => c.Type.includes('Indoor'))) domLabel = 'In Mixed';
             }
 
-            const fScore = Number(session.Fatigue);
-            let fClass = fScore ? `f-tier-${Math.ceil(fScore/2)}` : '';
-
-            // V67 Flat List Engine 
+            // GHOST CARDS IN FLATTENED LIST ENGINE
             const childrenHtml = children.map(l => {
                 const rawGrade = String(l.Grade || "");
+                const isGhost = l.Style === 'worked' || l.Style === 'toprope';
                 const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
-                const isFail = l.Style === 'worked';
-                const perfClass = isF ? 'fl' : (isFail ? 'fail' : 'rp');
+                const perfClass = isGhost ? 'ghost' : (isF ? 'fl' : 'rp');
+                
                 let inlineColor = '';
-                if (l.Type === 'Indoor Bouldering') {
+                if (!isGhost && l.Type === 'Indoor Bouldering') {
                     const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(rawGrade));
                     if (idx > -1) inlineColor = `color: ${AppConfig.grades.bouldsIn.colors[idx]} !important;`;
                 }
@@ -512,8 +553,11 @@ const App = {
                 return `
                 <div class="log-entry ${perfClass}">
                     <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.session-children .log-entry').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">
-                        <div class="log-info" style="padding-left:10px;"><div class="log-name">${l.Name.split(' @ ')[0]}${l._synced === false ? ' ☁️✕' : ''}</div></div>
-                        <div class="log-grade ${isF ? 'fl' : (isFail ? 'fail' : 'rp')}" style="${inlineColor}">${getBadge(l.Type, rawGrade)}${rawGrade}</div>
+                        <div class="log-info" style="padding-left:10px;">
+                            <div class="log-name" style="${isGhost ? 'color: #888;' : ''}">${l.Name.split(' @ ')[0]}${l._synced === false ? ' ☁️✕' : ''}</div>
+                        </div>
+                        ${isGhost && l.HighPoint !== undefined ? `<div class="log-ghost-tag">High Point: ${l.HighPoint}%</div>` : ''}
+                        <div class="log-grade ${perfClass}" style="${inlineColor}">${!isGhost ? getBadge(l.Type, rawGrade) : ''}${rawGrade}</div>
                     </div>
                     <div class="log-details">
                         <div class="log-details-grid">
@@ -527,7 +571,7 @@ const App = {
             }).join('');
 
             return `
-            <div class="session-card ${domDisc} ${fClass}">
+            <div class="session-card ${domDisc}">
                 <div class="session-header">
                     <div class="s-date-block"><div class="s-date-main">${dateInfo.main}</div><div class="s-date-sub">${dateInfo.sub}</div></div>
                     <div class="s-loc">@ ${session.Location} &nbsp;&bull;&nbsp; <span style="color:#a3a3a3;">${domLabel}</span></div>
@@ -537,11 +581,14 @@ const App = {
                     <div class="s-tag ${session.Fatigue ? 'fatigue-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">${session.Fatigue ? 'Fatigue: '+session.Fatigue : '+ Fatigue'}</div>
                     <div class="s-tag ${session.WarmUp ? 'warmup-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'warmup')">${session.WarmUp ? 'Warm-up: '+session.WarmUp : '+ Warm-up'}</div>
                 </div>
-                <div class="session-stats-grid">
-                    <div class="s-stat-box"><div class="s-stat-lbl">Volume</div><div class="s-stat-val">${totalBurns}</div></div>
-                    <div class="s-stat-box"><div class="s-stat-lbl">Max Sent</div><div class="s-stat-val" style="color:${maxColor};">${maxSentStr}</div></div>
-                    <div class="s-stat-box"><div class="s-stat-lbl">Routes</div><div class="s-stat-val">${children.length}</div></div>
+                
+                <div class="s-flat-stats">
+                    <span>${children.length} Routes</span><span>&bull;</span>
+                    <span>${totalBurns} Burns</span><span>&bull;</span>
+                    <span>Max: <span style="color:${maxColor};">${maxSentStr}</span></span>
                 </div>
+                ${session.Notes ? `<div class="s-session-notes">"${session.Notes}"</div>` : ''}
+                
                 <button class="session-accordion-btn" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">View ${children.length} Climbs ▾</button>
                 <div class="session-children">${childrenHtml}</div>
             </div>`;
@@ -652,11 +699,10 @@ const App = {
             document.getElementById('xpBarFill').style.width = `${pct}%`;
         }
 
-        // V67 Flat List Engine for Dashboard
         document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
             const rawGrade = String(l.Grade || "");
-            const isF = rawGrade.includes('⚡') || rawGrade.includes('💎'), isFail = l.Style === 'worked';
-            const perfClass = isF ? 'fl' : (isFail ? 'fail' : 'rp');
+            const isF = rawGrade.includes('⚡') || rawGrade.includes('💎');
+            const perfClass = isF ? 'fl' : 'rp';
             let inlineColor = '';
             if (l.Type === 'Indoor Bouldering') {
                 const idx = AppConfig.grades.bouldsIn.labels.indexOf(getBaseGrade(rawGrade));
@@ -668,7 +714,7 @@ const App = {
                 <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">
                     <div class="log-date" style="width: 50px; padding-left:10px;">${formatShortDate(l.cleanDate)}</div>
                     <div class="log-info" style="padding-left:0;"><div class="log-name">${l.Name.split(' @ ')[0]}</div></div>
-                    <div class="log-grade ${isF ? 'fl' : (isFail ? 'fail' : 'rp')}" style="${inlineColor}">${getBadge(l.Type, rawGrade)}${rawGrade}</div>
+                    <div class="log-grade ${perfClass}" style="${inlineColor}">${getBadge(l.Type, rawGrade)}${rawGrade}</div>
                 </div>
                 <div class="log-details">
                     <div class="log-details-grid">
@@ -702,7 +748,6 @@ const App = {
         else if (State.activeStyle === 'toprope') { g += " 🪢"; s = 0; }
         else if (State.activeStyle === 'autobelay') { g += " 🔄"; s = 0; }
         
-        // V67 Smart Outdoor Session Logic
         const sessionID = isOut ? `${climbDateStr}_Outdoor` : `${climbDateStr}_${State.activeGym.replace(/[^a-zA-Z0-9\s]/g, '').trim()}`;
         
         let existingSession = State.sessions.find(s => s.SessionID === sessionID);
@@ -714,7 +759,7 @@ const App = {
             if (!locs.includes(outC)) {
                 existingSession.Location = [...locs, outC].join(' / ');
                 existingSession._synced = false;
-                State.sessions = [...State.sessions]; // Trigger proxy paint
+                State.sessions = [...State.sessions]; 
             }
         }
 
@@ -727,6 +772,10 @@ const App = {
             Rating: State.activeRating || "", Holds: State.activeHolds.join(', '), ClimStyles: State.activeClimbStyles.join(', '),
             Notes: document.getElementById('input-notes').value.trim(), _synced: false 
         };
+
+        if (['worked', 'toprope'].includes(State.activeStyle)) {
+            climb.HighPoint = State.activeHighPoint;
+        }
         
         document.getElementById('input-notes').value = '';
         if (isOut) document.getElementById('input-name').value = '';
@@ -736,6 +785,7 @@ const App = {
         
         State.activeRating = 0; State.activeGradeFeel = ''; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
         State.activeBurns = ['flash', 'onsight', 'toprope', 'autobelay'].includes(State.activeStyle) ? 1 : (State.activeStyle === 'quick' ? 2 : 3);
+        State.activeHighPoint = 50;
         
         setTimeout(() => {
             btn.innerHTML = '✓ Saved!';
