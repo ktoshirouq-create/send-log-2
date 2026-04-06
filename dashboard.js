@@ -130,13 +130,12 @@ const Dashboard = {
             
             const grade = String(getV(l, 'Grade') || "");
             
-            // V65: Discipline Color Dot Mapping
             const type = String(getV(l, 'Type') || "");
             let dotColor = '#737373';
-            if (type === 'Indoor Rope Climbing') dotColor = '#10b981'; // Emerald Green
-            else if (type === 'Indoor Bouldering') dotColor = '#3b82f6'; // Electric Blue
-            else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316'; // Sunset Orange
-            else if (type === 'Outdoor Bouldering') dotColor = '#a855f7'; // Amethyst Purple
+            if (type === 'Indoor Rope Climbing') dotColor = '#10b981';
+            else if (type === 'Indoor Bouldering') dotColor = '#3b82f6';
+            else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316';
+            else if (type === 'Outdoor Bouldering') dotColor = '#a855f7';
             
             const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
             
@@ -324,8 +323,10 @@ document.addEventListener('DOMContentLoaded', () => {
         let maxScore = 0, peakG = '-';
         let dayC = {}, indoorCount = 0;
         const gradesForPyramid = {};
-        const locs = {};
         const steepnessPeaks = { 'Slab': null, 'Vertical': null, 'Overhang': null, 'Roof': null };
+
+        const locSessions = {};
+        const locs = {};
 
         currentFilteredLogs.forEach(l => { 
             const s = Number(getV(l, 'Score'));
@@ -336,6 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = getV(l, 'Date');
             const angleStr = String(getV(l, 'Angle') || "");
             let nameStr = String(getV(l, 'Name') || "");
+            const sessionID = String(getV(l, 'SessionID') || "");
 
             if (isSend && s > maxScore) { 
                 maxScore = s; 
@@ -364,8 +366,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if(nameStr) {
                 if(nameStr.includes('@')) nameStr = nameStr.split('@')[1].trim(); 
-                if (nameStr) locs[nameStr] = (locs[nameStr] || 0) + 1; 
+                if (nameStr && sessionID) {
+                    if (!locSessions[nameStr]) locSessions[nameStr] = new Set();
+                    locSessions[nameStr].add(sessionID);
+                }
             }
+        });
+
+        Object.keys(locSessions).forEach(loc => {
+            locs[loc] = locSessions[loc].size;
         });
 
         document.getElementById('stat-sends').innerText = currentFilteredLogs.length;
