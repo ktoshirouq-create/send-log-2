@@ -44,7 +44,7 @@ const getScaleConfig = (disc) => {
     return AppConfig.grades.ropes;
 };
 
-// TYPOGRAPHIC BADGES TO REPLACE EMOJIS
+// TYPOGRAPHIC BADGES
 const getStyleBadge = (style) => {
     const map = {
         'onsight': { text: 'OS', cls: 'badge-fl' },
@@ -249,16 +249,16 @@ const App = {
         }
     },
 
-    // CONTINUOUS SCRUBBER LOGIC (High Point + Fatigue)
+    // CONTINUOUS SCRUBBER LOGIC
     handleHPSlide: (e) => {
-        if (!App.isDraggingHP && e.type !== 'click' && e.type !== 'touchstart') return;
+        if (!App.isDraggingHP && e.type !== 'mousedown' && e.type !== 'touchstart') return;
         const track = document.getElementById('hp-track');
         const rect = track.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         let percent = (clientX - rect.left) / rect.width;
         percent = Math.max(0, Math.min(1, percent));
         let val = Math.round(percent * 100);
-        if (val === 100) val = 99; // 99% cap for incomplete routes
+        if (val === 100) val = 99; 
         
         if (Math.abs(val - State.activeHighPoint) >= 5 || val === 0 || val === 99) {
             if(Math.abs(val - State.activeHighPoint) >= 10) App.haptic(); 
@@ -269,7 +269,7 @@ const App = {
         }
     },
     handleFatigueSlide: (e) => {
-        if (!App.isDraggingFatigue && e.type !== 'click' && e.type !== 'touchstart') return;
+        if (!App.isDraggingFatigue && e.type !== 'mousedown' && e.type !== 'touchstart') return;
         const track = document.getElementById('fatigue-track');
         const rect = track.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -279,31 +279,29 @@ const App = {
         App.setModalFatigue(val);
     },
     initScrubber: () => {
-        // High Point
         const hpCont = document.getElementById('hp-track-container');
         if(hpCont) {
-            const startHP = (e) => { App.isDraggingHP = true; App.handleHPSlide(e); };
-            const endHP = () => { App.isDraggingHP = false; };
-            hpCont.addEventListener('mousedown', startHP);
-            document.addEventListener('mousemove', (e) => { if(App.isDraggingHP) App.handleHPSlide(e); });
-            document.addEventListener('mouseup', endHP);
-            hpCont.addEventListener('touchstart', startHP, {passive: true});
-            document.addEventListener('touchmove', (e) => { if(App.isDraggingHP) App.handleHPSlide(e); }, {passive: true});
-            document.addEventListener('touchend', endHP);
+            hpCont.addEventListener('mousedown', (e) => { App.isDraggingHP = true; App.handleHPSlide(e); });
+            hpCont.addEventListener('touchstart', (e) => { App.isDraggingHP = true; App.handleHPSlide(e); }, {passive: true});
         }
         
-        // Fatigue
         const fatCont = document.getElementById('fatigue-track-container');
         if(fatCont) {
-            const startFat = (e) => { App.isDraggingFatigue = true; App.handleFatigueSlide(e); };
-            const endFat = () => { App.isDraggingFatigue = false; };
-            fatCont.addEventListener('mousedown', startFat);
-            document.addEventListener('mousemove', (e) => { if(App.isDraggingFatigue) App.handleFatigueSlide(e); });
-            document.addEventListener('mouseup', endFat);
-            fatCont.addEventListener('touchstart', startFat, {passive: true});
-            document.addEventListener('touchmove', (e) => { if(App.isDraggingFatigue) App.handleFatigueSlide(e); }, {passive: true});
-            document.addEventListener('touchend', endFat);
+            fatCont.addEventListener('mousedown', (e) => { App.isDraggingFatigue = true; App.handleFatigueSlide(e); });
+            fatCont.addEventListener('touchstart', (e) => { App.isDraggingFatigue = true; App.handleFatigueSlide(e); }, {passive: true});
         }
+
+        document.addEventListener('mousemove', (e) => { 
+            if(App.isDraggingHP) App.handleHPSlide(e); 
+            if(App.isDraggingFatigue) App.handleFatigueSlide(e);
+        });
+        document.addEventListener('touchmove', (e) => { 
+            if(App.isDraggingHP) App.handleHPSlide(e); 
+            if(App.isDraggingFatigue) App.handleFatigueSlide(e);
+        }, {passive: true});
+
+        document.addEventListener('mouseup', () => { App.isDraggingHP = false; App.isDraggingFatigue = false; });
+        document.addEventListener('touchend', () => { App.isDraggingHP = false; App.isDraggingFatigue = false; });
     },
 
     updateSegmentedHighlight: (containerId, val) => {
@@ -353,10 +351,6 @@ const App = {
         }
         document.getElementById('sessionModal').classList.add('active');
     },
-    closeSessionModal: () => {
-        App.haptic();
-        document.getElementById('sessionModal').classList.remove('active');
-    },
     
     setModalFocus: (val, init = false) => {
         if(!init) App.haptic();
@@ -371,7 +365,6 @@ const App = {
         const strVal = String(val);
         const newVal = (!init && current === strVal) ? "" : strVal;
         
-        // Apply haptic tick if crossing a whole number
         if (!init && current !== newVal && newVal !== "") App.haptic();
         
         document.getElementById('modalFatigueVal').value = newVal;
@@ -413,7 +406,7 @@ const App = {
         
         State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: focus, Fatigue: fatigue, WarmUp: warmup, Notes: notes, _synced: false} : s);
         SyncManager.pushAll(State.sessions.filter(s => s._synced === false), []);
-        App.closeSessionModal();
+        document.getElementById('sessionModal').classList.remove('active');
     },
 
     validateForm: () => {
@@ -509,8 +502,7 @@ const App = {
         syncMulti('#holdsSelector', State.activeHolds);
         syncSingle('#chartToggle', State.chartMode);
 
-        // CONDITIONAL HIGH POINT UI
-        if (['worked', 'toprope'].includes(State.activeStyle)) {
+        if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
             document.getElementById('highPointContainer').classList.remove('hidden');
         } else {
             document.getElementById('highPointContainer').classList.add('hidden');
@@ -558,26 +550,7 @@ const App = {
                     maxColor = sConf.colors[mIdx] || '#fff';
                 } else if (maxSend.Type.includes('Rope')) maxColor = 'var(--primary)';
             }
-            
-            let domDisc = 'bg-mixed', domLabel = 'Mixed';
-            const allTypes = [...new Set(children.map(c => c.Type))];
-            if (allTypes.length === 1) {
-                const typeStr = allTypes[0];
-                domDisc = typeStr.includes('Bouldering') ? 'bg-boulder' : 'bg-rope';
-                const idx = AppConfig.disciplines.indexOf(typeStr);
-                domLabel = idx > -1 ? AppConfig.discLabels[idx] : 'Mixed';
-            } else {
-                const rC = children.filter(c => c.Type.includes('Rope')).length;
-                const bC = children.filter(c => c.Type.includes('Bouldering')).length;
-                if (bC > 0 && rC === 0) domDisc = 'bg-boulder';
-                else if (rC > 0 && bC === 0) domDisc = 'bg-rope';
-                
-                const isAllOut = children.every(c => c.Type.includes('Outdoor'));
-                if (isAllOut) domLabel = 'Out Mixed';
-                else if (children.every(c => c.Type.includes('Indoor'))) domLabel = 'In Mixed';
-            }
 
-            // FLATTENED LIST ENGINE WITH GHOST STATE & MICRO-BADGES
             const childrenHtml = children.map(l => {
                 const rawGrade = String(l.Grade || "");
                 const cleanGrade = getBaseGrade(rawGrade);
@@ -612,10 +585,10 @@ const App = {
             }).join('');
 
             return `
-            <div class="session-card ${domDisc}">
+            <div class="session-card">
                 <div class="session-header">
                     <div class="s-date-block"><div class="s-date-main">${dateInfo.main}</div><div class="s-date-sub">${dateInfo.sub}</div></div>
-                    <div class="s-loc">@ ${session.Location} &nbsp;&bull;&nbsp; <span style="color:#a3a3a3;">${domLabel}</span></div>
+                    <div class="s-loc">@ ${session.Location}</div>
                 </div>
                 <div class="s-tags-row">
                     <div class="s-tag ${session.Focus ? 'focus-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'focus')">${session.Focus ? 'Focus: '+session.Focus : '+ Focus'}</div>
@@ -642,7 +615,7 @@ const App = {
 
     renderDashboardCharts: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
-        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked' && l.Style !== 'toprope' && l.Style !== 'autobelay').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked' && l.Style !== 'toprope' && l.Style !== 'project' && l.Style !== 'autobelay').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
         const ctxCanvas = document.getElementById('progressChart');
         if (!window.Chart || viewLogs.length === 0) { ctxCanvas.style.display = 'none'; document.getElementById('noDataMsg').style.display = 'block'; return; }
         ctxCanvas.style.display = 'block'; document.getElementById('noDataMsg').style.display = 'none';
@@ -707,7 +680,7 @@ const App = {
 
     renderDashboardLogs: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
-        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked' && l.Style !== 'toprope' && l.Style !== 'autobelay').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay'].includes(l.Style)).map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
         
         document.getElementById('listToggleTop').className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
         document.getElementById('listToggleRecent').className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
@@ -786,9 +759,7 @@ const App = {
         
         if(State.activeStyle === 'flash') { s += State.discipline.includes('Rope') ? 10 : 17; } 
         else if (State.activeStyle === 'onsight') { s += 10; }
-        else if (State.activeStyle === 'worked') { s = 0; }
-        else if (State.activeStyle === 'toprope') { s = 0; }
-        else if (State.activeStyle === 'autobelay') { s = 0; }
+        else if (['worked', 'toprope', 'project', 'autobelay'].includes(State.activeStyle)) { s = 0; }
         
         const sessionID = isOut ? `${climbDateStr}_Outdoor` : `${climbDateStr}_${State.activeGym.replace(/[^a-zA-Z0-9\s]/g, '').trim()}`;
         
@@ -815,7 +786,7 @@ const App = {
             Notes: document.getElementById('input-notes').value.trim(), _synced: false 
         };
 
-        if (['worked', 'toprope'].includes(State.activeStyle)) {
+        if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
             climb.HighPoint = State.activeHighPoint;
         }
         
