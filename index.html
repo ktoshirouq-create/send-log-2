@@ -99,7 +99,7 @@
         .burn-btn:active { background: #333; transform: scale(0.95); }
         .burns-val { font-size: 1.25rem; font-weight: 800; color: #fff; width: 30px; text-align: center; }
 
-        /* V69 MICRO-BADGES & NESTED CARDS */
+        /* MICRO-BADGES & NESTED CARDS */
         .micro-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; font-weight: 800; vertical-align: middle; margin-right: 10px; letter-spacing: 0.5px; }
         .badge-fl { background: rgba(219,39,119,0.15); color: #db2777; }
         .badge-rp { background: rgba(16,185,129,0.15); color: #10b981; }
@@ -136,12 +136,11 @@
         .log-notes-box { margin-top: 16px; background: rgba(255,255,255,0.03); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; font-style: italic; color: #a3a3a3; line-height: 1.5; }
         .log-del-btn { width: 100%; margin-top: 20px; padding: 14px; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: none; border-radius: 10px; font-weight: 800; font-size: 0.85rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* V69 DIET SESSION CARDS */
-        .session-card { border-radius: var(--radius); margin-bottom: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.8); overflow: hidden; transition: 0.3s; border: 1px solid rgba(255,255,255,0.03); }
+        /* SESSION CARDS */
+        .session-card { background: linear-gradient(145deg, #0a140f, #050a08); border-radius: var(--radius); margin-bottom: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.8); overflow: hidden; transition: 0.3s; border: 1px solid rgba(255,255,255,0.03); }
         .session-header { padding: 20px 20px 12px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
         .s-date-block { display: flex; flex-direction: column; }
         .s-date-main { font-size: 1.25rem; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
-        .s-date-sub { font-size: 0.75rem; color: #888; font-weight: 700; text-transform: uppercase; margin-top: 4px; letter-spacing: 1px; }
         .s-loc { font-size: 0.8rem; color: #a3a3a3; font-weight: 700; background: rgba(0,0,0,0.4); padding: 8px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
         
         .s-tags-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 20px 16px 20px; }
@@ -186,10 +185,6 @@
 
         .empty-msg { color: #555; font-style: italic; font-size: 0.9rem; text-align: center; padding: 30px 0; font-weight: 500; }
         .flex { display: flex; gap: 12px; } .flex > div { flex: 1; } .hidden { display: none !important; }
-
-        .bg-boulder { background: linear-gradient(145deg, #0f1420, #080a10) !important; }
-        .bg-rope { background: linear-gradient(145deg, #0a140f, #050a08) !important; }
-        .bg-mixed { background: linear-gradient(145deg, #0f1420, #0a140f) !important; }
     </style>
 </head>
 <body>
@@ -248,7 +243,7 @@
             <textarea id="modalNotesVal" placeholder="How did the day feel?"></textarea>
 
             <div class="flex" style="margin-top: 24px; gap: 12px;">
-                <button class="btn-ghost" onclick="App.closeSessionModal()">Cancel</button>
+                <button class="btn-ghost" onclick="document.getElementById('sessionModal').classList.remove('active');">Cancel</button>
                 <button class="btn-main" style="margin-top: 0; padding: 14px;" onclick="App.saveSessionModal()">Save</button>
             </div>
         </div>
@@ -405,6 +400,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=69"></script>
+    <script src="app.js?v=71"></script>
 </body>
 </html>
