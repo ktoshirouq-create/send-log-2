@@ -388,11 +388,27 @@ const App = {
         const s = State.sessions.find(x => String(x.SessionID) === String(sessionId));
         if(!s) return;
         document.getElementById('modalSessionId').value = s.SessionID;
+        
+        // Hide all segments by default
         ['sec-focus', 'sec-fatigue', 'sec-warmup', 'sec-approach'].forEach(id => document.getElementById(id).classList.add('hidden'));
         
-        document.getElementById('modalTitle').classList.toggle('hidden', mode === 'approach' || mode === 'notes');
-        document.getElementById('sec-notes-label').classList.toggle('hidden', mode === 'approach');
-        document.getElementById('modalNotesVal').classList.toggle('hidden', mode === 'approach');
+        // Dynamic Titles
+        const titles = {
+            'focus': 'Session Focus',
+            'fatigue': 'Session Fatigue',
+            'warmup': 'Warm-up',
+            'approach': 'Approach',
+            'notes': 'Session Notes'
+        };
+        
+        const titleEl = document.getElementById('modalTitle');
+        titleEl.innerText = titles[mode] || 'Session Editor';
+        titleEl.classList.remove('hidden'); // Ensure title is visible for all
+
+        // Only show Notes textarea if specifically adding a note
+        const isNotes = mode === 'notes';
+        document.getElementById('sec-notes-label').classList.toggle('hidden', !isNotes);
+        document.getElementById('modalNotesVal').classList.toggle('hidden', !isNotes);
 
         document.getElementById('modalFocusVal').value = s.Focus || "";
         document.getElementById('modalFatigueVal').value = s.Fatigue || "";
@@ -415,6 +431,7 @@ const App = {
         } else if (mode === 'notes') {
             setTimeout(() => document.getElementById('modalNotesVal').focus(), 300);
         }
+        
         document.getElementById('sessionModal').classList.add('active');
     },
     
