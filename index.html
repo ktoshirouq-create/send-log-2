@@ -134,7 +134,12 @@
         .log-meta-val { font-size: 0.95rem; color: #fff; font-weight: 600; margin-top: 4px; text-transform: capitalize; }
         .log-entry.ghost .log-meta-val { color: #aaa; }
         .log-notes-box { margin-top: 16px; background: rgba(255,255,255,0.03); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; font-style: italic; color: #a3a3a3; line-height: 1.5; }
-        .log-del-btn { width: 100%; margin-top: 20px; padding: 14px; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: none; border-radius: 10px; font-weight: 800; font-size: 0.85rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; }
+        
+        /* EDIT UX */
+        .log-actions { display: flex; gap: 12px; margin-top: 20px; }
+        .log-edit-btn { flex: 1; padding: 14px; background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: none; border-radius: 10px; font-weight: 800; font-size: 0.85rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; }
+        .log-del-btn { flex: 1; padding: 14px; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: none; border-radius: 10px; font-weight: 800; font-size: 0.85rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; }
+        .log-edit-btn:active, .log-del-btn:active { filter: brightness(1.2); transform: scale(0.97); }
 
         /* SESSION CARDS */
         .session-card { background: linear-gradient(145deg, #0a140f, #050a08); border-radius: var(--radius); margin-bottom: 24px; box-shadow: 0 15px 35px rgba(0,0,0,0.8); overflow: hidden; transition: 0.3s; border: 1px solid rgba(255,255,255,0.03); }
@@ -149,6 +154,7 @@
         .s-tag.focus-tag { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: none; } 
         .s-tag.fatigue-tag { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: none; } 
         .s-tag.warmup-tag { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: none; } 
+        .s-tag.approach-tag { background: rgba(20, 184, 166, 0.15); color: #14b8a6; border: none; } 
         .s-tag.note-tag { background: rgba(255, 255, 255, 0.15); color: #fff; border: none; } 
         .s-tag.empty-tag { background: rgba(255,255,255,0.05); color: #737373; border: none; }
 
@@ -203,6 +209,7 @@
             <input type="hidden" id="modalFocusVal">
             <input type="hidden" id="modalFatigueVal">
             <input type="hidden" id="modalWarmUpVal">
+            <input type="hidden" id="modalApproachVal">
             
             <div id="sec-focus" class="hidden">
                 <div class="seg-ctrl" id="focus-segmented">
@@ -239,6 +246,15 @@
                 </div>
             </div>
             
+            <div id="sec-approach" class="hidden">
+                <div class="seg-ctrl" id="approach-segmented">
+                    <div class="seg-highlight"></div>
+                    <div class="seg-item" data-val="Roadside" onclick="App.setModalApproach('Roadside')">Roadside</div>
+                    <div class="seg-item" data-val="Moderate" onclick="App.setModalApproach('Moderate')">Moderate</div>
+                    <div class="seg-item" data-val="Brutal" onclick="App.setModalApproach('Brutal')">Brutal</div>
+                </div>
+            </div>
+
             <div class="sub-label" id="sec-notes-label">Session Summary</div>
             <textarea id="modalNotesVal" placeholder="How did the day feel?"></textarea>
 
@@ -400,6 +416,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=71"></script>
+    <script src="app.js?v=73"></script>
 </body>
 </html>
