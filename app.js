@@ -44,6 +44,7 @@ const getScaleConfig = (disc) => {
     return AppConfig.grades.ropes;
 };
 
+// TYPOGRAPHIC BADGES
 const getStyleBadge = (style) => {
     const map = {
         'onsight': { text: 'OS', cls: 'badge-fl' },
@@ -388,6 +389,11 @@ const App = {
         if(!s) return;
         document.getElementById('modalSessionId').value = s.SessionID;
         ['sec-focus', 'sec-fatigue', 'sec-warmup', 'sec-approach'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        
+        document.getElementById('modalTitle').classList.toggle('hidden', mode === 'approach' || mode === 'notes');
+        document.getElementById('sec-notes-label').classList.toggle('hidden', mode === 'approach');
+        document.getElementById('modalNotesVal').classList.toggle('hidden', mode === 'approach');
+
         document.getElementById('modalFocusVal').value = s.Focus || "";
         document.getElementById('modalFatigueVal').value = s.Fatigue || "";
         document.getElementById('modalWarmUpVal').value = s.WarmUp || "";
