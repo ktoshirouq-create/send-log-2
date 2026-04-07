@@ -74,6 +74,12 @@ const Dashboard = {
         if(row && details) { row.classList.toggle('expanded'); details.classList.toggle('active'); }
     },
 
+    editClimb: (id) => {
+        Dashboard.haptic();
+        localStorage.setItem('crag_edit_climb_id', id);
+        window.location.href = 'index.html';
+    },
+
     openArchetypeModal: () => {
         Dashboard.haptic();
         const archText = document.getElementById('id-arch').innerText;
@@ -164,6 +170,9 @@ const Dashboard = {
                             <div><div class="d-lbl">Session Focus</div><div class="d-val" style="color:#60a5fa;">${focus}</div></div>
                         </div>
                         ${cleanNotes ? `<div class="d-notes">"${cleanNotes}"</div>` : ''}
+                        <div class="log-actions" style="display:flex; gap:12px; margin-top:20px;">
+                            <button class="log-edit-btn" style="flex:1; padding:12px; background:rgba(59,130,246,0.1); color:#3b82f6; border:none; border-radius:8px; font-weight:700; cursor:pointer;" onclick="Dashboard.editClimb('${id}')">Edit Entry</button>
+                        </div>
                     </div>
                 </td>
             </tr>`;
