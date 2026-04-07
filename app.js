@@ -44,7 +44,6 @@ const getScaleConfig = (disc) => {
     return AppConfig.grades.ropes;
 };
 
-// TYPOGRAPHIC BADGES
 const getStyleBadge = (style) => {
     const map = {
         'onsight': { text: 'OS', cls: 'badge-fl' },
@@ -184,6 +183,7 @@ const App = {
     isSaving: false,
     isDraggingHP: false,
     isDraggingFatigue: false,
+    editingClimbId: null,
     
     init: () => {
         if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
@@ -193,6 +193,13 @@ const App = {
         App.renderUI();
         SyncManager.trigger(); 
         window.addEventListener('online', SyncManager.trigger);
+
+        // Check if Nerd Dashboard requested an edit
+        const pendingEditId = localStorage.getItem('crag_edit_climb_id');
+        if (pendingEditId) {
+            localStorage.removeItem('crag_edit_climb_id');
+            setTimeout(() => App.editClimb(pendingEditId), 300);
+        }
     },
     haptic: () => { if (navigator.vibrate) navigator.vibrate(40); },
     toast: (msg) => {
@@ -208,6 +215,56 @@ const App = {
             SyncManager.pushAll([], []); 
             App.toast("Deleted"); 
         } 
+    },
+    editClimb: (id) => {
+        App.haptic();
+        const climb = State.climbs.find(c => String(c.ClimbID) === String(id));
+        if (!climb) return;
+
+        State.view = 'log';
+        App.editingClimbId = id;
+        
+        State.discipline = climb.Type || 'Indoor Rope Climbing';
+        App.setDate('custom', climb.Date);
+        
+        if (climb.Type.includes('Outdoor')) {
+            const parts = (climb.Name || "").split(' @ ');
+            document.getElementById('input-name').value = parts[0] ? parts[0].trim() : '';
+            document.getElementById('input-crag').value = parts[1] ? parts[1].trim() : '';
+        } else {
+            State.activeGym = climb.Name || 'OKS';
+        }
+
+        const conf = getScaleConfig(State.discipline);
+        const cleanGrade = getBaseGrade(climb.Grade);
+        const gIdx = conf.labels.indexOf(cleanGrade);
+        State.activeGrade = gIdx > -1 ? { text: conf.labels[gIdx], score: conf.scores[gIdx] } : { text: conf.labels[0], score: conf.scores[0] };
+
+        State.activeStyle = climb.Style || 'quick';
+        State.activeBurns = climb.Burns || '-';
+        State.activeHighPoint = climb.HighPoint || 50;
+        
+        State.activeRPE = climb.Effort || 'Solid';
+        State.activeGradeFeel = climb.GradeFeel || '';
+        State.activeRating = Number(climb.Rating) || 0;
+        State.activeSteepness = climb.Angle ? climb.Angle.split(', ') : [];
+        State.activeClimbStyles = climb.ClimStyles ? climb.ClimStyles.split(', ') : [];
+        State.activeHolds = climb.Holds ? climb.Holds.split(', ') : [];
+        
+        document.getElementById('input-notes').value = climb.Notes || '';
+
+        const advContent = document.getElementById('advanced-content');
+        if (climb.Effort || climb.GradeFeel || climb.Rating || climb.Angle || climb.ClimStyles || climb.Holds || climb.Notes) {
+            advContent.classList.remove('hidden');
+            document.querySelector('.advanced-toggle').innerText = '- Hide Details';
+        }
+
+        const btn = document.getElementById('saveClimbBtn');
+        btn.innerText = 'Update Entry';
+        btn.style.background = '#3b82f6';
+        btn.style.color = '#fff';
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     },
     setDate: (type, val = null) => {
         App.haptic();
@@ -249,7 +306,6 @@ const App = {
         }
     },
 
-    // CONTINUOUS SCRUBBER LOGIC
     handleHPSlide: (e) => {
         if (!App.isDraggingHP && e.type !== 'mousedown' && e.type !== 'touchstart') return;
         const track = document.getElementById('hp-track');
@@ -331,10 +387,11 @@ const App = {
         const s = State.sessions.find(x => String(x.SessionID) === String(sessionId));
         if(!s) return;
         document.getElementById('modalSessionId').value = s.SessionID;
-        ['sec-focus', 'sec-fatigue', 'sec-warmup'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['sec-focus', 'sec-fatigue', 'sec-warmup', 'sec-approach'].forEach(id => document.getElementById(id).classList.add('hidden'));
         document.getElementById('modalFocusVal').value = s.Focus || "";
         document.getElementById('modalFatigueVal').value = s.Fatigue || "";
         document.getElementById('modalWarmUpVal').value = s.WarmUp || "";
+        document.getElementById('modalApproachVal').value = s.Approach || "";
         document.getElementById('modalNotesVal').value = s.Notes || "";
 
         if (mode === 'focus') {
@@ -346,6 +403,9 @@ const App = {
         } else if (mode === 'warmup') {
             document.getElementById('sec-warmup').classList.remove('hidden');
             App.setModalWarmUp(s.WarmUp || "", true);
+        } else if (mode === 'approach') {
+            document.getElementById('sec-approach').classList.remove('hidden');
+            App.setModalApproach(s.Approach || "", true);
         } else if (mode === 'notes') {
             setTimeout(() => document.getElementById('modalNotesVal').focus(), 300);
         }
@@ -358,6 +418,14 @@ const App = {
         const newVal = (!init && current === val) ? "" : val;
         document.getElementById('modalFocusVal').value = newVal;
         App.updateSegmentedHighlight('focus-segmented', newVal);
+    },
+
+    setModalApproach: (val, init = false) => {
+        if(!init) App.haptic();
+        const current = document.getElementById('modalApproachVal').value;
+        const newVal = (!init && current === val) ? "" : val;
+        document.getElementById('modalApproachVal').value = newVal;
+        App.updateSegmentedHighlight('approach-segmented', newVal);
     },
     
     setModalFatigue: (val, init = false) => {
@@ -402,9 +470,10 @@ const App = {
         const focus = document.getElementById('modalFocusVal').value;
         const fatigue = document.getElementById('modalFatigueVal').value;
         const warmup = document.getElementById('modalWarmUpVal').value;
+        const approach = document.getElementById('modalApproachVal').value;
         const notes = document.getElementById('modalNotesVal').value.trim();
         
-        State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: focus, Fatigue: fatigue, WarmUp: warmup, Notes: notes, _synced: false} : s);
+        State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: focus, Fatigue: fatigue, WarmUp: warmup, Approach: approach, Notes: notes, _synced: false} : s);
         SyncManager.pushAll(State.sessions.filter(s => s._synced === false), []);
         document.getElementById('sessionModal').classList.remove('active');
     },
@@ -419,10 +488,10 @@ const App = {
         const c = document.getElementById('input-crag').value.trim();
         if (isOut && (!n || !c)) {
             btn.disabled = true;
-            btn.innerText = 'Missing Route or Crag';
+            btn.innerText = App.editingClimbId ? 'Missing Route or Crag' : 'Missing Route or Crag';
         } else {
             btn.disabled = false;
-            btn.innerText = 'Save to Cloud';
+            btn.innerText = App.editingClimbId ? 'Update Entry' : 'Save to Cloud';
         }
     },
 
@@ -579,7 +648,10 @@ const App = {
                             ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
                         </div>
                         ${l.Notes ? `<div class="log-notes-box">"${l.Notes}"</div>` : ''}
-                        <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete Entry</button>
+                        <div class="log-actions">
+                            <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
+                            <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
+                        </div>
                     </div>
                 </div>`;
             }).join('');
@@ -594,6 +666,7 @@ const App = {
                     <div class="s-tag ${session.Focus ? 'focus-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'focus')">${session.Focus ? 'Focus: '+session.Focus : '+ Focus'}</div>
                     <div class="s-tag ${session.Fatigue ? 'fatigue-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">${session.Fatigue ? 'Fatigue: '+session.Fatigue : '+ Fatigue'}</div>
                     <div class="s-tag ${session.WarmUp ? 'warmup-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'warmup')">${session.WarmUp ? 'Warm-up: '+session.WarmUp : '+ Warm-up'}</div>
+                    <div class="s-tag ${session.Approach ? 'approach-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'approach')">${session.Approach ? 'Approach: '+session.Approach : '+ Approach'}</div>
                     <div class="s-tag ${session.Notes ? 'note-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'notes')">${session.Notes ? '📝 Note Added' : '+ Note'}</div>
                 </div>
                 
@@ -615,7 +688,7 @@ const App = {
 
     renderDashboardCharts: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
-        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && l.Style !== 'worked' && l.Style !== 'toprope' && l.Style !== 'project' && l.Style !== 'autobelay').map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay'].includes(l.Style)).map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
         const ctxCanvas = document.getElementById('progressChart');
         if (!window.Chart || viewLogs.length === 0) { ctxCanvas.style.display = 'none'; document.getElementById('noDataMsg').style.display = 'block'; return; }
         ctxCanvas.style.display = 'block'; document.getElementById('noDataMsg').style.display = 'none';
@@ -738,7 +811,10 @@ const App = {
                         ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
                     </div>
                     ${l.Notes ? `<div class="log-notes-box">"${l.Notes}"</div>` : ''}
-                    <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete Entry</button>
+                    <div class="log-actions">
+                        <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
+                        <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
+                    </div>
                 </div>
             </div>`;
         }).join('') + `</div>`;
@@ -765,7 +841,7 @@ const App = {
         
         let existingSession = State.sessions.find(s => s.SessionID === sessionID);
         if (!existingSession) {
-            const newS = { SessionID: sessionID, Date: climbDateStr, Location: isOut ? outC : State.activeGym, Focus: "", Fatigue: "", WarmUp: "", Notes: "", _synced: false };
+            const newS = { SessionID: sessionID, Date: climbDateStr, Location: isOut ? outC : State.activeGym, Focus: "", Fatigue: "", WarmUp: "", Approach: "", Notes: "", _synced: false };
             State.sessions = [newS, ...State.sessions];
         } else if (isOut) {
             let locs = existingSession.Location.split(' / ');
@@ -780,7 +856,8 @@ const App = {
         btn.disabled = true; btn.innerText = 'Saving...';
         
         const climb = { 
-            ClimbID: String(Date.now()), SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Grade: g, Score: s, Style: State.activeStyle, 
+            ClimbID: App.editingClimbId ? App.editingClimbId : String(Date.now()), 
+            SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Grade: g, Score: s, Style: State.activeStyle, 
             Burns: State.activeBurns === '-' ? '' : State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE, GradeFeel: State.activeGradeFeel,
             Rating: State.activeRating || "", Holds: State.activeHolds.join(', '), ClimStyles: State.activeClimbStyles.join(', '),
             Notes: document.getElementById('input-notes').value.trim(), _synced: false 
@@ -793,7 +870,12 @@ const App = {
         document.getElementById('input-notes').value = '';
         if (isOut) document.getElementById('input-name').value = '';
         
-        State.climbs = [climb, ...State.climbs]; 
+        if (App.editingClimbId) {
+            State.climbs = State.climbs.map(c => String(c.ClimbID) === String(App.editingClimbId) ? climb : c);
+        } else {
+            State.climbs = [climb, ...State.climbs]; 
+        }
+
         SyncManager.pushAll(State.sessions.filter(s => !s._synced), [climb]); 
         
         State.activeRating = 0; State.activeGradeFeel = ''; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
@@ -801,8 +883,15 @@ const App = {
         State.activeHighPoint = 50;
         
         setTimeout(() => {
-            btn.innerHTML = '✓ Saved!';
+            btn.innerHTML = App.editingClimbId ? '✓ Updated!' : '✓ Saved!';
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
+            
+            if (App.editingClimbId) {
+                App.editingClimbId = null;
+                btn.style.background = 'var(--primary)';
+                btn.style.color = '#000';
+            }
+
             setTimeout(() => { 
                 App.isSaving = false; 
                 App.validateForm(); 
