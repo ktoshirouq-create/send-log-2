@@ -116,21 +116,31 @@ const Dashboard = {
             <div id="insightModal" class="modal-overlay" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.9); z-index:3000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(8px); opacity:0; pointer-events:none; transition:0.3s;" onclick="if(event.target===this) this.classList.remove('active')">
                 <div class="modal-content" style="background:#121212; padding:30px; border-radius:16px; width:90%; max-width:400px; border:1px solid #1a1a1a; transform:translateY(20px); transition:0.3s; box-shadow:0 20px 50px rgba(0,0,0,0.8);">
                     <h2 id="insightTitle" style="color:#10b981; border:none; margin-bottom:15px; font-size:1.2rem; font-weight:800;">Insight</h2>
-                    <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0; font-family:'Inter',sans-serif;"></p>
+                    <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0; font-family:'Inter',sans-serif; white-space:pre-wrap;"></p>
                     <button style="background:#10b981; color:#000; border:none; padding:14px; width:100%; border-radius:14px; font-weight:800; font-size:1.05rem; cursor:pointer; margin-top:24px;" onclick="document.getElementById('insightModal').classList.remove('active'); Dashboard.haptic();">Got it</button>
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', modalHTML);
         }
 
+        // SCALPEL DOM INJECTION: Finds pure text nodes and injects inline without touching parent CSS
         const addIcon = (textMatches, type) => {
-            // FIX: Only target clean title headings, ignore large wrapper divs.
-            document.querySelectorAll('h2, h3, h4, .title').forEach(el => {
-                if (el.innerText.trim() === textMatches && !el.querySelector('.info-icon')) {
-                    // FIX: Instead of flexing the element and breaking layout, we append an inline span.
-                    el.innerHTML += ` <span class="info-icon" style="display:inline-block; margin-left:8px; color:#10b981; font-size:0.9rem; font-weight:800; cursor:pointer; background:rgba(16,185,129,0.15); border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px; vertical-align:middle;" onclick="Dashboard.showInsight('${type}')">ⓘ</span>`;
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.nodeValue.trim() === textMatches) {
+                    const parent = node.parentNode;
+                    if (!parent.querySelector(`.icon-${type}`)) {
+                        const icon = document.createElement('span');
+                        icon.className = `info-icon icon-${type}`;
+                        icon.style.cssText = 'display:inline-flex; align-items:center; justify-content:center; margin-left:8px; color:#10b981; font-size:0.85rem; font-weight:800; cursor:pointer; background:rgba(16,185,129,0.15); border-radius:50%; width:22px; height:22px; vertical-align:middle; line-height:1; transition:0.2s;';
+                        icon.innerHTML = 'i';
+                        icon.onclick = (e) => { e.stopPropagation(); Dashboard.showInsight(type); };
+                        
+                        parent.insertBefore(icon, node.nextSibling);
+                    }
                 }
-            });
+            }
         };
         addIcon('CNS PEAK OUTPUT TRACKER', 'cns');
         addIcon('CLIMBER PROFILE', 'profile');
@@ -533,16 +543,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        const chartContainer = document.getElementById('cnsLineChart').parentElement;
-        if (!document.getElementById('cnsLegend')) {
-            const legendDiv = document.createElement('div');
-            legendDiv.id = 'cnsLegend';
-            legendDiv.style.cssText = 'display:flex; justify-content:center; gap:20px; margin-bottom:15px; font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:1px;';
-            legendDiv.innerHTML = `
-                <div style="cursor:pointer; display:flex; align-items:center; gap:6px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(0, this)"><div style="width:10px; height:10px; border-radius:50%; background:#10b981;"></div> Peak Send</div>
-                <div style="cursor:pointer; display:flex; align-items:center; gap:6px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(1, this)"><div style="width:10px; height:10px; border-radius:4px; background:#333;"></div> Avg Fatigue</div>
-            `;
-            chartContainer.insertBefore(legendDiv, document.getElementById('cnsLineChart'));
+        const canvasElement = document.getElementById('cnsLineChart');
+        if (canvasElement) {
+            const chartWrapper = canvasElement.parentElement;
+            if (!document.getElementById('cnsLegend') && chartWrapper && chartWrapper.parentElement) {
+                const legendDiv = document.createElement('div');
+                legendDiv.id = 'cnsLegend';
+                legendDiv.style.cssText = 'display:flex; justify-content:center; gap:24px; width:100%; margin-bottom:16px; font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:1px;';
+                legendDiv.innerHTML = `
+                    <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(0, this)"><div style="width:12px; height:12px; border-radius:50%; background:#10b981;"></div> Peak Send</div>
+                    <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(1, this)"><div style="width:12px; height:12px; border-radius:4px; background:#333;"></div> Avg Fatigue</div>
+                `;
+                // SCALPEL INJECTION: Place it before the relative Chart wrapper, not inside it
+                chartWrapper.parentElement.insertBefore(legendDiv, chartWrapper);
+            }
         }
 
         let gL = document.getElementById('cnsLineChart').getContext('2d').createLinearGradient(0,0,0,250); 
@@ -560,7 +574,8 @@ document.addEventListener('DOMContentLoaded', () => {
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + ctx.raw.toFixed(1) + '/10' } } }, 
+                // TERNARY FIX: Don't divide empty data, just return the -/10 string
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + (ctx.raw > 0 ? ctx.raw.toFixed(1) + '/10' : '- / 10') } } }, 
                 scales: { 
                     y: { display: false, position: 'left' }, 
                     y1: { display: false, position: 'right', min: 0, max: 10 },
@@ -626,7 +641,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<div class="list-item"><div><div class="list-main">${cleanName}</div><div class="list-sub">${'★'.repeat(Number(getV(l, 'Rating')))}</div></div><div class="list-badge">${getBaseGrade(getV(l, 'Grade'))}</div></div>`
         }).join(''));
 
-        const limit = [...currentFilteredLogs].filter(l => String(getV(l, 'Effort')||"").includes('Limit') || String(getV(l, 'GradeFeel')||"").includes('Hard')).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
+        const limit = [...currentFilteredLogs].filter(l => String(getV(l, 'Effort')||"").includes('Limit')).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
         renderList('list-limit', limit.map(l => {
             const name = String(getV(l, 'Name') || "");
             const cleanName = escapeHTML(name ? name.split('@')[0].trim() : "Unknown");
