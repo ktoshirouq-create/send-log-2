@@ -77,8 +77,8 @@ const State = new Proxy({
     view: 'log', discipline: initDisc, 
     activeGrade: { text: initConf.labels[gIdx], score: initConf.scores[gIdx] },
     activeStyle: initStyle, activeBurns: '-', activeHighPoint: 50, activeDate: getLocalISO(), activeGym: initGym, chartMode: 'max', listMode: 'top10',
-    activeRPE: 'Solid', activeGradeFeel: '', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
-    activeTimeBucket: '', climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
+    activeRPE: 'Solid', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
+    climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
 }, {
     set(target, prop, value) {
         let oldVal = target[prop];
@@ -109,8 +109,8 @@ const State = new Proxy({
         } else {
             const softPaintTriggers = [
                 'activeGym', 'activeStyle', 'activeBurns', 'chartMode', 
-                'activeRPE', 'activeGradeFeel', 'activeRating', 'activeSteepness', 
-                'activeClimbStyles', 'activeHolds', 'activeTimeBucket', 'activeGrade'
+                'activeRPE', 'activeRating', 'activeSteepness', 
+                'activeClimbStyles', 'activeHolds', 'activeGrade'
             ];
             if (softPaintTriggers.includes(prop)) {
                 App.updateUISelections(); 
@@ -195,7 +195,6 @@ const App = {
         SyncManager.trigger(); 
         window.addEventListener('online', SyncManager.trigger);
 
-        // Check if Nerd Dashboard requested an edit
         const pendingEditId = localStorage.getItem('crag_edit_climb_id');
         if (pendingEditId) {
             localStorage.removeItem('crag_edit_climb_id');
@@ -206,6 +205,18 @@ const App = {
     toast: (msg) => {
         const t = document.getElementById('toast');
         if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
+    },
+    showInsight: (type) => {
+        App.haptic();
+        const copy = {
+            'capacity': { title: 'Working Capacity', desc: 'Your reliable baseline power. This is calculated by averaging the scores of your Top 10 hardest sends over the last 60 days. It filters out one-off lucky flashes to show the grade you can consistently crush.' },
+            'cns': { title: 'CNS Peak Output', desc: 'Tracks your maximum physical output (Peak Send) against your systemic tiredness (Average Session Fatigue) over the last 4 weeks. A rising fatigue bar with a dropping peak line is an early warning sign of overtraining.' },
+            'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' }
+        };
+        const modal = document.getElementById('insightModal');
+        document.getElementById('insightTitle').innerText = copy[type].title;
+        document.getElementById('insightDesc').innerText = copy[type].desc;
+        modal.classList.add('active');
     },
     deleteClimb: (id) => { 
         App.haptic(); 
@@ -246,7 +257,6 @@ const App = {
         State.activeHighPoint = climb.HighPoint || 50;
         
         State.activeRPE = climb.Effort || 'Solid';
-        State.activeGradeFeel = climb.GradeFeel || '';
         State.activeRating = Number(climb.Rating) || 0;
         State.activeSteepness = climb.Angle ? climb.Angle.split(', ') : [];
         State.activeClimbStyles = climb.ClimStyles ? climb.ClimStyles.split(', ') : [];
@@ -255,7 +265,7 @@ const App = {
         document.getElementById('input-notes').value = climb.Notes || '';
 
         const advContent = document.getElementById('advanced-content');
-        if (climb.Effort || climb.GradeFeel || climb.Rating || climb.Angle || climb.ClimStyles || climb.Holds || climb.Notes) {
+        if (climb.Effort || climb.Rating || climb.Angle || climb.ClimStyles || climb.Holds || climb.Notes) {
             advContent.classList.remove('hidden');
             document.querySelector('.advanced-toggle').innerText = '- Hide Details';
         }
@@ -279,7 +289,6 @@ const App = {
             customPill.innerText = `${AppConfig.months[parseInt(m)-1]} ${parseInt(d)}`;
         }
     },
-    setTimeBucket: (val) => { App.haptic(); State.activeTimeBucket = State.activeTimeBucket === val ? '' : val; },
     centerActivePills: () => {
         document.querySelectorAll('.pill-row').forEach(row => {
             const active = row.querySelector('.pill.active');
@@ -290,7 +299,6 @@ const App = {
         });
     },
     setRating: (num) => { App.haptic(); State.activeRating = State.activeRating === num ? 0 : num; },
-    toggleGradeFeel: (feel) => { App.haptic(); State.activeGradeFeel = State.activeGradeFeel === feel ? '' : feel; },
     toggleMulti: (category, val) => {
         App.haptic();
         if (category === 'style') State.activeClimbStyles = State.activeClimbStyles.includes(val) ? State.activeClimbStyles.filter(x => x !== val) : [...State.activeClimbStyles, val];
@@ -389,10 +397,8 @@ const App = {
         if(!s) return;
         document.getElementById('modalSessionId').value = s.SessionID;
         
-        // Hide all segments by default
         ['sec-focus', 'sec-fatigue', 'sec-warmup', 'sec-approach'].forEach(id => document.getElementById(id).classList.add('hidden'));
         
-        // Dynamic Titles
         const titles = {
             'focus': 'Session Focus',
             'fatigue': 'Session Fatigue',
@@ -403,9 +409,8 @@ const App = {
         
         const titleEl = document.getElementById('modalTitle');
         titleEl.innerText = titles[mode] || 'Session Editor';
-        titleEl.classList.remove('hidden'); // Ensure title is visible for all
+        titleEl.classList.remove('hidden');
 
-        // Only show Notes textarea if specifically adding a note
         const isNotes = mode === 'notes';
         document.getElementById('sec-notes-label').classList.toggle('hidden', !isNotes);
         document.getElementById('modalNotesVal').classList.toggle('hidden', !isNotes);
@@ -452,11 +457,10 @@ const App = {
     },
     
     setModalFatigue: (val, init = false) => {
-        const current = String(document.getElementById('modalFatigueVal').value);
         const strVal = String(val);
-        const newVal = (!init && current === strVal) ? "" : strVal;
+        const newVal = strVal; 
         
-        if (!init && current !== newVal && newVal !== "") App.haptic();
+        if (!init && newVal !== "") App.haptic();
         
         document.getElementById('modalFatigueVal').value = newVal;
         
@@ -464,7 +468,7 @@ const App = {
         const fill = document.getElementById('fatigue-fill');
         const thumb = document.getElementById('fatigue-thumb');
         
-        if (newVal === "") {
+        if (newVal === "" || newVal === "0") {
             out.innerText = "- / 10";
             out.style.color = "#737373";
             fill.style.width = "0%";
@@ -503,7 +507,6 @@ const App = {
 
     validateForm: () => {
         if (App.isSaving) return; 
-        
         const btn = document.getElementById('saveClimbBtn');
         if (!btn) return;
         const isOut = State.discipline.includes('Outdoor');
@@ -600,12 +603,6 @@ const App = {
             document.getElementById('highPointContainer').classList.add('hidden');
         }
 
-        ['morn', 'aft', 'eve'].forEach(id => {
-            const el = document.getElementById(`time-${id}`);
-            if (el) el.classList.toggle('active', State.activeTimeBucket === el.innerText);
-        });
-        document.getElementById('feel-soft').classList.toggle('active', State.activeGradeFeel === 'Soft');
-        document.getElementById('feel-hard').classList.toggle('active', State.activeGradeFeel === 'Hard');
         const stars = document.getElementById('starRating').children;
         for(let i=0; i<stars.length; i++) stars[i].className = i < State.activeRating ? 'active' : '';
         
@@ -765,6 +762,7 @@ const App = {
             data: { labels: cD.lbl, datasets: dSet },
             options: { 
                 responsive: true, maintainAspectRatio: false, 
+                interaction: { mode: 'index', intersect: false },
                 plugins: { legend: { display: false }, tooltip: { callbacks: { label: toolC } } }, 
                 scales: { 
                     y: { ticks: { callback: v => conf.labels[v] || "", font: { weight: '600' } }, grid: { display: false, drawBorder: false } }, 
@@ -881,7 +879,7 @@ const App = {
         const climb = { 
             ClimbID: App.editingClimbId ? App.editingClimbId : String(Date.now()), 
             SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Grade: g, Score: s, Style: State.activeStyle, 
-            Burns: State.activeBurns === '-' ? '' : State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE, GradeFeel: State.activeGradeFeel,
+            Burns: State.activeBurns === '-' ? '' : State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE,
             Rating: State.activeRating || "", Holds: State.activeHolds.join(', '), ClimStyles: State.activeClimbStyles.join(', '),
             Notes: document.getElementById('input-notes').value.trim(), _synced: false 
         };
@@ -901,7 +899,7 @@ const App = {
 
         SyncManager.pushAll(State.sessions.filter(s => !s._synced), [climb]); 
         
-        State.activeRating = 0; State.activeGradeFeel = ''; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
+        State.activeRating = 0; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
         State.activeBurns = ['flash', 'onsight', 'toprope', 'autobelay'].includes(State.activeStyle) ? 1 : (State.activeStyle === 'quick' ? 2 : '-');
         State.activeHighPoint = 50;
         
