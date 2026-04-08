@@ -181,7 +181,7 @@
 
         .xp-container { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px dashed var(--border); }
         .xp-row-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
-        .xp-title { font-size: 0.75rem; font-weight: 800; color: #737373; text-transform: uppercase; letter-spacing: 1.5px; }
+        .xp-title { font-size: 0.75rem; font-weight: 800; color: #737373; text-transform: uppercase; letter-spacing: 1.5px; display:flex; align-items:center; }
         .xp-percent { font-size: 1.3rem; font-weight: 800; color: #fff; line-height: 1; transition: 0.3s; letter-spacing: -0.5px; }
         .xp-row-bottom { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
         .xp-grade { font-size: 1.2rem; font-weight: 800; color: var(--primary); width: 40px; transition: 0.3s; }
@@ -191,6 +191,10 @@
 
         .empty-msg { color: #555; font-style: italic; font-size: 0.9rem; text-align: center; padding: 30px 0; font-weight: 500; }
         .flex { display: flex; gap: 12px; } .flex > div { flex: 1; } .hidden { display: none !important; }
+
+        /* V74 Insight Modal & Info Icons */
+        .info-icon { display:inline-block; margin-left:8px; color:var(--primary); font-size:0.9rem; font-weight:800; cursor:pointer; background:rgba(16,185,129,0.15); border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px; vertical-align:middle; transition:0.2s; }
+        .info-icon:active { transform:scale(0.9); }
     </style>
 </head>
 <body>
@@ -201,6 +205,14 @@
     </nav>
 
     <div id="toast" class="toast">Action Successful</div>
+
+    <div id="insightModal" class="modal-overlay" onclick="if(event.target===this) this.classList.remove('active')">
+        <div class="modal-content">
+            <h2 id="insightTitle" style="color:var(--primary); border:none; margin-bottom:15px; font-size:1.2rem;">Insight</h2>
+            <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0;"></p>
+            <button class="btn-main" style="margin-top:24px; padding:14px;" onclick="document.getElementById('insightModal').classList.remove('active'); App.haptic();">Got it</button>
+        </div>
+    </div>
 
     <div id="sessionModal" class="modal-overlay">
         <div class="modal-content">
@@ -218,7 +230,6 @@
                     <div class="seg-item" data-val="Endurance" onclick="App.setModalFocus('Endurance')">Endur.</div>
                     <div class="seg-item" data-val="Volume" onclick="App.setModalFocus('Volume')">Volume</div>
                     <div class="seg-item" data-val="Fun" onclick="App.setModalFocus('Fun')">Fun</div>
-                    <div class="seg-item" data-val="Mix" onclick="App.setModalFocus('Mix')">Mix</div>
                 </div>
             </div>
 
@@ -324,24 +335,10 @@
                     
                     <div id="advanced-content" class="hidden">
                         
-                        <label>Time of Day</label>
-                        <div class="pill-row" id="timeBucketSelector">
-                            <div class="pill" id="time-morn" onclick="App.setTimeBucket('Morning')">Morning</div>
-                            <div class="pill" id="time-aft" onclick="App.setTimeBucket('Afternoon')">Afternoon</div>
-                            <div class="pill" id="time-eve" onclick="App.setTimeBucket('Evening')">Evening</div>
-                        </div>
-
-                        <hr class="zone-divider">
-
-                        <div class="sub-label">My Effort</div>
+                        <div class="sub-label" style="margin-top:0;">My Effort</div>
                         <div class="pill-row" id="rpeSelector"></div>
-                        <div class="sub-label">The Grade</div>
-                        <div class="pill-row" id="gradeFeelSelector">
-                            <div class="pill" id="feel-soft" onclick="App.toggleGradeFeel('Soft')">Soft</div>
-                            <div class="pill" id="feel-hard" onclick="App.toggleGradeFeel('Hard')">Hard</div>
-                        </div>
                         
-                        <div class="sub-label">Route Rating</div>
+                        <div class="sub-label">Route Rating <span class="info-icon" onclick="App.showInsight('rating')">ⓘ</span></div>
                         <div class="star-rating" id="starRating">
                             <span onclick="App.setRating(1)">★</span>
                             <span onclick="App.setRating(2)">★</span>
@@ -401,7 +398,7 @@
                 
                 <div id="xpContainer" class="xp-container hidden">
                     <div class="xp-row-top">
-                        <div class="xp-title">Working Capacity</div>
+                        <div class="xp-title">Working Capacity <span class="info-icon" onclick="App.showInsight('capacity')">ⓘ</span></div>
                         <div class="xp-percent" id="xpPercent">0%</div>
                     </div>
                     <div class="xp-row-bottom">
@@ -416,6 +413,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=73"></script>
+    <script src="app.js?v=74"></script>
 </body>
 </html>
