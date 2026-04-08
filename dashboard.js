@@ -96,6 +96,58 @@ const Dashboard = {
         document.getElementById('archetypeModal').classList.remove('active');
     },
 
+    showInsight: (type) => {
+        Dashboard.haptic();
+        const copy = {
+            'cns': { title: 'CNS Peak Output', desc: 'Tracks your maximum physical output (Peak Send) against your systemic tiredness (Average Session Fatigue) over the last 4 weeks. A rising fatigue bar with a dropping peak line is an early warning sign of overtraining.' },
+            'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' }
+        };
+        const modal = document.getElementById('insightModal');
+        if(modal) {
+            document.getElementById('insightTitle').innerText = copy[type].title;
+            document.getElementById('insightDesc').innerText = copy[type].desc;
+            modal.classList.add('active');
+        }
+    },
+
+    setupInsights: () => {
+        if (!document.getElementById('insightModal')) {
+            const modalHTML = `
+            <div id="insightModal" class="modal-overlay" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.9); z-index:3000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(8px); opacity:0; pointer-events:none; transition:0.3s;" onclick="if(event.target===this) this.classList.remove('active')">
+                <div class="modal-content" style="background:#121212; padding:30px; border-radius:16px; width:90%; max-width:400px; border:1px solid #1a1a1a; transform:translateY(20px); transition:0.3s; box-shadow:0 20px 50px rgba(0,0,0,0.8);">
+                    <h2 id="insightTitle" style="color:#10b981; border:none; margin-bottom:15px; font-size:1.2rem; font-weight:800;">Insight</h2>
+                    <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0; font-family:'Inter',sans-serif;"></p>
+                    <button style="background:#10b981; color:#000; border:none; padding:14px; width:100%; border-radius:14px; font-weight:800; font-size:1.05rem; cursor:pointer; margin-top:24px;" onclick="document.getElementById('insightModal').classList.remove('active'); Dashboard.haptic();">Got it</button>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        }
+
+        const addIcon = (textMatches, type) => {
+            document.querySelectorAll('h2, h3, div').forEach(el => {
+                if (el.innerText.trim() === textMatches && !el.querySelector('.info-icon')) {
+                    el.style.display = 'flex';
+                    el.style.justifyContent = 'space-between';
+                    el.style.alignItems = 'center';
+                    el.innerHTML += `<span class="info-icon" style="color:#10b981; font-size:0.9rem; font-weight:800; cursor:pointer; background:rgba(16,185,129,0.15); border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px;" onclick="Dashboard.showInsight('${type}')">ⓘ</span>`;
+                }
+            });
+        };
+        addIcon('CNS PEAK OUTPUT TRACKER', 'cns');
+        addIcon('CLIMBER PROFILE', 'profile');
+    },
+
+    toggleDataset: (idx, el) => {
+        Dashboard.haptic();
+        if (!window.charts || !window.charts.line) return;
+        const chart = window.charts.line;
+        const meta = chart.getDatasetMeta(idx);
+        meta.hidden = meta.hidden === null ? true : null;
+        chart.update();
+        el.style.opacity = meta.hidden ? '0.4' : '1';
+        el.style.textDecoration = meta.hidden ? 'line-through' : 'none';
+    },
+
     renderLogbook: () => {
         const tbody = document.getElementById('masterLogbookBody');
         const q = document.getElementById('logSearch').value.toLowerCase();
@@ -191,6 +243,8 @@ const Dashboard = {
     }
 };
 
+window.charts = { radar: null, line: null, pyr: null };
+
 document.addEventListener('DOMContentLoaded', () => {
     if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
 
@@ -208,7 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let activeDisc = 'All';
     let activeTime = '90'; 
-    let charts = { radar: null, line: null, pyr: null };
     
     const getScaleConfig = (disc) => {
         if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
@@ -311,6 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     function renderDashboard() {
+        Dashboard.setupInsights();
         const now = new Date();
         
         const allTimeLogsFiltered = allLogs.filter(l => {
@@ -414,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('id-day').innerText = topDay;
         document.getElementById('id-env').innerText = envLabel;
 
-        Object.values(charts).forEach(c => { if(c) c.destroy(); });
+        Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
 
         const pyrCard = document.getElementById('pyramidCard');
         const pyrCanvas = document.getElementById('pyramidChart');
@@ -432,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
             });
 
-            charts.pyr = new Chart(pyrCanvas, {
+            window.charts.pyr = new Chart(pyrCanvas, {
                 type: 'bar',
                 data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
                 options: { 
@@ -480,10 +534,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        const chartContainer = document.getElementById('cnsLineChart').parentElement;
+        if (!document.getElementById('cnsLegend')) {
+            const legendDiv = document.createElement('div');
+            legendDiv.id = 'cnsLegend';
+            legendDiv.style.cssText = 'display:flex; justify-content:center; gap:20px; margin-bottom:15px; font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:1px;';
+            legendDiv.innerHTML = `
+                <div style="cursor:pointer; display:flex; align-items:center; gap:6px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(0, this)"><div style="width:10px; height:10px; border-radius:50%; background:#10b981;"></div> Peak Send</div>
+                <div style="cursor:pointer; display:flex; align-items:center; gap:6px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(1, this)"><div style="width:10px; height:10px; border-radius:4px; background:#333;"></div> Avg Fatigue</div>
+            `;
+            chartContainer.insertBefore(legendDiv, document.getElementById('cnsLineChart'));
+        }
+
         let gL = document.getElementById('cnsLineChart').getContext('2d').createLinearGradient(0,0,0,250); 
         gL.addColorStop(0, 'rgba(16, 185, 129, 0.4)'); gL.addColorStop(1, 'transparent');
         
-        charts.line = new Chart(document.getElementById('cnsLineChart'), {
+        window.charts.line = new Chart(document.getElementById('cnsLineChart'), {
             type: 'line', 
             data: { 
                 labels: cnsData.labels, 
@@ -493,7 +559,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 ] 
             },
             options: { 
-                responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + ctx.raw.toFixed(1) + '/10' } } }, 
+                responsive: true, maintainAspectRatio: false, 
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + ctx.raw.toFixed(1) + '/10' } } }, 
                 scales: { 
                     y: { display: false, position: 'left' }, 
                     y1: { display: false, position: 'right', min: 0, max: 10 },
@@ -519,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const radarLabels = Object.keys(currAttr).map(k => [k.toUpperCase(), currAttr[k].toString()]);
 
-        charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
+        window.charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
             type: 'radar', 
             data: { 
                 labels: radarLabels, 
