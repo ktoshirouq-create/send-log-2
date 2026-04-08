@@ -217,6 +217,7 @@ const App = {
         const modal = document.getElementById('insightModal');
         if(copy[type]) {
             document.getElementById('insightTitle').innerText = copy[type].title;
+            document.getElementById('insightDesc').style.whiteSpace = 'pre-wrap';
             document.getElementById('insightDesc').innerText = copy[type].desc;
             modal.classList.add('active');
         }
