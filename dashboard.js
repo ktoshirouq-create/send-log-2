@@ -103,7 +103,7 @@ const Dashboard = {
             'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' }
         };
         const modal = document.getElementById('insightModal');
-        if(modal) {
+        if(modal && copy[type]) {
             document.getElementById('insightTitle').innerText = copy[type].title;
             document.getElementById('insightDesc').innerText = copy[type].desc;
             modal.classList.add('active');
@@ -124,12 +124,11 @@ const Dashboard = {
         }
 
         const addIcon = (textMatches, type) => {
-            document.querySelectorAll('h2, h3, div').forEach(el => {
+            // FIX: Only target clean title headings, ignore large wrapper divs.
+            document.querySelectorAll('h2, h3, h4, .title').forEach(el => {
                 if (el.innerText.trim() === textMatches && !el.querySelector('.info-icon')) {
-                    el.style.display = 'flex';
-                    el.style.justifyContent = 'space-between';
-                    el.style.alignItems = 'center';
-                    el.innerHTML += `<span class="info-icon" style="color:#10b981; font-size:0.9rem; font-weight:800; cursor:pointer; background:rgba(16,185,129,0.15); border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px;" onclick="Dashboard.showInsight('${type}')">ⓘ</span>`;
+                    // FIX: Instead of flexing the element and breaking layout, we append an inline span.
+                    el.innerHTML += ` <span class="info-icon" style="display:inline-block; margin-left:8px; color:#10b981; font-size:0.9rem; font-weight:800; cursor:pointer; background:rgba(16,185,129,0.15); border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px; vertical-align:middle;" onclick="Dashboard.showInsight('${type}')">ⓘ</span>`;
                 }
             });
         };
