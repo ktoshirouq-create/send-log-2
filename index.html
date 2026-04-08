@@ -192,7 +192,6 @@
         .empty-msg { color: #555; font-style: italic; font-size: 0.9rem; text-align: center; padding: 30px 0; font-weight: 500; }
         .flex { display: flex; gap: 12px; } .flex > div { flex: 1; } .hidden { display: none !important; }
 
-        /* V74 Insight Modal & Info Icons */
         .info-icon { display:inline-block; margin-left:8px; color:var(--primary); font-size:0.9rem; font-weight:800; cursor:pointer; background:rgba(16,185,129,0.15); border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px; vertical-align:middle; transition:0.2s; }
         .info-icon:active { transform:scale(0.9); }
     </style>
@@ -209,7 +208,7 @@
     <div id="insightModal" class="modal-overlay" onclick="if(event.target===this) this.classList.remove('active')">
         <div class="modal-content">
             <h2 id="insightTitle" style="color:var(--primary); border:none; margin-bottom:15px; font-size:1.2rem;">Insight</h2>
-            <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0;"></p>
+            <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0; white-space:pre-wrap;"></p>
             <button class="btn-main" style="margin-top:24px; padding:14px;" onclick="document.getElementById('insightModal').classList.remove('active'); App.haptic();">Got it</button>
         </div>
     </div>
@@ -413,6 +412,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=74"></script>
+    <script src="app.js?v=75"></script>
 </body>
 </html>
