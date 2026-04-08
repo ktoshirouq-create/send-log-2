@@ -211,12 +211,15 @@ const App = {
         const copy = {
             'capacity': { title: 'Working Capacity', desc: 'Your reliable baseline power. This is calculated by averaging the scores of your Top 10 hardest sends over the last 60 days. It filters out one-off lucky flashes to show the grade you can consistently crush.' },
             'cns': { title: 'CNS Peak Output', desc: 'Tracks your maximum physical output (Peak Send) against your systemic tiredness (Average Session Fatigue) over the last 4 weeks. A rising fatigue bar with a dropping peak line is an early warning sign of overtraining.' },
-            'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' }
+            'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' },
+            'rating': { title: 'Route Rating', desc: '1★: Tweaky or Trash.\n2★: Filler or Warm-up.\n3★: Solid Baseline Route.\n4★: Excellent / Flowy.\n5★: Masterpiece / Classic.' }
         };
         const modal = document.getElementById('insightModal');
-        document.getElementById('insightTitle').innerText = copy[type].title;
-        document.getElementById('insightDesc').innerText = copy[type].desc;
-        modal.classList.add('active');
+        if(copy[type]) {
+            document.getElementById('insightTitle').innerText = copy[type].title;
+            document.getElementById('insightDesc').innerText = copy[type].desc;
+            modal.classList.add('active');
+        }
     },
     deleteClimb: (id) => { 
         App.haptic(); 
