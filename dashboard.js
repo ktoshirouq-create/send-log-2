@@ -3,8 +3,8 @@ const AppConfig = {
     gyms: ["OKS", "Torshov", "Løkka", "Bryn", "Gneiss", "Other"],
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'],
-    styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked' },
+    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering', 'Outdoor Multipitch'],
+    styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     grades: {
         ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
@@ -105,7 +105,8 @@ const Dashboard = {
         const modal = document.getElementById('insightModal');
         if(modal && copy[type]) {
             document.getElementById('insightTitle').innerText = copy[type].title;
-            document.getElementById('insightDesc').innerText = copy[type].desc;
+            // Using innerHTML to ensure any injected breaks format properly
+            document.getElementById('insightDesc').innerHTML = copy[type].desc;
             modal.classList.add('active');
         }
     },
@@ -116,7 +117,7 @@ const Dashboard = {
             <div id="insightModal" class="modal-overlay" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.9); z-index:3000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(8px); opacity:0; pointer-events:none; transition:0.3s;" onclick="if(event.target===this) this.classList.remove('active')">
                 <div class="modal-content" style="background:#121212; padding:30px; border-radius:16px; width:90%; max-width:400px; border:1px solid #1a1a1a; transform:translateY(20px); transition:0.3s; box-shadow:0 20px 50px rgba(0,0,0,0.8);">
                     <h2 id="insightTitle" style="color:#10b981; border:none; margin-bottom:15px; font-size:1.2rem; font-weight:800;">Insight</h2>
-                    <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0; font-family:'Inter',sans-serif; white-space:pre-wrap;"></p>
+                    <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0; font-family:'Inter',sans-serif;"></p>
                     <button style="background:#10b981; color:#000; border:none; padding:14px; width:100%; border-radius:14px; font-weight:800; font-size:1.05rem; cursor:pointer; margin-top:24px;" onclick="document.getElementById('insightModal').classList.remove('active'); Dashboard.haptic();">Got it</button>
                 </div>
             </div>`;
@@ -203,6 +204,7 @@ const Dashboard = {
             else if (type === 'Indoor Bouldering') dotColor = '#3b82f6';
             else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316';
             else if (type === 'Outdoor Bouldering') dotColor = '#a855f7';
+            else if (type === 'Outdoor Multipitch') dotColor = '#ef4444';
             
             const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
             
@@ -229,6 +231,10 @@ const Dashboard = {
                             <div><div class="d-lbl">RPE (Effort)</div><div class="d-val">${getV(l, 'Effort') || '-'}</div></div>
                             <div><div class="d-lbl">Session Fatigue</div><div class="d-val" style="color:#fb923c;">${fatigue}</div></div>
                             <div><div class="d-lbl">Session Focus</div><div class="d-val" style="color:#60a5fa;">${focus}</div></div>
+                            ${getV(l, 'Pitches') ? `<div><div class="d-lbl">Pitches</div><div class="d-val">${getV(l, 'Pitches')}</div></div>` : ''}
+                            ${getV(l, 'GearStyle') ? `<div><div class="d-lbl">Gear Style</div><div class="d-val">${getV(l, 'GearStyle')}</div></div>` : ''}
+                            ${getV(l, 'PackWeight') ? `<div><div class="d-lbl">Pack Weight</div><div class="d-val">${getV(l, 'PackWeight')}</div></div>` : ''}
+                            ${getV(l, 'PitchBreakdown') ? `<div class="d-notes" style="grid-column: span 3;">Pitches: ${getV(l, 'PitchBreakdown')}</div>` : ''}
                         </div>
                         ${cleanNotes ? `<div class="d-notes">"${cleanNotes}"</div>` : ''}
                         <div class="log-actions" style="display:flex; gap:12px; margin-top:20px;">
@@ -338,6 +344,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const type = String(getV(l, 'Type') || "");
             const isOutdoor = type.toLowerCase().includes('outdoor');
             const score = Number(getV(l, 'Score')) || 0;
+            
+            const pitches = Number(getV(l, 'Pitches')) || 1;
+            const gear = String(getV(l, 'GearStyle') || "");
+            const pack = String(getV(l, 'PackWeight') || "");
 
             if (angle.includes('Overhang') || angle.includes('Roof')) attr.Power += 2;
             if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
@@ -365,6 +375,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (styleResult === 'project' || styleResult === 'worked') attr.Tenacity += 3;
             if (burns >= 3) attr.Tenacity += 1;
             if (burns >= 5) attr.Tenacity += 2;
+            
+            if (type === 'Outdoor Multipitch') {
+                attr.Endurance += pitches;
+                if (pack === 'Heavy' || pack === 'Training Weight') attr.Tenacity += 3;
+                if (gear === 'Trad' || gear === 'Mixed') attr.Headspace += 4;
+            }
         });
         
         const maxVal = Math.max(...Object.values(attr), 1);
@@ -403,7 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentFilteredLogs.forEach(l => { 
             const s = Number(getV(l, 'Score'));
             const style = String(getV(l, 'Style') || "").toLowerCase();
-            const isSend = s && style !== 'worked' && style !== 'toprope' && style !== 'autobelay';
+            const isSend = s && style !== 'worked' && style !== 'toprope' && style !== 'autobelay' && style !== 'bailed';
             const gradeStr = String(getV(l, 'Grade') || "");
             const typeStr = String(getV(l, 'Type') || "").toLowerCase();
             const dateStr = getV(l, 'Date');
@@ -509,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        const sortedCNS = [...currentFilteredLogs].filter(l => getV(l, 'Score') && getV(l, 'Style') !== 'worked' && getV(l, 'Style') !== 'toprope' && getV(l, 'Style') !== 'autobelay').sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date')));
+        const sortedCNS = [...currentFilteredLogs].filter(l => getV(l, 'Score') && !['worked', 'toprope', 'autobelay', 'bailed'].includes(String(getV(l, 'Style')))).sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date')));
         const cnsData = { labels: ['W4', 'W3', 'W2', 'W1'], peak: [null, null, null, null], grades: ['-','-','-','-'], fatigue: [0,0,0,0] };
         const weekBins = [[],[],[],[]]; 
         const sessionBins = [[],[],[],[]];
@@ -554,7 +570,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(0, this)"><div style="width:12px; height:12px; border-radius:50%; background:#10b981;"></div> Peak Send</div>
                     <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(1, this)"><div style="width:12px; height:12px; border-radius:4px; background:#333;"></div> Avg Fatigue</div>
                 `;
-                // SCALPEL INJECTION: Place it before the relative Chart wrapper, not inside it
                 chartWrapper.parentElement.insertBefore(legendDiv, chartWrapper);
             }
         }
@@ -574,7 +589,6 @@ document.addEventListener('DOMContentLoaded', () => {
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 interaction: { mode: 'index', intersect: false },
-                // TERNARY FIX: Don't divide empty data, just return the -/10 string
                 plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + (ctx.raw > 0 ? ctx.raw.toFixed(1) + '/10' : '- / 10') } } }, 
                 scales: { 
                     y: { display: false, position: 'left' }, 
