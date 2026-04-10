@@ -300,11 +300,29 @@
                         </div>
                     </div>
                     
-                    <label>Grade</label>
+                    <label id="gradeLabel">Grade</label>
                     <div id="gradePicker" class="pill-row"></div>
 
                     <label>Style / Result</label>
                     <div class="pill-row" id="styleSelector"></div>
+                    
+                    <div id="multipitch-container" class="hidden" style="margin-top: 15px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+                        <label style="margin-top:0;">Total Pitches</label>
+                        <div class="burns-counter" style="margin-bottom: 20px;">
+                            <button class="burn-btn" onclick="App.adjPitches(-1)">-</button>
+                            <span id="pitches-val" class="burns-val">2</span>
+                            <button class="burn-btn" onclick="App.adjPitches(1)">+</button>
+                        </div>
+                        
+                        <label>Gear Style</label>
+                        <div class="pill-row" id="gearStyleSelector"></div>
+                        
+                        <label>Pack Weight</label>
+                        <div class="pill-row" id="packWeightSelector"></div>
+                        
+                        <label>Pitch Breakdown (Optional)</label>
+                        <input type="text" id="input-pitch-breakdown" placeholder="e.g. 5a, 5c, 6b+ crux, 6a" oninput="App.validateForm()">
+                    </div>
                     
                     <div id="highPointContainer" class="hidden" style="margin-top: 15px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
                         <div class="slider-header">
@@ -412,6 +430,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=75"></script>
+    <script src="app.js?v=76"></script>
 </body>
 </html>
