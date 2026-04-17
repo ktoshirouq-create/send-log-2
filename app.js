@@ -24,8 +24,8 @@ const AppConfig = {
         5: "Masterpiece / Classic"
     },
     grades: {
-        ropesIn: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
-        ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800], colors: [] },
+        ropesIn: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
+        ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
@@ -108,7 +108,7 @@ const State = new Proxy({
             const conf = getScaleConfig(value);
             const isOutdoor = value.includes('Outdoor') || value.includes('Multipitch');
             
-            // Vulnerability 2 Patch: Prevent Out of Bounds UI Crash
+            // Vulnerability Patch: Prevent Out of Bounds UI Crash
             if (!conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
                 target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
             }
@@ -147,7 +147,7 @@ const State = new Proxy({
             ];
             if (softPaintTriggers.includes(prop)) {
                 App.updateUISelections(); 
-                if (prop === 'chartMode' && target.view === 'dash') App.renderDashboardHUD();
+                // Removed renderDashboardHUD trigger as HUD is strictly in dashboard.js
             }
         }
 
@@ -222,105 +222,6 @@ const SyncManager = {
                 deletedSessions = []; localStorage.setItem('crag_deleted_sessions', '[]');
             }
         } catch (error) {}
-    }
-};
-
-// ==========================================
-// SPORTS SCIENCE ENGINE (ACWR)
-// ==========================================
-const ReadinessEngine = {
-    cleanseData: (sessions) => {
-        // Ghost Session Sweeper: Only consider sessions with actual climbs logged
-        return sessions.filter(session => State.climbs.some(c => String(c.SessionID) === String(session.SessionID)));
-    },
-    getHistoricalAverageFatigue: (sessions) => {
-        const fScores = sessions.filter(s => s.Fatigue && s.Fatigue !== "0").map(s => Number(s.Fatigue));
-        if (fScores.length === 0) return 5;
-        return fScores.reduce((a, b) => a + b, 0) / fScores.length;
-    },
-    calculateDailyLoad: (targetDate, validSessions) => {
-        const daySessions = validSessions.filter(s => getCleanDate(s.Date) === targetDate);
-        if (daySessions.length === 0) return { load: 0, missingFatigue: false };
-
-        let totalVolume = 0;
-        let maxFatigue = 0;
-        let missingFatigue = false;
-        const avgFatigue = ReadinessEngine.getHistoricalAverageFatigue(validSessions);
-
-        daySessions.forEach(session => {
-            if (!session.Fatigue || session.Fatigue === "0") missingFatigue = true;
-            let sessionFatigue = (session.Fatigue && session.Fatigue !== "0") ? Number(session.Fatigue) : avgFatigue;
-            
-            // Double-Header Patch: Highest daily fatigue, not sum
-            if (sessionFatigue > maxFatigue) maxFatigue = sessionFatigue;
-
-            const sessionClimbs = State.climbs.filter(c => String(c.SessionID) === String(session.SessionID));
-            sessionClimbs.forEach(climb => {
-                const conf = getScaleConfig(climb.Type);
-                const cleanGrade = getBaseGrade(climb.Grade);
-                const gradeIdx = conf.labels.indexOf(cleanGrade);
-                const baseXP = gradeIdx > -1 ? conf.scores[gradeIdx] : 0;
-                const pitches = climb.Pitches ? Number(climb.Pitches) : 1;
-                
-                // Projecting XP Math Patch
-                if (['Project', 'Worked', 'project', 'worked'].includes(climb.Style)) {
-                    let hpFactor = climb.HighPoint ? (Number(climb.HighPoint) / 100) : 0.5;
-                    let burns = (climb.Burns && climb.Burns !== '-') ? Number(climb.Burns) : 1;
-                    totalVolume += (baseXP * hpFactor * burns) * pitches;
-                } else {
-                    totalVolume += Number(climb.Score) * pitches;
-                }
-            });
-        });
-
-        return { load: totalVolume * maxFatigue, missingFatigue };
-    },
-    generateACWR: () => {
-        const validSessions = ReadinessEngine.cleanseData(State.sessions);
-        let acuteLoad = 0; 
-        let chronicLoad = 0;
-        let blockedByAcuteFatigue = false;
-
-        const today = new Date();
-        today.setHours(0,0,0,0);
-
-        for (let i = 0; i < 28; i++) {
-            let targetDate = new Date(today);
-            targetDate.setDate(targetDate.getDate() - i);
-            let dateString = getLocalISO(targetDate);
-            
-            let { load, missingFatigue } = ReadinessEngine.calculateDailyLoad(dateString, validSessions);
-            
-            if (i < 7) {
-                acuteLoad += load;
-                // Forgiveness Patch: Only block if missing fatigue in acute window
-                if (missingFatigue) blockedByAcuteFatigue = true;
-            }
-            chronicLoad += load;
-        }
-
-        if (blockedByAcuteFatigue) {
-            return { status: 'LOCKED', percent: '- %', ratio: '---', color: '#737373', msg: "⚠️ Missing Session Fatigue. Update recent logs in Journal to unlock Readiness Score." };
-        }
-
-        chronicLoad = chronicLoad / 4;
-
-        // Minimum Base Threshold Patch
-        if (chronicLoad < 2000) {
-            return { status: 'CALIBRATING', percent: '...', ratio: '---', color: '#3b82f6', msg: "Building Base: Volume too low for accurate ACWR. Focus on steady accumulation." };
-        }
-
-        const ratioNum = acuteLoad / chronicLoad;
-        const ratio = ratioNum.toFixed(2);
-
-        if (ratioNum > 1.5) return { status: 'DANGER', percent: '30%', color: '#ff1744', ratio: ratio + 'x', msg: "Overtraining risk. High injury probability. Strict rest recommended." };
-        if (ratioNum > 1.3) return { status: 'WARNING', percent: '55%', color: '#ffc107', ratio: ratio + 'x', msg: "High systemic load. Focus on volume, avoid limit projecting." };
-        
-        // Rest Day Phantom Drop Logic
-        if (ratioNum < 0.8 && acuteLoad < 1000) return { status: 'PRIME', percent: '100%', color: '#00e5ff', ratio: ratio + 'x', msg: "Fully Recovered. Prime for Limit Effort." };
-        if (ratioNum < 0.8) return { status: 'UNDER', percent: '75%', color: '#ffc107', ratio: ratio + 'x', msg: "Undertraining detected. Increase training stimulus." };
-        
-        return { status: 'OPTIMAL', percent: '85%', color: '#00e5ff', ratio: ratio + 'x', msg: "Balanced training. Optimal zone for power generation." };
     }
 };
 
@@ -777,7 +678,6 @@ const App = {
         const cSS = document.getElementById('climbStyleSelector'); if(cSS) cSS.innerHTML = AppConfig.climbStyles.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('style', '${s}')">${s}</div>`).join('');
         const hS = document.getElementById('holdsSelector'); if(hS) hS.innerHTML = AppConfig.holds.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" data-val="${h}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join('');
         
-        // Execute dead charts. chartToggle visually hidden in updateUISelections, but keeping standard logic safe here.
         App.updateUISelections(); 
         App.validateForm();
         if (State.view === 'dash') App.renderDashboard();
@@ -950,88 +850,16 @@ const App = {
     },
     
     renderDashboard: () => { 
-        App.renderDashboardHUD(); 
-        App.renderDashboardLogs(); 
-    },
-
-    renderDashboardHUD: () => {
-        // Execute dead charts
+        // Execute dead charts on the main screen so they stay hidden
         const ctxCanvas = document.getElementById('progressChart');
         if (ctxCanvas) ctxCanvas.style.display = 'none';
         const chartTog = document.getElementById('chartToggle');
         if (chartTog) chartTog.style.display = 'none';
+        const noDataMsg = document.getElementById('noDataMsg');
+        if (noDataMsg) noDataMsg.style.display = 'none';
 
-        const acwr = ReadinessEngine.generateACWR();
-        
-        let hudContainer = document.getElementById('readiness-hud-wrapper');
-        if (!hudContainer) {
-            hudContainer = document.createElement('div');
-            hudContainer.id = 'readiness-hud-wrapper';
-            
-            // HUD CSS Boundary Lock to prevent bleeding
-            hudContainer.style.position = 'relative';
-            hudContainer.style.overflow = 'hidden';
-            hudContainer.style.width = '100%';
-
-            const dashContent = document.getElementById('view-dash');
-            
-            // Re-order Layout: Try to insert after Vital Stats
-            const vitalStats = dashContent ? (dashContent.querySelector('.vital-stats-grid') || dashContent.querySelector('.stats-grid') || dashContent.querySelector('.stats-row') || dashContent.querySelector('.dashboard-stats')) : null;
-
-            if (vitalStats && vitalStats.nextSibling) {
-                vitalStats.parentNode.insertBefore(hudContainer, vitalStats.nextSibling);
-            } else if (dashContent) {
-                // Fallback: Insert just before the Climber Identity section if Vital Stats class is unknown
-                const identityHeader = Array.from(dashContent.querySelectorAll('div, span, h3')).find(el => el.innerText && el.innerText.includes('CLIMBER IDENTITY'));
-                if (identityHeader) {
-                    dashContent.insertBefore(hudContainer, identityHeader);
-                } else {
-                    dashContent.insertBefore(hudContainer, dashContent.firstChild); // Absolute fallback
-                }
-            }
-        }
-
-        const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
-        const todayStr = new Date().toLocaleDateString('en-US', dateOptions).toUpperCase();
-
-        hudContainer.innerHTML = `
-        <div class="section-header hud-header" style="display: flex; justify-content: space-between; align-items: center; margin: 24px 0 12px 0; border-bottom: 1px solid #222; padding-bottom: 8px;">
-            <span style="font-size: 0.75rem; color: #888; letter-spacing: 1px; text-transform: uppercase;">TODAY'S READINESS</span>
-            <span class="date-string" style="color: #555; font-size: 0.75rem;">${todayStr}</span>
-        </div>
-        <div class="readiness-hud-card" id="readiness-hud" style="background: linear-gradient(145deg, #111 0%, #0a0a0a 100%); border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border: 1px solid #222; position: relative; overflow: hidden; margin-bottom: 24px;">
-            ${acwr.status === 'DANGER' ? `
-            <div class="warning-banner" id="overtrain-warning" style="background: rgba(220, 53, 69, 0.15); color: #ff4d4d; text-align: center; font-weight: 800; font-size: 0.75rem; padding: 6px; border-radius: 6px; margin-bottom: 16px; letter-spacing: 1px;">
-                ⚠️ OVERTRAINING RISK: Reduce load today.
-            </div>` : ''}
-            
-            <div class="hud-split" style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-                <div class="hud-left" style="display: flex; flex-direction: column;">
-                    <span class="hud-val" id="readiness-percent" style="font-size: 3rem; font-weight: 900; line-height: 1; margin-bottom: 4px; color: ${acwr.color}; font-family: 'Inter', sans-serif;">${acwr.percent}</span>
-                    <span class="hud-label" style="font-size: 0.7rem; color: #777; font-weight: 700; letter-spacing: 1px;">READINESS</span>
-                </div>
-                <div class="hud-right" style="display: flex; flex-direction: column; text-align: right;">
-                    <span class="hud-val" id="load-ratio" style="font-size: 3rem; font-weight: 900; line-height: 1; margin-bottom: 4px; color: ${acwr.color}; font-family: 'Inter', sans-serif;">${acwr.ratio}</span>
-                    <span class="hud-label" style="font-size: 0.7rem; color: #777; font-weight: 700; letter-spacing: 1px;">LOAD RATIO</span>
-                </div>
-            </div>
-
-            <div class="hud-prescription" id="hud-msg" style="background: rgba(255, 255, 255, 0.05); border-left: 3px solid ${acwr.color}; padding: 12px; border-radius: 6px; font-size: 0.85rem; color: #ccc; line-height: 1.4;">
-                ${acwr.msg}
-            </div>
-        </div>`;
-
-        // Update Dynamic Environment Identity
-        const totalS = State.sessions.length;
-        const outS = State.sessions.filter(s => !AppConfig.gyms.includes(s.Location)).length;
-        let envVal = "All-Terrain";
-        if (totalS > 0) {
-            const ratio = outS / totalS;
-            if (ratio > 0.6) envVal = "Crag Hound";
-            else if (ratio < 0.2) envVal = "Gym Rat";
-        }
-        const envStatEl = document.getElementById('env-stat');
-        if (envStatEl) envStatEl.innerText = envVal;
+        // Render the log list below the Nerd Dashboard button
+        App.renderDashboardLogs(); 
     },
 
     renderDashboardLogs: () => {
