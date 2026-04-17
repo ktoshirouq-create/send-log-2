@@ -424,12 +424,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const ratioNum = acuteLoad / chronicLoad;
             const ratio = ratioNum.toFixed(2);
 
+            // COLOR AESTHETIC FIX: Swapped glaring yellows for dark mode friendly Burnt Amber and Cool Blue.
             if (ratioNum > 1.5) return { status: 'DANGER', percent: '30%', color: '#ff4d4d', ratio: ratio + 'x', msg: "Overtraining risk. High injury probability. Strict rest recommended." };
-            if (ratioNum > 1.3) return { status: 'WARNING', percent: '55%', color: '#ffd700', ratio: ratio + 'x', msg: "High systemic load. Focus on volume, avoid limit projecting." };
+            if (ratioNum > 1.3) return { status: 'WARNING', percent: '55%', color: '#f59e0b', ratio: ratio + 'x', msg: "High systemic load. Focus on volume, avoid limit projecting." };
             
-            // Phantom drop match with App.js perfectly
             if (ratioNum < 0.8 && daysActiveAcute >= 2) return { status: 'PRIME', percent: '100%', color: '#00d084', ratio: ratio + 'x', msg: "Fully Recovered. Prime for Limit Effort." };
-            if (ratioNum < 0.8) return { status: 'UNDER', percent: '75%', color: '#ffd700', ratio: ratio + 'x', msg: "Undertraining detected. Increase training stimulus." };
+            if (ratioNum < 0.8) return { status: 'UNDER', percent: '75%', color: '#3b82f6', ratio: ratio + 'x', msg: "Undertraining detected. Increase training stimulus." };
             
             return { status: 'OPTIMAL', percent: '85%', color: '#00d084', ratio: ratio + 'x', msg: "Balanced training. Optimal zone for power generation." };
         }
@@ -580,7 +580,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
             const todayStr = new Date().toLocaleDateString('en-US', dateOptions).toUpperCase();
 
-            // Using pure classnames mapped to dashboard.html styles
             hudWrapper.innerHTML = `
             <div class="section-header hud-header">
                 <span class="hud-header-title">TODAY'S READINESS</span>
