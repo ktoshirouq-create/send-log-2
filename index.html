@@ -16,6 +16,8 @@
             --primary: #10b981; --primary-fade: rgba(16,185,129,0.12); 
             --flash: #db2777; --dark: #050505; --card-bg: #121212; --input-bg: #181818; --border: #1a1a1a; 
             --text: #e5e5e5; --text-muted: #737373; --danger: #ef4444; --radius: 16px;
+            /* POGO Readiness Colors added to global scope */
+            --status-prime: #00d084; --status-maintain: #ffd700; --status-danger: #ff4d4d; --status-calibrating: #3b82f6; --status-locked: #737373;
         }
 
         body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--dark); color: var(--text); margin: 0; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; }
@@ -411,6 +413,9 @@
                     <canvas id="progressChart"></canvas>
                 </div>
             </div>
+            
+            <div id="readiness-hud-wrapper"></div>
+            
             <div class="card">
                 <div class="log-header-row">
                     <h2 id="logListTitle">Last 60 Days</h2>
