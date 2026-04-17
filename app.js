@@ -300,14 +300,14 @@ const ReadinessEngine = {
         }
 
         if (blockedByAcuteFatigue) {
-            return { status: 'LOCKED', percent: '-', ratio: '-', color: '#737373', msg: "⚠️ Missing Session Fatigue. Update recent logs in Journal to unlock Readiness Score." };
+            return { status: 'LOCKED', percent: '- %', ratio: '---', color: '#737373', msg: "⚠️ Missing Session Fatigue. Update recent logs in Journal to unlock Readiness Score." };
         }
 
         chronicLoad = chronicLoad / 4;
 
         // Minimum Base Threshold Patch
         if (chronicLoad < 2000) {
-            return { status: 'CALIBRATING', percent: '...', ratio: '-', color: '#3b82f6', msg: "Building Base: Volume too low for accurate ACWR. Focus on steady accumulation." };
+            return { status: 'CALIBRATING', percent: '...', ratio: '---', color: '#3b82f6', msg: "Building Base: Volume too low for accurate ACWR. Focus on steady accumulation." };
         }
 
         const ratioNum = acuteLoad / chronicLoad;
@@ -955,7 +955,7 @@ const App = {
     },
 
     renderDashboardHUD: () => {
-        // Execute dead charts and UI bloat safely by targeting old canvas or wrappers.
+        // Execute dead charts
         const ctxCanvas = document.getElementById('progressChart');
         if (ctxCanvas) ctxCanvas.style.display = 'none';
         const chartTog = document.getElementById('chartToggle');
@@ -968,36 +968,55 @@ const App = {
             hudContainer = document.createElement('div');
             hudContainer.id = 'readiness-hud-wrapper';
             
-            // Try to place it gracefully at the top of the dashboard content
+            // HUD CSS Boundary Lock to prevent bleeding
+            hudContainer.style.position = 'relative';
+            hudContainer.style.overflow = 'hidden';
+            hudContainer.style.width = '100%';
+
             const dashContent = document.getElementById('view-dash');
-            if (dashContent && dashContent.firstChild) {
-                dashContent.insertBefore(hudContainer, dashContent.firstChild);
-            } else if (ctxCanvas && ctxCanvas.parentElement) {
-                ctxCanvas.parentElement.insertBefore(hudContainer, ctxCanvas);
+            
+            // Re-order Layout: Try to insert after Vital Stats
+            const vitalStats = dashContent ? (dashContent.querySelector('.vital-stats-grid') || dashContent.querySelector('.stats-grid') || dashContent.querySelector('.stats-row') || dashContent.querySelector('.dashboard-stats')) : null;
+
+            if (vitalStats && vitalStats.nextSibling) {
+                vitalStats.parentNode.insertBefore(hudContainer, vitalStats.nextSibling);
+            } else if (dashContent) {
+                // Fallback: Insert just before the Climber Identity section if Vital Stats class is unknown
+                const identityHeader = Array.from(dashContent.querySelectorAll('div, span, h3')).find(el => el.innerText && el.innerText.includes('CLIMBER IDENTITY'));
+                if (identityHeader) {
+                    dashContent.insertBefore(hudContainer, identityHeader);
+                } else {
+                    dashContent.insertBefore(hudContainer, dashContent.firstChild); // Absolute fallback
+                }
             }
         }
 
+        const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+        const todayStr = new Date().toLocaleDateString('en-US', dateOptions).toUpperCase();
+
         hudContainer.innerHTML = `
-        <div class="readiness-hud-card" id="readiness-hud" style="background: var(--card-surface, #121212); margin: 1rem; border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 20px ${acwr.color}15; border: 1px solid rgba(255, 255, 255, 0.05); position: relative; overflow: hidden;">
+        <div class="section-header hud-header" style="display: flex; justify-content: space-between; align-items: center; margin: 24px 0 12px 0; border-bottom: 1px solid #222; padding-bottom: 8px;">
+            <span style="font-size: 0.75rem; color: #888; letter-spacing: 1px; text-transform: uppercase;">TODAY'S READINESS</span>
+            <span class="date-string" style="color: #555; font-size: 0.75rem;">${todayStr}</span>
+        </div>
+        <div class="readiness-hud-card" id="readiness-hud" style="background: linear-gradient(145deg, #111 0%, #0a0a0a 100%); border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border: 1px solid #222; position: relative; overflow: hidden; margin-bottom: 24px;">
             ${acwr.status === 'DANGER' ? `
-            <div class="warning-banner" id="overtrain-warning" style="background: rgba(255, 23, 68, 0.15); color: #ff1744; text-align: center; font-weight: 800; font-size: 0.8rem; padding: 6px; margin: -1.5rem -1.5rem 1rem -1.5rem; letter-spacing: 1px;">
+            <div class="warning-banner" id="overtrain-warning" style="background: rgba(220, 53, 69, 0.15); color: #ff4d4d; text-align: center; font-weight: 800; font-size: 0.75rem; padding: 6px; border-radius: 6px; margin-bottom: 16px; letter-spacing: 1px;">
                 ⚠️ OVERTRAINING RISK: Reduce load today.
             </div>` : ''}
             
-            <div class="hud-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                <div class="hud-column">
-                    <span class="hud-label" style="font-size: 0.75rem; color: #888888; letter-spacing: 1.5px; font-weight: 700;">READINESS</span>
-                    <div class="hud-value" id="readiness-percent" style="font-size: 3rem; font-weight: 900; margin: 0.2rem 0; color: ${acwr.color};">${acwr.percent}</div>
-                    <span class="hud-sub" id="readiness-sub" style="font-size: 0.85rem; font-weight: 600; color: #ffffff;">${acwr.status}</span>
+            <div class="hud-split" style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                <div class="hud-left" style="display: flex; flex-direction: column;">
+                    <span class="hud-val" id="readiness-percent" style="font-size: 3rem; font-weight: 900; line-height: 1; margin-bottom: 4px; color: ${acwr.color}; font-family: 'Inter', sans-serif;">${acwr.percent}</span>
+                    <span class="hud-label" style="font-size: 0.7rem; color: #777; font-weight: 700; letter-spacing: 1px;">READINESS</span>
                 </div>
-                <div class="hud-column right-align" style="text-align: right;">
-                    <span class="hud-label" style="font-size: 0.75rem; color: #888888; letter-spacing: 1.5px; font-weight: 700;">LOAD RATIO</span>
-                    <div class="hud-value" id="load-ratio" style="font-size: 3rem; font-weight: 900; margin: 0.2rem 0; color: ${acwr.color};">${acwr.ratio}</div>
-                    <span class="hud-sub" style="font-size: 0.85rem; font-weight: 600; color: #ffffff;">ACWR</span>
+                <div class="hud-right" style="display: flex; flex-direction: column; text-align: right;">
+                    <span class="hud-val" id="load-ratio" style="font-size: 3rem; font-weight: 900; line-height: 1; margin-bottom: 4px; color: ${acwr.color}; font-family: 'Inter', sans-serif;">${acwr.ratio}</span>
+                    <span class="hud-label" style="font-size: 0.7rem; color: #777; font-weight: 700; letter-spacing: 1px;">LOAD RATIO</span>
                 </div>
             </div>
 
-            <div class="hud-prescription" id="hud-msg" style="background: rgba(255, 255, 255, 0.03); padding: 1rem; border-radius: 8px; font-size: 0.9rem; line-height: 1.4; color: #cccccc; border-left: 3px solid ${acwr.color};">
+            <div class="hud-prescription" id="hud-msg" style="background: rgba(255, 255, 255, 0.05); border-left: 3px solid ${acwr.color}; padding: 12px; border-radius: 6px; font-size: 0.85rem; color: #ccc; line-height: 1.4;">
                 ${acwr.msg}
             </div>
         </div>`;
