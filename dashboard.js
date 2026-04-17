@@ -7,7 +7,8 @@ const AppConfig = {
     styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     grades: {
-        ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
+        ropesIn: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
+        ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
@@ -35,6 +36,9 @@ const escapeHTML = (str) => {
 };
 
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
+const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
+const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
+
 const formatShortDate = (dStr) => {
     const clean = dStr ? String(dStr).substring(0, 10) : "";
     if(!clean) return "";
@@ -99,13 +103,11 @@ const Dashboard = {
     showInsight: (type) => {
         Dashboard.haptic();
         const copy = {
-            'cns': { title: 'CNS Peak Output', desc: 'Tracks your maximum physical output (Peak Send) against your systemic tiredness (Average Session Fatigue) over the last 4 weeks. A rising fatigue bar with a dropping peak line is an early warning sign of overtraining.' },
             'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' }
         };
         const modal = document.getElementById('insightModal');
         if(modal && copy[type]) {
             document.getElementById('insightTitle').innerText = copy[type].title;
-            // Using innerHTML to ensure any injected breaks format properly
             document.getElementById('insightDesc').innerHTML = copy[type].desc;
             modal.classList.add('active');
         }
@@ -124,7 +126,6 @@ const Dashboard = {
             document.body.insertAdjacentHTML('beforeend', modalHTML);
         }
 
-        // SCALPEL DOM INJECTION: Finds pure text nodes and injects inline without touching parent CSS
         const addIcon = (textMatches, type) => {
             const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
             let node;
@@ -143,19 +144,7 @@ const Dashboard = {
                 }
             }
         };
-        addIcon('CNS PEAK OUTPUT TRACKER', 'cns');
         addIcon('CLIMBER PROFILE', 'profile');
-    },
-
-    toggleDataset: (idx, el) => {
-        Dashboard.haptic();
-        if (!window.charts || !window.charts.line) return;
-        const chart = window.charts.line;
-        const meta = chart.getDatasetMeta(idx);
-        meta.hidden = meta.hidden === null ? true : null;
-        chart.update();
-        el.style.opacity = meta.hidden ? '0.4' : '1';
-        el.style.textDecoration = meta.hidden ? 'line-through' : 'none';
     },
 
     renderLogbook: () => {
@@ -258,7 +247,7 @@ const Dashboard = {
     }
 };
 
-window.charts = { radar: null, line: null, pyr: null };
+window.charts = { radar: null, pyr: null };
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
@@ -281,16 +270,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const getScaleConfig = (disc) => {
         if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
         if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
-        return AppConfig.grades.ropes;
+        if (disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Multipitch') return AppConfig.grades.ropesOut;
+        return AppConfig.grades.ropesIn;
     };
 
-    document.getElementById('logSearch').addEventListener('input', () => {
-        Dashboard.logLimit = 10; 
-        Dashboard.renderLogbook();
-    });
+    const searchInput = document.getElementById('logSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            Dashboard.logLimit = 10; 
+            Dashboard.renderLogbook();
+        });
+    }
 
     const syncText = document.getElementById('syncStatus');
-    syncText.innerText = "(Syncing)";
+    if (syncText) syncText.innerText = "(Syncing)";
 
     fetch(AppConfig.api)
         .then(res => res.json())
@@ -305,14 +298,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     allSessionsMaster = allSessions;
                     localStorage.setItem('crag_sessions_master', JSON.stringify(allSessions));
                 }
-                syncText.innerText = "● LIVE";
-                setTimeout(() => syncText.innerText = "", 3000);
+                if (syncText) syncText.innerText = "● LIVE";
+                setTimeout(() => { if(syncText) syncText.innerText = ""; }, 3000);
                 renderDashboard(); 
             }
         }).catch(err => {
             console.log("Dashboard background sync failed", err);
-            syncText.innerText = "○ OFFLINE";
-            syncText.style.color = "#737373";
+            if (syncText) {
+                syncText.innerText = "○ OFFLINE";
+                syncText.style.color = "#737373";
+            }
         });
 
     const attachFilters = (id, propName, className) => {
@@ -329,6 +324,99 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     attachFilters('disc-filter', 'disc', 'filter-pill');
     attachFilters('time-filter', 'time', 'time-tab');
+
+    // ==========================================
+    // SPORTS SCIENCE ENGINE (ACWR) - Dashboard
+    // ==========================================
+    const ReadinessEngine = {
+        cleanseData: (sessions) => {
+            return sessions.filter(session => allLogs.some(c => String(c.SessionID) === String(session.SessionID)));
+        },
+        getHistoricalAverageFatigue: (sessions) => {
+            const fScores = sessions.filter(s => s.Fatigue && s.Fatigue !== "0").map(s => Number(s.Fatigue));
+            if (fScores.length === 0) return 5;
+            return fScores.reduce((a, b) => a + b, 0) / fScores.length;
+        },
+        calculateDailyLoad: (targetDate, validSessions) => {
+            const daySessions = validSessions.filter(s => getCleanDate(s.Date) === targetDate);
+            if (daySessions.length === 0) return { load: 0, missingFatigue: false };
+
+            let totalVolume = 0;
+            let maxFatigue = 0;
+            let missingFatigue = false;
+            const avgFatigue = ReadinessEngine.getHistoricalAverageFatigue(validSessions);
+
+            daySessions.forEach(session => {
+                if (!session.Fatigue || session.Fatigue === "0") missingFatigue = true;
+                let sessionFatigue = (session.Fatigue && session.Fatigue !== "0") ? Number(session.Fatigue) : avgFatigue;
+                
+                if (sessionFatigue > maxFatigue) maxFatigue = sessionFatigue;
+
+                const sessionClimbs = allLogs.filter(c => String(c.SessionID) === String(session.SessionID));
+                sessionClimbs.forEach(climb => {
+                    const conf = getScaleConfig(climb.Type);
+                    const cleanGrade = getBaseGrade(climb.Grade);
+                    const gradeIdx = conf.labels.indexOf(cleanGrade);
+                    const baseXP = gradeIdx > -1 ? conf.scores[gradeIdx] : 0;
+                    const pitches = climb.Pitches ? Number(climb.Pitches) : 1;
+                    
+                    if (['Project', 'Worked', 'project', 'worked'].includes(climb.Style)) {
+                        let hpFactor = climb.HighPoint ? (Number(climb.HighPoint) / 100) : 0.5;
+                        let burns = (climb.Burns && climb.Burns !== '-') ? Number(climb.Burns) : 1;
+                        totalVolume += (baseXP * hpFactor * burns) * pitches;
+                    } else {
+                        totalVolume += Number(climb.Score) * pitches;
+                    }
+                });
+            });
+
+            return { load: totalVolume * maxFatigue, missingFatigue };
+        },
+        generateACWR: () => {
+            const validSessions = ReadinessEngine.cleanseData(allSessionsMaster);
+            let acuteLoad = 0; 
+            let chronicLoad = 0;
+            let blockedByAcuteFatigue = false;
+
+            const today = new Date();
+            today.setHours(0,0,0,0);
+
+            for (let i = 0; i < 28; i++) {
+                let targetDate = new Date(today);
+                targetDate.setDate(targetDate.getDate() - i);
+                let dateString = getLocalISO(targetDate);
+                
+                let { load, missingFatigue } = ReadinessEngine.calculateDailyLoad(dateString, validSessions);
+                
+                if (i < 7) {
+                    acuteLoad += load;
+                    if (missingFatigue) blockedByAcuteFatigue = true;
+                }
+                chronicLoad += load;
+            }
+
+            if (blockedByAcuteFatigue) {
+                return { status: 'LOCKED', percent: '-', ratio: '-', color: '#737373', msg: "⚠️ Missing Session Fatigue. Update recent logs in Journal to unlock Readiness Score." };
+            }
+
+            chronicLoad = chronicLoad / 4;
+
+            if (chronicLoad < 2000) {
+                return { status: 'CALIBRATING', percent: '...', ratio: '-', color: '#3b82f6', msg: "Building Base: Volume too low for accurate ACWR. Focus on steady accumulation." };
+            }
+
+            const ratioNum = acuteLoad / chronicLoad;
+            const ratio = ratioNum.toFixed(2);
+
+            if (ratioNum > 1.5) return { status: 'DANGER', percent: '30%', color: '#ff1744', ratio: ratio + 'x', msg: "Overtraining risk. High injury probability. Strict rest recommended." };
+            if (ratioNum > 1.3) return { status: 'WARNING', percent: '55%', color: '#ffc107', ratio: ratio + 'x', msg: "High systemic load. Focus on volume, avoid limit projecting." };
+            
+            if (ratioNum < 0.8 && acuteLoad < 1000) return { status: 'PRIME', percent: '100%', color: '#00e5ff', ratio: ratio + 'x', msg: "Fully Recovered. Prime for Limit Effort." };
+            if (ratioNum < 0.8) return { status: 'UNDER', percent: '75%', color: '#ffc107', ratio: ratio + 'x', msg: "Undertraining detected. Increase training stimulus." };
+            
+            return { status: 'OPTIMAL', percent: '85%', color: '#00e5ff', ratio: ratio + 'x', msg: "Balanced training. Optimal zone for power generation." };
+        }
+    };
 
     const calcRPG = (logs) => {
         let attr = { Power: 0, Endurance: 0, Technique: 0, Fingers: 0, Headspace: 0, Tenacity: 0 };
@@ -465,138 +553,105 @@ document.addEventListener('DOMContentLoaded', () => {
             locs[loc] = locSessions[loc].size;
         });
 
-        document.getElementById('stat-sends').innerText = currentFilteredLogs.length;
+        // ==========================================
+        // RENDER READINESS HUD (POGO Style)
+        // ==========================================
+        const acwr = ReadinessEngine.generateACWR();
+        const hudWrapper = document.getElementById('readiness-hud-wrapper');
+        if (hudWrapper) {
+            hudWrapper.innerHTML = `
+            <div class="readiness-hud-card" id="readiness-hud" style="background: var(--card-surface, #121212); margin-bottom: 24px; border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 20px ${acwr.color}15; border: 1px solid rgba(255, 255, 255, 0.05); position: relative; overflow: hidden;">
+                ${acwr.status === 'DANGER' ? `
+                <div class="warning-banner" id="overtrain-warning" style="background: rgba(255, 23, 68, 0.15); color: #ff1744; text-align: center; font-weight: 800; font-size: 0.8rem; padding: 6px; margin: -1.5rem -1.5rem 1rem -1.5rem; letter-spacing: 1px;">
+                    ⚠️ OVERTRAINING RISK: Reduce load today.
+                </div>` : ''}
+                
+                <div class="hud-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="hud-column">
+                        <span class="hud-label" style="font-size: 0.75rem; color: #888888; letter-spacing: 1.5px; font-weight: 700;">READINESS</span>
+                        <div class="hud-value" id="readiness-percent" style="font-size: 3rem; font-weight: 900; margin: 0.2rem 0; color: ${acwr.color};">${acwr.percent}</div>
+                        <span class="hud-sub" id="readiness-sub" style="font-size: 0.85rem; font-weight: 600; color: #ffffff;">${acwr.status}</span>
+                    </div>
+                    <div class="hud-column right-align" style="text-align: right;">
+                        <span class="hud-label" style="font-size: 0.75rem; color: #888888; letter-spacing: 1.5px; font-weight: 700;">LOAD RATIO</span>
+                        <div class="hud-value" id="load-ratio" style="font-size: 3rem; font-weight: 900; margin: 0.2rem 0; color: ${acwr.color};">${acwr.ratio}</div>
+                        <span class="hud-sub" style="font-size: 0.85rem; font-weight: 600; color: #ffffff;">ACWR</span>
+                    </div>
+                </div>
+
+                <div class="hud-prescription" id="hud-msg" style="background: rgba(255, 255, 255, 0.03); padding: 1rem; border-radius: 8px; font-size: 0.9rem; line-height: 1.4; color: #cccccc; border-left: 3px solid ${acwr.color};">
+                    ${acwr.msg}
+                </div>
+            </div>`;
+        }
+
+        const statsS = document.getElementById('stat-sends'); if(statsS) statsS.innerText = currentFilteredLogs.length;
         const outDays = new Set(currentFilteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getV(l, 'Date'))).size;
-        document.getElementById('stat-outdoor').innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
+        const statsO = document.getElementById('stat-outdoor'); if(statsO) statsO.innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
         
         const peakEl = document.getElementById('stat-peak');
-        const cleanPeak = getBaseGrade(peakG);
-        peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
-        
-        if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
-            const conf = AppConfig.grades.bouldsIn;
-            const idx = conf.labels.indexOf(cleanPeak);
-            peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
-        } else {
-            peakEl.style.color = '#fff';
+        if (peakEl) {
+            const cleanPeak = getBaseGrade(peakG);
+            peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
+            
+            if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
+                const conf = AppConfig.grades.bouldsIn;
+                const idx = conf.labels.indexOf(cleanPeak);
+                peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
+            } else {
+                peakEl.style.color = '#fff';
+            }
         }
 
         const topDay = Object.keys(dayC).length ? Object.keys(dayC).length > 0 ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-' : '-';
+        
+        // Environment Logic Update Patch
         let envLabel = '-';
-        if (currentFilteredLogs.length > 0) {
-            const inRatio = indoorCount / currentFilteredLogs.length;
-            if (inRatio >= 0.8) envLabel = 'Gym Rat';
-            else if (inRatio <= 0.4) envLabel = 'Crag Hound';
-            else envLabel = 'Weekend Warrior';
+        const totalS = allSessionsMaster.length;
+        if (totalS > 0) {
+            const outS = allSessionsMaster.filter(s => !AppConfig.gyms.includes(getV(s, 'Location'))).length;
+            const outRatio = outS / totalS;
+            if (outRatio > 0.6) envLabel = 'Crag Hound';
+            else if (outRatio < 0.2) envLabel = 'Gym Rat';
+            else envLabel = 'All-Terrain';
         }
 
-        document.getElementById('id-day').innerText = topDay;
-        document.getElementById('id-env').innerText = envLabel;
+        const idDay = document.getElementById('id-day'); if(idDay) idDay.innerText = topDay;
+        const idEnv = document.getElementById('id-env'); if(idEnv) idEnv.innerText = envLabel;
 
         Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
 
         const pyrCard = document.getElementById('pyramidCard');
         const pyrCanvas = document.getElementById('pyramidChart');
 
-        if (activeDisc === 'All' || currentFilteredLogs.length === 0) {
-            pyrCard.style.display = 'none';
-        } else {
-            pyrCard.style.display = 'block';
-            const conf = getScaleConfig(activeDisc);
-            const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
-            const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
-            
-            const pyrColors = sortedGrades.map(g => {
-                const idx = conf.labels.indexOf(g);
-                return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
-            });
+        if (pyrCard && pyrCanvas) {
+            if (activeDisc === 'All' || currentFilteredLogs.length === 0) {
+                pyrCard.style.display = 'none';
+            } else {
+                pyrCard.style.display = 'block';
+                const conf = getScaleConfig(activeDisc);
+                const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
+                const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
+                
+                const pyrColors = sortedGrades.map(g => {
+                    const idx = conf.labels.indexOf(g);
+                    return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
+                });
 
-            window.charts.pyr = new Chart(pyrCanvas, {
-                type: 'bar',
-                data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
-                options: { 
-                    responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
-                    plugins: { legend: { display: false } }, 
-                    scales: { 
-                        x: { display: false },
-                        y: { ticks: { color: '#a3a3a3', font: { weight: '600' } }, grid: { display: false, drawBorder: false } }
-                    } 
-                }
-            });
-        }
-
-        const sortedCNS = [...currentFilteredLogs].filter(l => getV(l, 'Score') && !['worked', 'toprope', 'autobelay', 'bailed'].includes(String(getV(l, 'Style')))).sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date')));
-        const cnsData = { labels: ['W4', 'W3', 'W2', 'W1'], peak: [null, null, null, null], grades: ['-','-','-','-'], fatigue: [0,0,0,0] };
-        const weekBins = [[],[],[],[]]; 
-        const sessionBins = [[],[],[],[]];
-
-        sortedCNS.forEach(l => {
-            const diffDays = Math.floor((now - new Date(getV(l, 'Date'))) / (1000 * 60 * 60 * 24));
-            if (diffDays <= 7) weekBins[3].push(l); 
-            else if (diffDays <= 14) weekBins[2].push(l); 
-            else if (diffDays <= 21) weekBins[1].push(l); 
-            else if (diffDays <= 28) weekBins[0].push(l);
-        });
-
-        allSessionsMaster.forEach(s => {
-            const diffDays = Math.floor((now - new Date(getV(s, 'Date'))) / (1000 * 60 * 60 * 24));
-            const f = getV(s, 'Fatigue');
-            if (diffDays <= 28 && f) {
-                let binIdx = -1;
-                if (diffDays <= 7) binIdx = 3; else if (diffDays <= 14) binIdx = 2; else if (diffDays <= 21) binIdx = 1; else if (diffDays <= 28) binIdx = 0;
-                sessionBins[binIdx].push(Number(f));
-            }
-        });
-
-        weekBins.forEach((bin, i) => {
-            if (bin.length > 0) {
-                const maxLog = bin.reduce((max, cur) => Number(getV(cur, 'Score')) > Number(getV(max, 'Score')) ? cur : max);
-                cnsData.peak[i] = Number(getV(maxLog, 'Score')); 
-                cnsData.grades[i] = getBaseGrade(getV(maxLog, 'Grade'));
-            }
-            if (sessionBins[i].length > 0) {
-                cnsData.fatigue[i] = sessionBins[i].reduce((a,b)=>a+b, 0) / sessionBins[i].length;
-            }
-        });
-
-        const canvasElement = document.getElementById('cnsLineChart');
-        if (canvasElement) {
-            const chartWrapper = canvasElement.parentElement;
-            if (!document.getElementById('cnsLegend') && chartWrapper && chartWrapper.parentElement) {
-                const legendDiv = document.createElement('div');
-                legendDiv.id = 'cnsLegend';
-                legendDiv.style.cssText = 'display:flex; justify-content:center; gap:24px; width:100%; margin-bottom:16px; font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:1px;';
-                legendDiv.innerHTML = `
-                    <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(0, this)"><div style="width:12px; height:12px; border-radius:50%; background:#10b981;"></div> Peak Send</div>
-                    <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(1, this)"><div style="width:12px; height:12px; border-radius:4px; background:#333;"></div> Avg Fatigue</div>
-                `;
-                chartWrapper.parentElement.insertBefore(legendDiv, chartWrapper);
+                window.charts.pyr = new Chart(pyrCanvas, {
+                    type: 'bar',
+                    data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
+                    options: { 
+                        responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
+                        plugins: { legend: { display: false } }, 
+                        scales: { 
+                            x: { display: false },
+                            y: { ticks: { color: '#a3a3a3', font: { weight: '600' } }, grid: { display: false, drawBorder: false } }
+                        } 
+                    }
+                });
             }
         }
-
-        let gL = document.getElementById('cnsLineChart').getContext('2d').createLinearGradient(0,0,0,250); 
-        gL.addColorStop(0, 'rgba(16, 185, 129, 0.4)'); gL.addColorStop(1, 'transparent');
-        
-        window.charts.line = new Chart(document.getElementById('cnsLineChart'), {
-            type: 'line', 
-            data: { 
-                labels: cnsData.labels, 
-                datasets: [
-                    { type: 'line', label: 'Peak Send', data: cnsData.peak, borderColor: '#10b981', backgroundColor: gL, fill: true, tension: 0.4, spanGaps: true, pointBackgroundColor: '#121212', pointBorderWidth: 2, yAxisID: 'y' },
-                    { type: 'bar', label: 'Avg Fatigue', data: cnsData.fatigue, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 4, yAxisID: 'y1' }
-                ] 
-            },
-            options: { 
-                responsive: true, maintainAspectRatio: false, 
-                interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + (ctx.raw > 0 ? ctx.raw.toFixed(1) + '/10' : '- / 10') } } }, 
-                scales: { 
-                    y: { display: false, position: 'left' }, 
-                    y1: { display: false, position: 'right', min: 0, max: 10 },
-                    x: { grid: { display: false }, ticks: { color: '#737373', font: { weight: '600' } } } 
-                } 
-            }
-        });
 
         const currAttr = calcRPG(currentFilteredLogs);
         const baseAttr = calcRPG(allTimeLogsFiltered);
@@ -611,42 +666,48 @@ document.addEventListener('DOMContentLoaded', () => {
             archetype = topAttrs.length > 1 ? 'The All-Rounder' : archMap[topAttrs[0]];
         }
         
-        document.getElementById('id-arch').innerText = archetype;
+        const idArch = document.getElementById('id-arch'); if(idArch) idArch.innerText = archetype;
 
         const radarLabels = Object.keys(currAttr).map(k => [k.toUpperCase(), currAttr[k].toString()]);
+        const radarCanvas = document.getElementById('attributeRadarChart');
 
-        window.charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
-            type: 'radar', 
-            data: { 
-                labels: radarLabels, 
-                datasets: [
-                    { 
-                        label: 'Current Phase', data: Object.values(currAttr), borderColor: '#10b981', 
-                        backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true
-                    },
-                    { 
-                        label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.15)', 
-                        backgroundColor: 'rgba(255,255,255,0.02)', pointRadius: 0, borderWidth: 2, borderDash: [4, 4], fill: true
-                    }
-                ] 
-            }, 
-            options: { 
-                responsive: true, maintainAspectRatio: false, 
-                plugins: { 
-                    legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } },
-                    tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } }
+        if (radarCanvas) {
+            window.charts.radar = new Chart(radarCanvas, { 
+                type: 'radar', 
+                data: { 
+                    labels: radarLabels, 
+                    datasets: [
+                        { 
+                            label: 'Current Phase', data: Object.values(currAttr), borderColor: '#10b981', 
+                            backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true
+                        },
+                        { 
+                            label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.15)', 
+                            backgroundColor: 'rgba(255,255,255,0.02)', pointRadius: 0, borderWidth: 2, borderDash: [4, 4], fill: true
+                        }
+                    ] 
                 }, 
-                scales: { 
-                    r: { 
-                        min: 0, max: 100, ticks: { display: false, stepSize: 20 }, 
-                        grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, 
-                        pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } 
+                options: { 
+                    responsive: true, maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } },
+                        tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } }
+                    }, 
+                    scales: { 
+                        r: { 
+                            min: 0, max: 100, ticks: { display: false, stepSize: 20 }, 
+                            grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, 
+                            pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } 
+                        } 
                     } 
                 } 
-            } 
-        });
+            });
+        }
 
-        const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No data available for this phase.</div>'; };
+        const renderList = (id, html) => { 
+            const el = document.getElementById(id); 
+            if(el) el.innerHTML = html || '<div class="empty-msg">No data available for this phase.</div>'; 
+        };
         
         const hof = [...currentFilteredLogs].filter(l => Number(getV(l, 'Rating')) >= 4).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
         renderList('list-fame', hof.map(l => {
