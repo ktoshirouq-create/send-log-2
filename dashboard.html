@@ -38,7 +38,7 @@
         .section-header { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #737373; margin-bottom: 24px; font-weight: 700; position: relative; padding-bottom: 0; }
         .section-header::after { content: ''; position: absolute; left: 0; bottom: -8px; width: 24px; height: 2px; background: #10b981; border-radius: 2px; }
         
-        /* Updated Identity Grid - Perfectly balanced 3 columns */
+        /* Updated Identity Grid - Responsive Fix */
         .identity-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         .identity-card { background: #181818; padding: 18px; border-radius: 12px; text-align: center; transition: transform 0.2s, background 0.2s; border: 1px solid #262626; }
         .identity-card.clickable { cursor: pointer; }
@@ -115,7 +115,10 @@
             .log-table th, .log-table td { padding: 14px 4px; font-size: 0.85rem; }
             .col-style { font-size: 0.75rem; } 
             .dash-card { padding: 18px; }
-            .identity-grid { grid-template-columns: 1fr 1fr 1fr; }
+            
+            /* Archetype Bleed Fix */
+            .identity-grid { grid-template-columns: 1fr 1fr; }
+            .identity-card:nth-child(3) { grid-column: span 2; }
         }
     </style>
 </head>
@@ -150,8 +153,7 @@
         <div class="stat-card"><div class="stat-val" id="stat-peak">-</div><div class="stat-lbl">Peak Grade</div></div>
     </div>
 
-    <div id="readiness-hud-wrapper">
-        </div>
+    <div id="readiness-hud-wrapper"></div>
 
     <div class="dash-card">
         <div class="section-header">Climber Profile</div>
@@ -217,6 +219,6 @@
         </div>
     </div>
 
-    <script src="dashboard.js?v=66"></script> 
+    <script src="dashboard.js?v=68"></script> 
 </body>
 </html>
