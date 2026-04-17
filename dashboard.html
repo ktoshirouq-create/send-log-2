@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nerd Dashboard</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230a0a0a%22/><text y=%2250%22 x=%2250%22 font-size=%2255%22 text-anchor=%22middle%22 dominant-baseline=%22central%22>📊</text></svg>">
+    <title>🧠 Nerd Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230a0a0a%22/><text y=%2250%22 x=%2250%22 font-size=%2255%22 text-anchor=%22middle%22 dominant-baseline=%22central%22>🧠</text></svg>">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
         /* Premium Typography & Deep Backgrounds */
-        body { background-color: #050505; color: #e5e5e5; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; }
+        body { background-color: #0a0a0a; color: #e5e5e5; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; }
         
         .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 15px; margin-bottom: 15px; }
         .back-btn { background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
         .back-btn:hover { background: #262626; }
         
-        .sticky-zone { position: sticky; top: 0; background: rgba(5,5,5,0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 100; padding: 10px 0; border-bottom: 1px solid #1a1a1a; margin-bottom: 20px; }
+        .sticky-zone { position: sticky; top: 0; background: rgba(10,10,10,0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 100; padding: 10px 0; border-bottom: 1px solid #1a1a1a; margin-bottom: 20px; }
         
         .filter-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 15px; scrollbar-width: none; }
         .filter-row::-webkit-scrollbar { display: none; }
@@ -29,17 +29,18 @@
 
         /* Floating Elevation Cards */
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 24px; }
-        .stat-card { background: #121212; padding: 18px 10px; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); text-align: center; }
+        .stat-card { background: #121212; padding: 18px 10px; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); text-align: center; border: 1px solid rgba(255, 255, 255, 0.05); }
         .stat-val { font-size: 26px; font-weight: 800; color: #fff; margin-bottom: 4px; letter-spacing: -0.5px; }
         .stat-lbl { font-size: 10px; color: #737373; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
 
-        .dash-card { background: #121212; padding: 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); margin-bottom: 24px; position: relative; }
+        .dash-card { background: #121212; padding: 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); margin-bottom: 24px; position: relative; border: 1px solid rgba(255, 255, 255, 0.05); }
         
         .section-header { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #737373; margin-bottom: 24px; font-weight: 700; position: relative; padding-bottom: 0; }
         .section-header::after { content: ''; position: absolute; left: 0; bottom: -8px; width: 24px; height: 2px; background: #10b981; border-radius: 2px; }
         
-        .identity-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .identity-card { background: #181818; padding: 18px; border-radius: 12px; text-align: center; transition: transform 0.2s, background 0.2s; }
+        /* Updated Identity Grid - Now perfectly balanced with 3 columns */
+        .identity-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .identity-card { background: #181818; padding: 18px; border-radius: 12px; text-align: center; transition: transform 0.2s, background 0.2s; border: 1px solid #262626; }
         .identity-card.clickable { cursor: pointer; }
         .identity-card.clickable:hover { background: #202020; transform: translateY(-2px); }
         .id-lbl { font-size: 10px; color: #737373; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: 600; }
@@ -74,7 +75,6 @@
         .table-row:hover { background: #181818; }
         .table-row.expanded { background: #1a1a1a; border-left: 3px solid #10b981; }
         
-        /* V65 Discipline Dot */
         .disc-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 10px; vertical-align: baseline; }
 
         .details-row { display: none; background: #0f0f0f; }
@@ -96,16 +96,17 @@
             .log-table th, .log-table td { padding: 14px 4px; font-size: 0.85rem; }
             .col-style { font-size: 0.75rem; } 
             .dash-card { padding: 18px; }
+            .identity-grid { grid-template-columns: 1fr 1fr 1fr; } /* Ensures 3 cols stay intact on mobile */
         }
     </style>
 </head>
 <body>
     <div class="header-bar">
         <h2 style="display:flex; align-items:center; gap:10px; font-size: 1.3rem; margin: 0; font-weight: 800; letter-spacing: -0.5px;">
-            Nerd Dashboard 
+            🧠 Nerd Dashboard 
             <span id="syncStatus" style="font-size:10px; color:#10b981; font-weight:600; letter-spacing:0.5px; text-transform: uppercase;"></span>
         </h2>
-        <button class="back-btn" onclick="Dashboard.haptic(); window.location.href='./'">← Back</button>
+        <button class="back-btn" onclick="if(window.Dashboard && Dashboard.haptic) Dashboard.haptic(); window.location.href='./'">← Back</button>
     </div>
 
     <div class="sticky-zone">
@@ -124,6 +125,8 @@
         </div>
     </div>
 
+    <div id="readiness-hud-wrapper"></div>
+
     <div class="stats-grid">
         <div class="stat-card"><div class="stat-val" id="stat-sends">0</div><div class="stat-lbl">Total Sends</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-outdoor">0</div><div class="stat-lbl">Outdoor Days</div></div>
@@ -135,12 +138,16 @@
         <div class="identity-grid">
             <div class="identity-card"><div class="id-lbl">Environment</div><div class="id-val" id="id-env">-</div></div>
             <div class="identity-card"><div class="id-lbl">Fav Day</div><div class="id-val" id="id-day">-</div></div>
-            <div class="identity-card"><div class="id-lbl">Prime Time</div><div class="id-val" id="id-time">-</div></div>
-            <div class="identity-card clickable" onclick="Dashboard.openArchetypeModal()">
+            <div class="identity-card clickable" onclick="if(window.Dashboard) Dashboard.openArchetypeModal()">
                 <div class="id-lbl">Archetype ⓘ</div>
                 <div class="id-val" id="id-arch">-</div>
             </div>
         </div>
+    </div>
+
+    <div class="dash-card">
+        <div class="section-header">Climber Profile</div>
+        <div class="chart-wrapper" style="height: 300px;"><canvas id="attributeRadarChart"></canvas></div>
     </div>
 
     <div class="dash-card" id="pyramidCard">
@@ -148,16 +155,6 @@
         <div class="chart-wrapper" style="height: 250px;">
             <canvas id="pyramidChart"></canvas>
         </div>
-    </div>
-
-    <div class="dash-card">
-        <div class="section-header">CNS Peak Output Tracker</div>
-        <div class="chart-wrapper" style="height: 250px;"><canvas id="cnsLineChart"></canvas></div>
-    </div>
-
-    <div class="dash-card">
-        <div class="section-header">Climber Profile</div>
-        <div class="chart-wrapper" style="height: 300px;"><canvas id="attributeRadarChart"></canvas></div>
     </div>
 
     <div class="grid-2">
@@ -179,11 +176,11 @@
             <table class="log-table">
                 <thead>
                     <tr>
-                        <th onclick="Dashboard.sortLogbook('Date')">Date ↕</th>
-                        <th onclick="Dashboard.sortLogbook('Name')">Route / Gym ↕</th>
-                        <th onclick="Dashboard.sortLogbook('Grade')">Grade ↕</th>
-                        <th onclick="Dashboard.sortLogbook('Style')" class="col-style">Style ↕</th>
-                        <th onclick="Dashboard.sortLogbook('Burns')" class="align-right">Burns ↕</th>
+                        <th onclick="if(window.Dashboard) Dashboard.sortLogbook('Date')">Date ↕</th>
+                        <th onclick="if(window.Dashboard) Dashboard.sortLogbook('Name')">Route / Gym ↕</th>
+                        <th onclick="if(window.Dashboard) Dashboard.sortLogbook('Grade')">Grade ↕</th>
+                        <th onclick="if(window.Dashboard) Dashboard.sortLogbook('Style')" class="col-style">Style ↕</th>
+                        <th onclick="if(window.Dashboard) Dashboard.sortLogbook('Burns')" class="align-right">Burns ↕</th>
                     </tr>
                 </thead>
                 <tbody id="masterLogbookBody">
@@ -192,14 +189,14 @@
         </div>
     </div>
 
-    <div id="archetypeModal" class="modal-overlay" onclick="if(event.target === this) Dashboard.closeArchetypeModal()">
+    <div id="archetypeModal" class="modal-overlay" onclick="if(event.target === this && window.Dashboard) Dashboard.closeArchetypeModal()">
         <div class="modal-content">
             <h3 id="archModalTitle" style="margin-top:0; margin-bottom:12px; color:#10b981; font-size:1.4rem; font-weight:800; letter-spacing:-0.5px; text-transform:uppercase;">-</h3>
             <p id="archModalDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; margin:0;"></p>
-            <button class="modal-btn" onclick="Dashboard.closeArchetypeModal()">Close</button>
+            <button class="modal-btn" onclick="if(window.Dashboard) Dashboard.closeArchetypeModal()">Close</button>
         </div>
     </div>
 
-    <script src="dashboard.js?v=65"></script> 
+    <script src="dashboard.js?v=66"></script> 
 </body>
 </html>
