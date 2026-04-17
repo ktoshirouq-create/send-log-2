@@ -7,8 +7,8 @@ const AppConfig = {
     styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     grades: {
-        ropesIn: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
-        ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800], colors: [] },
+        ropesIn: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
+        ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
@@ -253,14 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
 
     let allLogs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
-    if (allLogs.length === 0) {
-        allLogs = JSON.parse(localStorage.getItem('climbingLogs') || localStorage.getItem('climbLogs') || '[]');
-    }
-
     let allSessions = JSON.parse(localStorage.getItem('crag_sessions_master') || '[]');
-    if (allSessions.length === 0) {
-        allSessions = JSON.parse(localStorage.getItem('sessionLogs') || '[]');
-    }
     
     allSessionsMaster = allSessions; 
     
@@ -290,14 +283,32 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             if (data.status === 'success') {
                 if (data.climbs && data.climbs.length > 0) {
-                    allLogs = data.climbs;
+                    const localClimbs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
+                    // Cloud Defender Patch for Dashboard: Safely merge to protect local multipitch fields
+                    allLogs = data.climbs.map(cloudLog => {
+                        let localLog = localClimbs.find(c => String(getV(c, 'ClimbID')) === String(getV(cloudLog, 'ClimbID')));
+                        if (localLog) {
+                            if (getV(localLog, 'Pitches') && !getV(cloudLog, 'Pitches')) cloudLog.Pitches = getV(localLog, 'Pitches');
+                            if (getV(localLog, 'PackWeight') && !getV(cloudLog, 'PackWeight')) cloudLog.PackWeight = getV(localLog, 'PackWeight');
+                            if (getV(localLog, 'GearStyle') && !getV(cloudLog, 'GearStyle')) cloudLog.GearStyle = getV(localLog, 'GearStyle');
+                            if (getV(localLog, 'PitchBreakdown') && !getV(cloudLog, 'PitchBreakdown')) cloudLog.PitchBreakdown = getV(localLog, 'PitchBreakdown');
+                            return { ...localLog, ...cloudLog }; 
+                        }
+                        return cloudLog;
+                    });
+                    
+                    // Retain purely local (unsynced) climbs so they don't vanish on dashboard load
+                    const unsynced = localClimbs.filter(c => c._synced === false && !allLogs.some(l => String(getV(l, 'ClimbID')) === String(getV(c, 'ClimbID'))));
+                    allLogs = [...allLogs, ...unsynced];
                     localStorage.setItem('crag_climbs_master', JSON.stringify(allLogs));
                 }
+                
                 if (data.sessions && data.sessions.length > 0) {
                     allSessions = data.sessions;
                     allSessionsMaster = allSessions;
                     localStorage.setItem('crag_sessions_master', JSON.stringify(allSessions));
                 }
+                
                 if (syncText) syncText.innerText = "● LIVE";
                 setTimeout(() => { if(syncText) syncText.innerText = ""; }, 3000);
                 renderDashboard(); 
@@ -330,15 +341,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     const ReadinessEngine = {
         cleanseData: (sessions) => {
-            return sessions.filter(session => allLogs.some(c => String(c.SessionID) === String(session.SessionID)));
+            return sessions.filter(session => allLogs.some(c => String(getV(c, 'SessionID')) === String(getV(session, 'SessionID'))));
         },
         getHistoricalAverageFatigue: (sessions) => {
-            const fScores = sessions.filter(s => s.Fatigue && s.Fatigue !== "0").map(s => Number(s.Fatigue));
+            const fScores = sessions.filter(s => getV(s, 'Fatigue') && getV(s, 'Fatigue') !== "0").map(s => Number(getV(s, 'Fatigue')));
             if (fScores.length === 0) return 5;
             return fScores.reduce((a, b) => a + b, 0) / fScores.length;
         },
         calculateDailyLoad: (targetDate, validSessions) => {
-            const daySessions = validSessions.filter(s => getCleanDate(s.Date) === targetDate);
+            const daySessions = validSessions.filter(s => getCleanDate(getV(s, 'Date')) === targetDate);
             if (daySessions.length === 0) return { load: 0, missingFatigue: false };
 
             let totalVolume = 0;
@@ -347,25 +358,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const avgFatigue = ReadinessEngine.getHistoricalAverageFatigue(validSessions);
 
             daySessions.forEach(session => {
-                if (!session.Fatigue || session.Fatigue === "0") missingFatigue = true;
-                let sessionFatigue = (session.Fatigue && session.Fatigue !== "0") ? Number(session.Fatigue) : avgFatigue;
+                const sFatigue = getV(session, 'Fatigue');
+                if (!sFatigue || sFatigue === "0") missingFatigue = true;
+                let sessionFatigue = (sFatigue && sFatigue !== "0") ? Number(sFatigue) : avgFatigue;
                 
                 if (sessionFatigue > maxFatigue) maxFatigue = sessionFatigue;
 
-                const sessionClimbs = allLogs.filter(c => String(c.SessionID) === String(session.SessionID));
+                const sessionClimbs = allLogs.filter(c => String(getV(c, 'SessionID')) === String(getV(session, 'SessionID')));
                 sessionClimbs.forEach(climb => {
-                    const conf = getScaleConfig(climb.Type);
-                    const cleanGrade = getBaseGrade(climb.Grade);
+                    const conf = getScaleConfig(getV(climb, 'Type'));
+                    const cleanGrade = getBaseGrade(getV(climb, 'Grade'));
                     const gradeIdx = conf.labels.indexOf(cleanGrade);
                     const baseXP = gradeIdx > -1 ? conf.scores[gradeIdx] : 0;
-                    const pitches = climb.Pitches ? Number(climb.Pitches) : 1;
+                    const pitches = getV(climb, 'Pitches') ? Number(getV(climb, 'Pitches')) : 1;
+                    const style = getV(climb, 'Style');
                     
-                    if (['Project', 'Worked', 'project', 'worked'].includes(climb.Style)) {
-                        let hpFactor = climb.HighPoint ? (Number(climb.HighPoint) / 100) : 0.5;
-                        let burns = (climb.Burns && climb.Burns !== '-') ? Number(climb.Burns) : 1;
+                    if (['Project', 'Worked', 'project', 'worked'].includes(style)) {
+                        let hpFactor = getV(climb, 'HighPoint') ? (Number(getV(climb, 'HighPoint')) / 100) : 0.5;
+                        let burns = (getV(climb, 'Burns') && getV(climb, 'Burns') !== '-') ? Number(getV(climb, 'Burns')) : 1;
                         totalVolume += (baseXP * hpFactor * burns) * pitches;
                     } else {
-                        totalVolume += Number(climb.Score) * pitches;
+                        totalVolume += Number(getV(climb, 'Score') || 0) * pitches;
                     }
                 });
             });
@@ -377,6 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let acuteLoad = 0; 
             let chronicLoad = 0;
             let blockedByAcuteFatigue = false;
+            let daysActiveAcute = 0;
 
             const today = new Date();
             today.setHours(0,0,0,0);
@@ -388,6 +402,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 let { load, missingFatigue } = ReadinessEngine.calculateDailyLoad(dateString, validSessions);
                 
+                if (load > 0 && i < 7) daysActiveAcute++;
+
                 if (i < 7) {
                     acuteLoad += load;
                     if (missingFatigue) blockedByAcuteFatigue = true;
@@ -396,25 +412,26 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (blockedByAcuteFatigue) {
-                return { status: 'LOCKED', percent: '-', ratio: '-', color: '#737373', msg: "⚠️ Missing Session Fatigue. Update recent logs in Journal to unlock Readiness Score." };
+                return { status: 'LOCKED', percent: '- %', ratio: '---', color: '#737373', msg: "⚠️ Missing Session Fatigue. Update recent logs in Journal to unlock Readiness Score." };
             }
 
             chronicLoad = chronicLoad / 4;
 
             if (chronicLoad < 2000) {
-                return { status: 'CALIBRATING', percent: '...', ratio: '-', color: '#3b82f6', msg: "Building Base: Volume too low for accurate ACWR. Focus on steady accumulation." };
+                return { status: 'CALIBRATING', percent: '...', ratio: '---', color: '#3b82f6', msg: "Building Base: Volume too low for accurate ACWR. Focus on steady accumulation." };
             }
 
             const ratioNum = acuteLoad / chronicLoad;
             const ratio = ratioNum.toFixed(2);
 
-            if (ratioNum > 1.5) return { status: 'DANGER', percent: '30%', color: '#ff1744', ratio: ratio + 'x', msg: "Overtraining risk. High injury probability. Strict rest recommended." };
-            if (ratioNum > 1.3) return { status: 'WARNING', percent: '55%', color: '#ffc107', ratio: ratio + 'x', msg: "High systemic load. Focus on volume, avoid limit projecting." };
+            if (ratioNum > 1.5) return { status: 'DANGER', percent: '30%', color: '#ff4d4d', ratio: ratio + 'x', msg: "Overtraining risk. High injury probability. Strict rest recommended." };
+            if (ratioNum > 1.3) return { status: 'WARNING', percent: '55%', color: '#ffd700', ratio: ratio + 'x', msg: "High systemic load. Focus on volume, avoid limit projecting." };
             
-            if (ratioNum < 0.8 && acuteLoad < 1000) return { status: 'PRIME', percent: '100%', color: '#00e5ff', ratio: ratio + 'x', msg: "Fully Recovered. Prime for Limit Effort." };
-            if (ratioNum < 0.8) return { status: 'UNDER', percent: '75%', color: '#ffc107', ratio: ratio + 'x', msg: "Undertraining detected. Increase training stimulus." };
+            // Phantom drop match with App.js perfectly
+            if (ratioNum < 0.8 && daysActiveAcute >= 2) return { status: 'PRIME', percent: '100%', color: '#00d084', ratio: ratio + 'x', msg: "Fully Recovered. Prime for Limit Effort." };
+            if (ratioNum < 0.8) return { status: 'UNDER', percent: '75%', color: '#ffd700', ratio: ratio + 'x', msg: "Undertraining detected. Increase training stimulus." };
             
-            return { status: 'OPTIMAL', percent: '85%', color: '#00e5ff', ratio: ratio + 'x', msg: "Balanced training. Optimal zone for power generation." };
+            return { status: 'OPTIMAL', percent: '85%', color: '#00d084', ratio: ratio + 'x', msg: "Balanced training. Optimal zone for power generation." };
         }
     };
 
@@ -466,7 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (type === 'Outdoor Multipitch') {
                 attr.Endurance += pitches;
-                if (pack === 'Heavy' || pack === 'Training Weight') attr.Tenacity += 3;
+                if (pack === 'Heavy' || pack === 'Standard') attr.Tenacity += 3;
                 if (gear === 'Trad' || gear === 'Mixed') attr.Headspace += 4;
             }
         });
@@ -558,28 +575,35 @@ document.addEventListener('DOMContentLoaded', () => {
         // ==========================================
         const acwr = ReadinessEngine.generateACWR();
         const hudWrapper = document.getElementById('readiness-hud-wrapper');
+        
         if (hudWrapper) {
+            const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+            const todayStr = new Date().toLocaleDateString('en-US', dateOptions).toUpperCase();
+
+            // Using pure classnames mapped to dashboard.html styles
             hudWrapper.innerHTML = `
-            <div class="readiness-hud-card" id="readiness-hud" style="background: var(--card-surface, #121212); margin-bottom: 24px; border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 20px ${acwr.color}15; border: 1px solid rgba(255, 255, 255, 0.05); position: relative; overflow: hidden;">
+            <div class="section-header hud-header">
+                <span class="hud-header-title">TODAY'S READINESS</span>
+                <span class="hud-date">${todayStr}</span>
+            </div>
+            <div class="readiness-hud-card">
                 ${acwr.status === 'DANGER' ? `
-                <div class="warning-banner" id="overtrain-warning" style="background: rgba(255, 23, 68, 0.15); color: #ff1744; text-align: center; font-weight: 800; font-size: 0.8rem; padding: 6px; margin: -1.5rem -1.5rem 1rem -1.5rem; letter-spacing: 1px;">
+                <div class="warning-banner">
                     ⚠️ OVERTRAINING RISK: Reduce load today.
                 </div>` : ''}
                 
-                <div class="hud-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                    <div class="hud-column">
-                        <span class="hud-label" style="font-size: 0.75rem; color: #888888; letter-spacing: 1.5px; font-weight: 700;">READINESS</span>
-                        <div class="hud-value" id="readiness-percent" style="font-size: 3rem; font-weight: 900; margin: 0.2rem 0; color: ${acwr.color};">${acwr.percent}</div>
-                        <span class="hud-sub" id="readiness-sub" style="font-size: 0.85rem; font-weight: 600; color: #ffffff;">${acwr.status}</span>
+                <div class="hud-split">
+                    <div class="hud-left">
+                        <span class="hud-val" style="color: ${acwr.color};">${acwr.percent}</span>
+                        <span class="hud-label">READINESS</span>
                     </div>
-                    <div class="hud-column right-align" style="text-align: right;">
-                        <span class="hud-label" style="font-size: 0.75rem; color: #888888; letter-spacing: 1.5px; font-weight: 700;">LOAD RATIO</span>
-                        <div class="hud-value" id="load-ratio" style="font-size: 3rem; font-weight: 900; margin: 0.2rem 0; color: ${acwr.color};">${acwr.ratio}</div>
-                        <span class="hud-sub" style="font-size: 0.85rem; font-weight: 600; color: #ffffff;">ACWR</span>
+                    <div class="hud-right">
+                        <span class="hud-val" style="color: ${acwr.color};">${acwr.ratio}</span>
+                        <span class="hud-label">LOAD RATIO</span>
                     </div>
                 </div>
 
-                <div class="hud-prescription" id="hud-msg" style="background: rgba(255, 255, 255, 0.03); padding: 1rem; border-radius: 8px; font-size: 0.9rem; line-height: 1.4; color: #cccccc; border-left: 3px solid ${acwr.color};">
+                <div class="hud-prescription" style="border-left-color: ${acwr.color};">
                     ${acwr.msg}
                 </div>
             </div>`;
@@ -605,7 +629,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const topDay = Object.keys(dayC).length ? Object.keys(dayC).length > 0 ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-' : '-';
         
-        // Environment Logic Update Patch
         let envLabel = '-';
         const totalS = allSessionsMaster.length;
         if (totalS > 0) {
