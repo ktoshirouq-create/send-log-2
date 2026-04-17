@@ -38,7 +38,7 @@
         .section-header { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #737373; margin-bottom: 24px; font-weight: 700; position: relative; padding-bottom: 0; }
         .section-header::after { content: ''; position: absolute; left: 0; bottom: -8px; width: 24px; height: 2px; background: #10b981; border-radius: 2px; }
         
-        /* Updated Identity Grid - Now perfectly balanced with 3 columns */
+        /* Updated Identity Grid - Perfectly balanced 3 columns */
         .identity-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         .identity-card { background: #181818; padding: 18px; border-radius: 12px; text-align: center; transition: transform 0.2s, background 0.2s; border: 1px solid #262626; }
         .identity-card.clickable { cursor: pointer; }
@@ -46,6 +46,25 @@
         .id-lbl { font-size: 10px; color: #737373; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: 600; }
         .id-val { font-size: 1.05rem; font-weight: 700; color: #fff; transition: color 0.3s; }
         .identity-card.clickable .id-val { color: #10b981; }
+
+        /* ==========================================
+           POGO-STYLE READINESS HUD CSS
+        ========================================== */
+        #readiness-hud-wrapper { margin-bottom: 24px; }
+        .hud-header { display: flex; justify-content: space-between; align-items: center; margin: 0 0 16px 0; border-bottom: 1px solid #262626; padding-bottom: 8px; }
+        .hud-header-title { font-size: 0.75rem; color: #737373; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; }
+        .hud-date { color: #555; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        
+        .readiness-hud-card { background: linear-gradient(145deg, #161616 0%, #0a0a0a 100%); border-radius: 16px; padding: 24px; box-shadow: 0 12px 32px rgba(0,0,0,0.6); border: 1px solid #262626; position: relative; overflow: hidden; }
+        .warning-banner { background: rgba(220, 53, 69, 0.15); color: #ff4d4d; text-align: center; font-weight: 800; font-size: 0.75rem; padding: 8px; border-radius: 8px; margin-bottom: 20px; letter-spacing: 1px; text-transform: uppercase; }
+        
+        .hud-split { display: flex; justify-content: space-between; margin-bottom: 24px; }
+        .hud-left { display: flex; flex-direction: column; }
+        .hud-right { display: flex; flex-direction: column; text-align: right; }
+        .hud-val { font-size: 3.5rem; font-weight: 900; line-height: 1; margin-bottom: 6px; font-family: 'Inter', -apple-system, sans-serif; letter-spacing: -1px; }
+        .hud-label { font-size: 0.7rem; color: #737373; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+        
+        .hud-prescription { background: #121212; border-left: 3px solid transparent; padding: 16px; border-radius: 8px; font-size: 0.9rem; color: #e5e5e5; line-height: 1.5; font-weight: 500; border-top: 1px solid #1f1f1f; border-right: 1px solid #1f1f1f; border-bottom: 1px solid #1f1f1f; }
 
         .chart-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; position: relative; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;}
@@ -96,7 +115,7 @@
             .log-table th, .log-table td { padding: 14px 4px; font-size: 0.85rem; }
             .col-style { font-size: 0.75rem; } 
             .dash-card { padding: 18px; }
-            .identity-grid { grid-template-columns: 1fr 1fr 1fr; } /* Ensures 3 cols stay intact on mobile */
+            .identity-grid { grid-template-columns: 1fr 1fr 1fr; }
         }
     </style>
 </head>
@@ -125,12 +144,18 @@
         </div>
     </div>
 
-    <div id="readiness-hud-wrapper"></div>
-
     <div class="stats-grid">
         <div class="stat-card"><div class="stat-val" id="stat-sends">0</div><div class="stat-lbl">Total Sends</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-outdoor">0</div><div class="stat-lbl">Outdoor Days</div></div>
         <div class="stat-card"><div class="stat-val" id="stat-peak">-</div><div class="stat-lbl">Peak Grade</div></div>
+    </div>
+
+    <div id="readiness-hud-wrapper">
+        </div>
+
+    <div class="dash-card">
+        <div class="section-header">Climber Profile</div>
+        <div class="chart-wrapper" style="height: 300px;"><canvas id="attributeRadarChart"></canvas></div>
     </div>
 
     <div class="dash-card">
@@ -143,11 +168,6 @@
                 <div class="id-val" id="id-arch">-</div>
             </div>
         </div>
-    </div>
-
-    <div class="dash-card">
-        <div class="section-header">Climber Profile</div>
-        <div class="chart-wrapper" style="height: 300px;"><canvas id="attributeRadarChart"></canvas></div>
     </div>
 
     <div class="dash-card" id="pyramidCard">
