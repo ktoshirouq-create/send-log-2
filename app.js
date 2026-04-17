@@ -35,13 +35,6 @@ const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢�
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
 
-const getJournalDateObj = (dStr) => {
-    const clean = getCleanDate(dStr);
-    const [y, m, d] = clean.split('-');
-    const dateObj = new Date(y, parseInt(m)-1, d);
-    return { main: `${d} ${AppConfig.months[parseInt(m)-1]}`, sub: AppConfig.days[dateObj.getDay()] };
-};
-
 const formatShortDate = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
@@ -874,19 +867,27 @@ const App = {
             if(noDataMsg) noDataMsg.style.display = 'none';
         }
 
+        // --- STRICT MONTHLY GROUPING LOGIC ---
         const grouped = {};
         viewLogs.forEach(l => {
-            const d = getCleanDate(l.Date);
-            if (!grouped[d]) grouped[d] = [];
-            grouped[d].push(Number(l.Score));
+            const d = new Date(getCleanDate(l.Date));
+            // Create a key for the first of the month
+            const monthKey = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+
+            if (!grouped[monthKey]) grouped[monthKey] = [];
+            grouped[monthKey].push(Number(l.Score));
         });
 
-        const sortedDates = Object.keys(grouped).sort((a,b) => new Date(a) - new Date(b)).slice(-15); 
-        const chartLabels = sortedDates.map(d => formatShortDate(d));
-        const chartData = sortedDates.map(d => {
-            if (State.chartMode === 'max') return Math.max(...grouped[d]);
-            const sum = grouped[d].reduce((a,b) => a+b, 0);
-            return Math.round(sum / grouped[d].length);
+        const sortedMonths = Object.keys(grouped).sort((a,b) => Number(a) - Number(b)).slice(-12);
+        const chartLabels = sortedMonths.map(ts => {
+            const d = new Date(Number(ts));
+            return `${AppConfig.months[d.getMonth()]} ${d.getFullYear().toString().substr(-2)}`; 
+        });
+        
+        const chartData = sortedMonths.map(ts => {
+            if (State.chartMode === 'max') return Math.max(...grouped[ts]);
+            const sum = grouped[ts].reduce((a,b) => a+b, 0);
+            return Math.round(sum / grouped[ts].length);
         });
 
         if (window.mainChart) window.mainChart.destroy();
@@ -901,9 +902,11 @@ const App = {
                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
                     borderWidth: 3,
                     pointBackgroundColor: '#10b981',
-                    pointRadius: 4,
+                    pointRadius: 6,
+                    pointBorderColor: '#0a0a0a',
+                    pointBorderWidth: 2,
                     fill: true,
-                    tension: 0.3
+                    tension: 0.35
                 }]
             },
             options: {
@@ -911,6 +914,13 @@ const App = {
                 plugins: { 
                     legend: { display: false },
                     tooltip: {
+                        backgroundColor: 'rgba(10,10,10,0.9)',
+                        titleColor: '#888',
+                        bodyColor: '#fff',
+                        bodyFont: { weight: 'bold', size: 14 },
+                        padding: 12,
+                        borderColor: '#262626',
+                        borderWidth: 1,
                         callbacks: {
                             label: function(context) {
                                 const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - context.raw) < Math.abs(prev - context.raw) ? curr : prev);
@@ -921,12 +931,14 @@ const App = {
                     }
                 },
                 scales: {
-                    x: { grid: { display: false, drawBorder: false }, ticks: { color: '#737373', font: { size: 10 } } },
+                    x: { grid: { display: false, drawBorder: false }, ticks: { color: '#737373', font: { size: 10, weight: '600' } } },
                     y: { 
                         grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, 
+                        beginAtZero: false,
                         ticks: { 
                             color: '#737373', 
-                            font: { size: 10 },
+                            font: { size: 10, weight: '700' },
+                            maxTicksLimit: 6,
                             callback: function(value) {
                                 const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev);
                                 const idx = conf.scores.indexOf(closest);
