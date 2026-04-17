@@ -108,7 +108,6 @@ const State = new Proxy({
             const conf = getScaleConfig(value);
             const isOutdoor = value.includes('Outdoor') || value.includes('Multipitch');
             
-            // Vulnerability Patch: Prevent Out of Bounds UI Crash
             if (!conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
                 target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
             }
@@ -117,7 +116,6 @@ const State = new Proxy({
                 target.activeGym = 'OKS';
             }
 
-            // Edit-Mode Cleanser / Data Bleed Patch
             if (!isOutdoor) {
                 target.activeRating = 0;
                 target.activeApproach = null;
@@ -147,7 +145,7 @@ const State = new Proxy({
             ];
             if (softPaintTriggers.includes(prop)) {
                 App.updateUISelections(); 
-                // Removed renderDashboardHUD trigger as HUD is strictly in dashboard.js
+                if (prop === 'chartMode' && target.view === 'dash') App.renderDashboardHUD();
             }
         }
 
@@ -183,7 +181,6 @@ const SyncManager = {
                 SyncManager.pushAll(unsyncedSessions, unsyncedClimbs);
             }
 
-            // Cloud Defender Patch: Never overwrite local multipitch rich data with cloud nulls
             State.climbs = [...cloudClimbs, ...unsyncedClimbs].reduce((acc, current) => {
                 const existingIdx = acc.findIndex(item => String(item.ClimbID) === String(current.ClimbID));
                 if (existingIdx === -1) return acc.concat([current]);
@@ -196,7 +193,6 @@ const SyncManager = {
                     current.PitchBreakdown = existing.PitchBreakdown;
                 }
                 
-                // Keep local modifications if local is newer (unsynced)
                 acc[existingIdx] = (current._synced === false) ? current : { ...existing, ...current, _synced: existing._synced };
                 return acc;
             }, []).filter(c => !deletedClimbs.includes(String(c.ClimbID)));
@@ -432,7 +428,6 @@ const App = {
         const fatCont = document.getElementById('fatigue-track-container');
         if(fatCont) {
             fatCont.addEventListener('mousedown', (e) => { App.isDraggingFatigue = true; App.handleFatigueSlide(e); });
-            // Strict touch-action natively handles vertical scroll isolation.
             fatCont.addEventListener('touchstart', (e) => { App.isDraggingFatigue = true; App.handleFatigueSlide(e); }, {passive: true});
         }
 
@@ -711,7 +706,6 @@ const App = {
         const isOut = State.discipline.includes('Outdoor');
         const isMulti = State.discipline === 'Outdoor Multipitch';
 
-        // Context Hiding Patch
         const ratingSec = document.getElementById('rating-section') || document.getElementById('starRating')?.parentElement;
         if (ratingSec) ratingSec.style.display = isOut ? 'block' : 'none';
 
@@ -850,16 +844,99 @@ const App = {
     },
     
     renderDashboard: () => { 
-        // Execute dead charts on the main screen so they stay hidden
-        const ctxCanvas = document.getElementById('progressChart');
-        if (ctxCanvas) ctxCanvas.style.display = 'none';
-        const chartTog = document.getElementById('chartToggle');
-        if (chartTog) chartTog.style.display = 'none';
-        const noDataMsg = document.getElementById('noDataMsg');
-        if (noDataMsg) noDataMsg.style.display = 'none';
-
-        // Render the log list below the Nerd Dashboard button
+        App.renderDashboardHUD();
         App.renderDashboardLogs(); 
+    },
+
+    renderDashboardHUD: () => {
+        const dStr = String(State.discipline || "");
+        const conf = getScaleConfig(dStr);
+        const viewLogs = State.climbs.filter(l => l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(l.Style));
+        
+        const chartTog = document.getElementById('chartToggle');
+        if (chartTog) {
+            chartTog.style.display = 'flex';
+            chartTog.innerHTML = `
+                <div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" data-val="max" onclick="App.haptic(); State.chartMode='max'">Max Grade</div>
+                <div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" data-val="avg" onclick="App.haptic(); State.chartMode='avg'">Volume (Avg)</div>
+            `;
+        }
+
+        const ctxCanvas = document.getElementById('progressChart');
+        const noDataMsg = document.getElementById('noDataMsg');
+        
+        if (viewLogs.length === 0) {
+            if(ctxCanvas) ctxCanvas.style.display = 'none';
+            if(noDataMsg) noDataMsg.style.display = 'block';
+            return;
+        } else {
+            if(ctxCanvas) ctxCanvas.style.display = 'block';
+            if(noDataMsg) noDataMsg.style.display = 'none';
+        }
+
+        const grouped = {};
+        viewLogs.forEach(l => {
+            const d = getCleanDate(l.Date);
+            if (!grouped[d]) grouped[d] = [];
+            grouped[d].push(Number(l.Score));
+        });
+
+        const sortedDates = Object.keys(grouped).sort((a,b) => new Date(a) - new Date(b)).slice(-15); 
+        const chartLabels = sortedDates.map(d => formatShortDate(d));
+        const chartData = sortedDates.map(d => {
+            if (State.chartMode === 'max') return Math.max(...grouped[d]);
+            const sum = grouped[d].reduce((a,b) => a+b, 0);
+            return Math.round(sum / grouped[d].length);
+        });
+
+        if (window.mainChart) window.mainChart.destroy();
+        const ctx = ctxCanvas.getContext('2d');
+        window.mainChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartLabels,
+                datasets: [{
+                    data: chartData,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#10b981',
+                    pointRadius: 4,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - context.raw) < Math.abs(prev - context.raw) ? curr : prev);
+                                const idx = conf.scores.indexOf(closest);
+                                return ` ${conf.labels[idx]} (${context.raw} XP)`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false, drawBorder: false }, ticks: { color: '#737373', font: { size: 10 } } },
+                    y: { 
+                        grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, 
+                        ticks: { 
+                            color: '#737373', 
+                            font: { size: 10 },
+                            callback: function(value) {
+                                const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev);
+                                const idx = conf.scores.indexOf(closest);
+                                return conf.labels[idx] || '';
+                            }
+                        } 
+                    }
+                }
+            }
+        });
     },
 
     renderDashboardLogs: () => {
