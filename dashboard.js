@@ -65,9 +65,23 @@ const Dashboard = {
 
     toggleRow: (id) => {
         Dashboard.haptic();
+        
+        // ACCORDION LOGIC: Close any other open rows first
+        document.querySelectorAll('.table-row.expanded').forEach(r => {
+            if (r.id !== `row-${id}`) {
+                r.classList.remove('expanded');
+                const dId = r.id.replace('row-', 'details-');
+                const d = document.getElementById(dId);
+                if (d) d.classList.remove('active');
+            }
+        });
+
         const row = document.getElementById(`row-${id}`);
         const details = document.getElementById(`details-${id}`);
-        if(row && details) { row.classList.toggle('expanded'); details.classList.toggle('active'); }
+        if(row && details) { 
+            row.classList.toggle('expanded'); 
+            details.classList.toggle('active'); 
+        }
     },
 
     editClimb: (id) => {
