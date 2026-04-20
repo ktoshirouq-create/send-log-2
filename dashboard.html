@@ -46,20 +46,23 @@
         .id-val { font-size: 1.05rem; font-weight: 700; color: #fff; transition: color 0.3s; }
         .identity-card.clickable .id-val { color: #10b981; }
 
-        /* HYBRID ACWR Readiness UI */
+        /* HYBRID ACWR Readiness UI - Marker Fix Applied */
         .acwr-giant-row { display: flex; gap: 30px; align-items: baseline; margin-bottom: 24px; }
         .acwr-giant-val { font-size: 3.5rem; font-weight: 800; line-height: 1; letter-spacing: -1.5px; transition: color 0.3s; }
         .acwr-giant-lbl { font-size: 0.7rem; color: #737373; font-weight: 800; letter-spacing: 1.5px; margin-top: 8px; text-transform: uppercase; }
         
         .acwr-callout { padding: 16px 20px; border-radius: 10px; margin-bottom: 20px; font-weight: 600; font-size: 0.95rem; color: #e5e5e5; line-height: 1.5; transition: all 0.3s; }
         
-        .acwr-bar-bg { width: 100%; height: 12px; background: #202020; border-radius: 6px; overflow: hidden; margin-bottom: 24px; display: flex; position: relative; }
+        /* Removed overflow:hidden from the background so marker renders fully */
+        .acwr-bar-bg { width: 100%; height: 12px; background: #202020; border-radius: 6px; margin-bottom: 24px; display: flex; position: relative; }
         .acwr-zone { height: 100%; }
-        .zone-blue { width: 40%; background: rgba(59, 130, 246, 0.2); }
+        /* Added border-radius manually to the end zones */
+        .zone-blue { width: 40%; background: rgba(59, 130, 246, 0.2); border-radius: 6px 0 0 6px; }
         .zone-green { width: 25%; background: rgba(16, 185, 129, 0.2); }
         .zone-yellow { width: 10%; background: rgba(234, 179, 8, 0.2); }
-        .zone-red { width: 25%; background: rgba(239, 68, 68, 0.2); }
-        .acwr-marker { width: 4px; height: 18px; background: #fff; border-radius: 2px; position: absolute; top: -3px; transition: left 0.5s ease; box-shadow: 0 0 10px rgba(255,255,255,0.8); left: 0%; }
+        .zone-red { width: 25%; background: rgba(239, 68, 68, 0.2); border-radius: 0 6px 6px 0; }
+        /* Added transform:translateX(-50%) so it sits exactly over the line without flowing right */
+        .acwr-marker { width: 4px; height: 18px; background: #fff; border-radius: 2px; position: absolute; top: -3px; transition: left 0.5s ease; box-shadow: 0 0 10px rgba(255,255,255,0.8); left: 0%; transform: translateX(-50%); }
 
         .acwr-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: rgba(255,255,255,0.02); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.03); }
         .acwr-stat-lbl { font-size: 0.65rem; color: #737373; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
@@ -119,14 +122,12 @@
         .modal-btn { background: #1a1a1a; color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; font-weight: 700; width: 100%; margin-top: 24px; transition: background 0.2s; font-family: inherit; }
         .modal-btn:hover { background: #262626; }
 
-        /* MULTI-PLATFORM RESPONSIVENESS */
         @media (max-width: 768px) { 
             .grid-2 { grid-template-columns: 1fr; } 
             .log-table th, .log-table td { padding: 14px 4px; font-size: 0.85rem; }
             .col-style { font-size: 0.75rem; } 
             .dash-card { padding: 18px; }
             
-            /* NEW: Breaks the Identity Grid into 2 rows, expanding the Archetype into a full-width banner */
             .identity-grid { grid-template-columns: 1fr 1fr; }
             .identity-card:last-child { grid-column: span 2; }
         }
@@ -189,7 +190,7 @@
             <div class="acwr-zone zone-green"></div>
             <div class="acwr-zone zone-yellow"></div>
             <div class="acwr-zone zone-red"></div>
-            <div class="acwr-marker" id="ui-acwr-marker" style="left: 0%;"></div>
+            <div class="acwr-marker" id="ui-acwr-marker"></div>
         </div>
 
         <div class="acwr-stats-grid">
@@ -279,6 +280,6 @@
         </div>
     </div>
 
-    <script src="dashboard.js?v=69"></script> 
+    <script src="dashboard.js?v=70"></script> 
 </body>
 </html>
