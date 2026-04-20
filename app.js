@@ -37,12 +37,7 @@ const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalIS
 
 const escapeHTML = (str) => {
     if (!str) return "";
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 };
 
 const getJournalDateObj = (dStr) => {
@@ -65,7 +60,7 @@ const getScaleConfig = (disc) => {
     return AppConfig.grades.ropesIn;
 };
 
-// TYPOGRAPHIC BADGES (Safely lowercases inputs to prevent undefined errors)
+// TYPOGRAPHIC BADGES
 const getStyleBadge = (style) => {
     const lowerStyle = String(style || "").toLowerCase();
     const map = {
@@ -103,7 +98,11 @@ const State = new Proxy({
     activeGrade: { text: initConf.labels[gIdx], score: initConf.scores[gIdx] },
     activeStyle: initStyle, activeBurns: '-', activeHighPoint: 50, activeDate: getLocalISO(), activeGym: initGym, chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
-    activePitches: 2, activeGearStyle: '', activePackWeight: '',
+    
+    // NEW MULTIPITCH STATE TRACKER
+    activePitches: [{type: 'Lead', grade: initConf.labels[gIdx]}, {type: 'Lead', grade: initConf.labels[gIdx]}], 
+    
+    activeGearStyle: '', activePackWeight: '',
     climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
 }, {
     set(target, prop, value) {
@@ -132,8 +131,12 @@ const State = new Proxy({
                 target.activeApproach = null;
                 target.activePackWeight = '';
                 target.activeGearStyle = '';
-                target.activePitches = 2;
                 App.updateDynamicRatingText(0);
+            }
+            
+            // Clean pitch state when switching back to multi
+            if (value === 'Outdoor Multipitch') {
+                target.activePitches = [{type: 'Lead', grade: target.activeGrade.text}, {type: 'Lead', grade: target.activeGrade.text}];
             }
 
             App.renderUI();
@@ -238,6 +241,7 @@ const App = {
     isDraggingHP: false,
     isDraggingFatigue: false,
     editingClimbId: null,
+    editingPitchIdx: null,
     
     init: () => {
         if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
@@ -317,12 +321,24 @@ const App = {
         State.activeBurns = climb.Burns || '-';
         State.activeHighPoint = climb.HighPoint || 50;
         
-        State.activePitches = climb.Pitches || 2;
         State.activeGearStyle = climb.GearStyle || '';
         State.activePackWeight = climb.PackWeight || '';
         
-        const pbInput = document.getElementById('input-pitch-breakdown');
-        if (pbInput) pbInput.value = climb.PitchBreakdown || '';
+        // PITCH RECONSTRUCTION ENGINE
+        if (State.discipline === 'Outdoor Multipitch') {
+            let parsedPitches = [];
+            if (climb.PitchBreakdown) {
+                let parts = climb.PitchBreakdown.split(', ');
+                parsedPitches = parts.map(p => {
+                    let [typeInitial, grade] = p.split(':');
+                    return { type: typeInitial === 'F' ? 'Follow' : 'Lead', grade: grade || climb.Grade };
+                });
+            } else {
+                let count = climb.Pitches || 2;
+                for(let i=0; i<count; i++) parsedPitches.push({ type: 'Lead', grade: climb.Grade });
+            }
+            State.activePitches = parsedPitches;
+        }
 
         State.activeRPE = climb.Effort || 'Solid';
         State.activeRating = Number(climb.Rating) || 0;
@@ -412,10 +428,35 @@ const App = {
             State.activeBurns = newVal < 1 ? '-' : newVal;
         }
     },
-    adjPitches: (dir) => { 
+
+    // MULTIPITCH BUILDER LOGIC
+    adjPitchCount: (dir) => { 
         App.haptic(); 
-        let newVal = State.activePitches + dir;
-        State.activePitches = newVal < 1 ? 1 : newVal;
+        let pArr = [...State.activePitches];
+        if (dir > 0) {
+            pArr.push({ type: 'Lead', grade: State.activeGrade.text || AppConfig.grades.ropesOut.labels[5] });
+        } else if (dir < 0 && pArr.length > 1) {
+            pArr.pop();
+        }
+        State.activePitches = pArr;
+    },
+    updatePitchObj: (index, key, val) => {
+        App.haptic();
+        let pArr = [...State.activePitches];
+        pArr[index][key] = val;
+        State.activePitches = pArr;
+    },
+    openPitchGradeModal: (idx) => {
+        App.haptic();
+        App.editingPitchIdx = idx;
+        const modal = document.getElementById('pitchGradeModal');
+        const picker = document.getElementById('pitchGradePicker');
+        const labels = AppConfig.grades.ropesOut.labels;
+        
+        if (picker) {
+            picker.innerHTML = labels.map(g => `<div class="pill ${State.activePitches[idx].grade === g ? 'active' : ''}" style="margin-bottom:8px; padding: 12px 18px;" onclick="App.updatePitchObj(${idx}, 'grade', '${g}'); document.getElementById('pitchGradeModal').classList.remove('active');">${g}</div>`).join('');
+        }
+        if (modal) modal.classList.add('active');
     },
 
     addPartner: (name) => {
@@ -725,8 +766,6 @@ const App = {
         const buildPills = (arr, activeVal, clickAction) => arr.map(item => `<div class="pill ${item === activeVal ? 'active' : ''}" data-val="${item}" onclick="${clickAction}='${item}';">${item}</div>`).join('');
 
         safeHTML('typeSelector', AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join(''));
-        
-        // ADDED THIS LINE BACK TO FIX THE DASHBOARD BUTTONS
         safeHTML('dashSelector', AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join(''));
         
         safeClass('input-outdoor', isOut ? '' : 'hidden');
@@ -811,11 +850,8 @@ const App = {
         const isMulti = State.discipline === 'Outdoor Multipitch';
         const isBould = State.discipline.includes('Boulder');
 
-        // PARTNER CONTAINER AUTO-HIDE LOGIC
         const partnerCont = document.getElementById('partner-container');
-        if (partnerCont) {
-            partnerCont.style.display = isBould ? 'none' : 'block';
-        }
+        if (partnerCont) partnerCont.style.display = isBould ? 'none' : 'block';
 
         const ratingSec = document.getElementById('rating-section');
         const starParent = document.getElementById('starRating');
@@ -827,11 +863,27 @@ const App = {
         const hpC = document.getElementById('highPointContainer');
         
         if (isMulti) {
-            if(mC) mC.classList.remove('hidden');
+            if(mC) {
+                mC.classList.remove('hidden');
+                // Render Dynamic Pitch Grid
+                const pg = document.getElementById('pitch-grid');
+                if (pg) {
+                    pg.innerHTML = State.activePitches.map((p, i) => `
+                        <div class="pitch-card">
+                            <span class="pitch-lbl">P${i+1}</span>
+                            <div class="pitch-toggle">
+                                <button class="pitch-toggle-btn ${p.type === 'Lead' ? 'active' : ''}" onclick="App.updatePitchObj(${i}, 'type', 'Lead')">L</button>
+                                <button class="pitch-toggle-btn ${p.type === 'Follow' ? 'active' : ''}" onclick="App.updatePitchObj(${i}, 'type', 'Follow')">F</button>
+                            </div>
+                            <button class="pitch-grade-btn" onclick="App.openPitchGradeModal(${i})">${p.grade} ▾</button>
+                        </div>
+                    `).join('');
+                }
+                const pV = document.getElementById('pitches-val');
+                if (pV) pV.innerText = State.activePitches.length;
+            }
             if(bC) bC.classList.add('hidden');
             if(hpC) hpC.classList.add('hidden');
-            const pV = document.getElementById('pitches-val');
-            if(pV) pV.innerText = State.activePitches;
         } else {
             if(mC) mC.classList.add('hidden');
             if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
@@ -1135,20 +1187,24 @@ const App = {
             const nextIdx = Math.min(curIdx + 1, conf.scores.length - 1);
             const pct = Math.min(100, Math.max(0, ((avgS - conf.scores[curIdx]) / (conf.scores[nextIdx] - conf.scores[curIdx])) * 100)) || 0;
             
-            let xpColor = 'var(--primary)';
-            if (dStr === 'Indoor Bouldering' && conf.colors && conf.colors[curIdx]) {
-                xpColor = conf.colors[curIdx];
+            // DUAL-COLOR XP BAR LOGIC
+            let colorBase = 'var(--primary)';
+            let colorNext = 'var(--primary)';
+            if (dStr.includes('Bouldering') && conf.colors) {
+                if (conf.colors[curIdx]) colorBase = conf.colors[curIdx];
+                if (conf.colors[nextIdx]) colorNext = conf.colors[nextIdx];
             }
 
             const xpBG = document.getElementById('xpBaseGrade'); 
             if(xpBG) {
                 xpBG.innerText = conf.labels[curIdx];
-                xpBG.style.color = xpColor;
+                xpBG.style.color = colorBase;
             }
             
             const xpNG = document.getElementById('xpNextGrade'); 
             if(xpNG) {
                 xpNG.innerText = conf.labels[nextIdx];
+                xpNG.style.color = colorNext;
             }
 
             const xpP = document.getElementById('xpPercent'); 
@@ -1157,8 +1213,8 @@ const App = {
             const xpBF = document.getElementById('xpBarFill'); 
             if(xpBF) {
                 xpBF.style.width = `${pct}%`;
-                xpBF.style.backgroundColor = xpColor;
-                xpBF.style.boxShadow = `0 0 15px ${xpColor}60`;
+                xpBF.style.background = `linear-gradient(90deg, ${colorBase}, ${colorNext})`;
+                xpBF.style.boxShadow = `0 0 15px ${colorNext}60`; // Glows with the target color
             }
         }
 
@@ -1169,14 +1225,15 @@ const App = {
             return;
         }
 
+        // Edge-To-Edge Table Builder
         let tableHtml = `
         <div class="table-responsive">
             <table class="log-table">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Route / Gym</th>
-                        <th>Grade</th>
+                        <th class="col-date">Date</th>
+                        <th class="col-route">Route / Gym</th>
+                        <th class="col-grade">Grade</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1201,16 +1258,16 @@ const App = {
 
             return `
             <tr class="table-row" id="dash-row-${l.ClimbID}" onclick="App.toggleDashRow('${l.ClimbID}')">
-                <td style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate)}</td>
-                <td style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
-                <td style="font-weight:700; color:#fff;">${cleanGrade}</td>
+                <td class="col-date" style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate)}</td>
+                <td class="col-route" style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
+                <td class="col-grade" style="font-weight:800; color:${dotColor};">${cleanGrade}</td>
             </tr>
             <tr class="details-row" id="dash-details-${l.ClimbID}">
                 <td colspan="3" style="padding:0;">
                     <div class="details-content">
                         <div class="details-grid">
                             <div><div class="d-lbl">Style</div><div class="d-val">${displayStyle}</div></div>
-                            <div><div class="d-lbl">Burns</div><div class="d-val">${l.Burns || 1}</div></div>
+                            ${type !== 'Outdoor Multipitch' ? `<div><div class="d-lbl">Burns</div><div class="d-val">${l.Burns || 1}</div></div>` : ''}
                             <div><div class="d-lbl">Rating</div><div class="d-val" style="color:#eab308;">${'★'.repeat(Number(l.Rating) || 0) || '-'}</div></div>
                             <div><div class="d-lbl">Angle</div><div class="d-val">${l.Angle || '-'}</div></div>
                             <div><div class="d-lbl">Holds</div><div class="d-val">${l.Holds || '-'}</div></div>
@@ -1290,12 +1347,22 @@ const App = {
             Notes: document.getElementById('input-notes') ? document.getElementById('input-notes').value.trim() : '', _synced: false 
         };
 
+        // NEW MULTIPITCH ACWR ENGINE & DATA COMPILER
         if (isMulti) {
-            climb.Pitches = State.activePitches;
+            let totalScore = 0;
+            State.activePitches.forEach(p => {
+                let sConf = AppConfig.grades.ropesOut;
+                let sIdx = sConf.labels.indexOf(p.grade);
+                let pScore = sIdx > -1 ? sConf.scores[sIdx] : sConf.scores[0];
+                if (p.type === 'Follow') pScore = Math.round(pScore * 0.8);
+                totalScore += pScore;
+            });
+            climb.Score = totalScore;
+            climb.Pitches = State.activePitches.length;
+            climb.PitchBreakdown = State.activePitches.map(p => `${p.type === 'Lead' ? 'L' : 'F'}:${p.grade}`).join(', ');
+            
             climb.GearStyle = State.activeGearStyle;
             climb.PackWeight = State.activePackWeight;
-            const pbInput = document.getElementById('input-pitch-breakdown');
-            climb.PitchBreakdown = pbInput ? pbInput.value.trim() : '';
         } else if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
             climb.HighPoint = State.activeHighPoint;
         }
@@ -1306,9 +1373,6 @@ const App = {
         
         const inPart = document.getElementById('input-partner');
         if (inPart) inPart.value = '';
-        
-        const pbInput = document.getElementById('input-pitch-breakdown');
-        if (pbInput) pbInput.value = '';
         
         if (App.editingClimbId) {
             State.climbs = State.climbs.map(c => String(c.ClimbID) === String(App.editingClimbId) ? climb : c);
@@ -1321,9 +1385,9 @@ const App = {
         State.activeRating = 0; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
         State.activeBurns = ['flash', 'onsight', 'toprope', 'autobelay', 'allfree'].includes(State.activeStyle) ? 1 : (['quick', 'topped'].includes(State.activeStyle) ? 2 : '-');
         State.activeHighPoint = 50;
-        State.activePitches = 2;
         State.activeGearStyle = '';
         State.activePackWeight = '';
+        State.activePitches = [{type: 'Lead', grade: State.activeGrade.text}, {type: 'Lead', grade: State.activeGrade.text}];
         
         setTimeout(() => {
             if (btn) {
