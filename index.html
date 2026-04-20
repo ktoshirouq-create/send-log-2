@@ -192,21 +192,23 @@
         .xp-bar-bg { flex: 1; height: 14px; background: #202020; border-radius: 8px; overflow: hidden; position: relative; border: inset 1px rgba(0,0,0,0.5); }
         .xp-bar-fill { height: 100%; background: var(--primary); width: 0%; border-radius: 8px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s, box-shadow 0.3s; box-shadow: 0 0 15px rgba(16,185,129,0.4); }
 
-        /* MASTER LOGBOOK TABLE CSS INJECTED HERE */
-        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.01); }
+        /* MASTER LOGBOOK TABLE CSS - OPTIMIZED FOR 3 COLUMNS */
+        .table-responsive { width: 100%; overflow: hidden; margin-top: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.01); }
         .log-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-        .log-table th { padding: 16px; color: #737373; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-        .log-table td { padding: 18px 16px; border-bottom: 1px solid rgba(255,255,255,0.03); white-space: nowrap; transition: background 0.2s; }
+        .log-table th { padding: 14px 12px; color: #737373; font-weight: 800; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        .log-table td { padding: 16px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.2s; }
+        
         .table-row { cursor: pointer; }
         .table-row:active td, .table-row.expanded td { background: rgba(255,255,255,0.03); }
-        .disc-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 12px; vertical-align: middle; }
+        .disc-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 10px; vertical-align: middle; }
         .align-right { text-align: right; }
-        .col-style { color: #a3a3a3; }
         
         .details-row { display: none; background: rgba(0,0,0,0.4); box-shadow: inset 0 5px 15px rgba(0,0,0,0.3); }
         .details-row.active { display: table-row; animation: fadeIn 0.2s ease; }
         .details-content { padding: 20px 16px; border-bottom: 1px solid var(--border); }
-        .details-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+        
+        /* DETAILS GRID - FIXED FOR MOBILE */
+        .details-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 16px; }
         .d-lbl { font-size: 0.65rem; color: #737373; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
         .d-val { font-size: 0.95rem; color: #fff; font-weight: 600; text-transform: capitalize; }
         .d-notes { grid-column: 1 / -1; font-style: italic; color: #a3a3a3; font-size: 0.9rem; line-height: 1.5; background: rgba(255,255,255,0.02); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03); margin-top: 8px;}
@@ -465,6 +467,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=83"></script>
+    <script src="app.js?v=84"></script>
 </body>
 </html>
