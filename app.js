@@ -98,10 +98,7 @@ const State = new Proxy({
     activeGrade: { text: initConf.labels[gIdx], score: initConf.scores[gIdx] },
     activeStyle: initStyle, activeBurns: '-', activeHighPoint: 50, activeDate: getLocalISO(), activeGym: initGym, chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
-    
-    // NEW MULTIPITCH STATE TRACKER
     activePitches: [{type: 'Lead', grade: initConf.labels[gIdx]}, {type: 'Lead', grade: initConf.labels[gIdx]}], 
-    
     activeGearStyle: '', activePackWeight: '',
     climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
 }, {
@@ -134,7 +131,6 @@ const State = new Proxy({
                 App.updateDynamicRatingText(0);
             }
             
-            // Clean pitch state when switching back to multi
             if (value === 'Outdoor Multipitch') {
                 target.activePitches = [{type: 'Lead', grade: target.activeGrade.text}, {type: 'Lead', grade: target.activeGrade.text}];
             }
@@ -324,7 +320,6 @@ const App = {
         State.activeGearStyle = climb.GearStyle || '';
         State.activePackWeight = climb.PackWeight || '';
         
-        // PITCH RECONSTRUCTION ENGINE
         if (State.discipline === 'Outdoor Multipitch') {
             let parsedPitches = [];
             if (climb.PitchBreakdown) {
@@ -428,8 +423,6 @@ const App = {
             State.activeBurns = newVal < 1 ? '-' : newVal;
         }
     },
-
-    // MULTIPITCH BUILDER LOGIC
     adjPitchCount: (dir) => { 
         App.haptic(); 
         let pArr = [...State.activePitches];
@@ -865,7 +858,6 @@ const App = {
         if (isMulti) {
             if(mC) {
                 mC.classList.remove('hidden');
-                // Render Dynamic Pitch Grid
                 const pg = document.getElementById('pitch-grid');
                 if (pg) {
                     pg.innerHTML = State.activePitches.map((p, i) => `
@@ -910,6 +902,23 @@ const App = {
         App.validateForm();
     },
 
+    toggleRow: (id, prefix) => {
+        App.haptic();
+        document.querySelectorAll('.table-row.expanded').forEach(r => {
+            if (r.id !== `${prefix}-row-${id}`) {
+                r.classList.remove('expanded');
+                const d = document.getElementById(r.id.replace('row', 'details'));
+                if (d) d.classList.remove('active');
+            }
+        });
+        const row = document.getElementById(`${prefix}-row-${id}`);
+        const details = document.getElementById(`${prefix}-details-${id}`);
+        if (row && details) {
+            row.classList.toggle('expanded');
+            details.classList.toggle('active');
+        }
+    },
+
     renderJournal: () => {
         const jList = document.getElementById('journalList');
         if (!jList) return;
@@ -938,47 +947,70 @@ const App = {
                 } else if (maxSend.Type.includes('Rope') || maxSend.Type.includes('Multipitch')) maxColor = 'var(--primary)';
             }
 
-            const childrenHtml = children.map(l => {
+            let childrenHtml = `
+            <div class="table-responsive" style="margin-top: 12px;">
+                <table class="log-table">
+                    <thead>
+                        <tr>
+                            <th class="col-date">Date</th>
+                            <th class="col-route">Route / Gym</th>
+                            <th class="col-grade">Grade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            childrenHtml += children.map(l => {
                 const rawGrade = String(l.Grade || "");
                 const cleanGrade = getBaseGrade(rawGrade);
+                const type = String(l.Type || "");
                 const cleanStyleLower = String(l.Style || "").toLowerCase();
                 const displayStyle = AppConfig.styles[cleanStyleLower] || (l.Style ? l.Style : 'Unknown'); 
                 
-                const isGhost = ['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(cleanStyleLower);
-                const isF = ['flash', 'onsight', 'allfree'].includes(cleanStyleLower);
-                const perfClass = isGhost ? 'ghost' : (isF ? 'fl' : 'rp');
-                
-                let inlineColor = '';
-                if (!isGhost && l.Type === 'Indoor Bouldering') {
-                    const idx = AppConfig.grades.bouldsIn.labels.indexOf(cleanGrade);
-                    if (idx > -1) inlineColor = `color: ${AppConfig.grades.bouldsIn.colors[idx]} !important;`;
-                }
+                let dotColor = '#737373';
+                if (type === 'Indoor Rope Climbing') dotColor = '#10b981';
+                else if (type === 'Indoor Bouldering') dotColor = '#3b82f6';
+                else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316';
+                else if (type === 'Outdoor Bouldering') dotColor = '#a855f7';
+                else if (type === 'Outdoor Multipitch') dotColor = '#ef4444';
+
+                const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
+                const cleanName = escapeHTML(l.Name ? l.Name.split('@')[0].trim() : "Unknown");
+                const cleanNotes = escapeHTML(l.Notes);
 
                 return `
-                <div class="log-entry ${perfClass}">
-                    <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; const isExp = p.classList.contains('expanded'); document.querySelectorAll('.session-children .log-entry').forEach(c => c.classList.remove('expanded')); if(!isExp) p.classList.add('expanded');">
-                        <div class="log-info">
-                            <div class="log-name">${l.Name.split(' @ ')[0]}${l._synced === false ? ' ☁️✕' : ''}</div>
+                <tr class="table-row" id="journal-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'journal')">
+                    <td class="col-date" style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate || l.Date)}</td>
+                    <td class="col-route" style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
+                    <td class="col-grade" style="font-weight:800; color:${dotColor};">${cleanGrade}</td>
+                </tr>
+                <tr class="details-row" id="journal-details-${l.ClimbID}">
+                    <td colspan="3" style="padding:0;">
+                        <div class="details-content">
+                            <div class="details-grid">
+                                <div><div class="d-lbl">Style</div><div class="d-val">${displayStyle}</div></div>
+                                ${type !== 'Outdoor Multipitch' ? `<div><div class="d-lbl">Burns</div><div class="d-val">${l.Burns || 1}</div></div>` : ''}
+                                <div><div class="d-lbl">Rating</div><div class="d-val" style="color:#eab308;">${'★'.repeat(Number(l.Rating) || 0) || '-'}</div></div>
+                                <div><div class="d-lbl">Angle</div><div class="d-val">${l.Angle || '-'}</div></div>
+                                <div><div class="d-lbl">Holds</div><div class="d-val">${l.Holds || '-'}</div></div>
+                                <div><div class="d-lbl">Effort</div><div class="d-val">${l.Effort || '-'}</div></div>
+                                ${l.Partner ? `<div><div class="d-lbl">Partner(s)</div><div class="d-val">${l.Partner}</div></div>` : ''}
+                                ${l.Pitches ? `<div><div class="d-lbl">Pitches</div><div class="d-val">${l.Pitches}</div></div>` : ''}
+                                ${l.GearStyle ? `<div><div class="d-lbl">Gear Style</div><div class="d-val">${l.GearStyle}</div></div>` : ''}
+                                ${l.PackWeight ? `<div><div class="d-lbl">Pack Weight</div><div class="d-val">${l.PackWeight}</div></div>` : ''}
+                                ${l.PitchBreakdown ? `<div class="d-notes" style="grid-column: 1 / -1;">Pitches: ${l.PitchBreakdown}</div>` : ''}
+                            </div>
+                            ${cleanNotes ? `<div class="d-notes">"${cleanNotes}"</div>` : ''}
+                            <div class="log-actions" style="display:flex; gap:12px; margin-top:20px;">
+                                <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
+                                <button class="log-del-btn" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
+                            </div>
                         </div>
-                        ${isGhost && l.HighPoint !== undefined ? `<div class="log-ghost-tag">High Point: ${l.HighPoint}%</div>` : ''}
-                        <div class="log-grade ${perfClass}" style="${inlineColor}">${getStyleBadge(l.Style)}${cleanGrade}</div>
-                    </div>
-                    <div class="log-details">
-                        <div class="log-details-grid">
-                            <div class="log-meta-item">STYLE<div class="log-meta-val">${displayStyle}</div></div>
-                            ${l.Partner ? `<div class="log-meta-item" style="grid-column: span 2;">PARTNER<div class="log-meta-val">${l.Partner}</div></div>` : ''}
-                            ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
-                            ${l.Pitches ? `<div class="log-meta-item">PITCHES<div class="log-meta-val">${l.Pitches}</div></div>` : ''}
-                            ${l.GearStyle ? `<div class="log-meta-item">GEAR<div class="log-meta-val">${l.GearStyle}</div></div>` : ''}
-                        </div>
-                        ${l.Notes ? `<div class="log-notes-box">"${l.Notes}"</div>` : ''}
-                        <div class="log-actions">
-                            <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
-                            <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
-                        </div>
-                    </div>
-                </div>`;
+                    </td>
+                </tr>`;
             }).join('');
+
+            childrenHtml += `</tbody></table></div>`;
 
             const isIndoorGym = AppConfig.gyms.includes(session.Location);
 
@@ -1133,23 +1165,6 @@ const App = {
         }
     },
 
-    toggleDashRow: (id) => {
-        App.haptic();
-        document.querySelectorAll('.table-row.expanded').forEach(r => {
-            if (r.id !== `dash-row-${id}`) {
-                r.classList.remove('expanded');
-                const d = document.getElementById(r.id.replace('row', 'details'));
-                if (d) d.classList.remove('active');
-            }
-        });
-        const row = document.getElementById(`dash-row-${id}`);
-        const details = document.getElementById(`dash-details-${id}`);
-        if (row && details) {
-            row.classList.toggle('expanded');
-            details.classList.toggle('active');
-        }
-    },
-
     renderDashboardLogs: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
         const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(String(l.Style).toLowerCase())).map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
@@ -1187,7 +1202,6 @@ const App = {
             const nextIdx = Math.min(curIdx + 1, conf.scores.length - 1);
             const pct = Math.min(100, Math.max(0, ((avgS - conf.scores[curIdx]) / (conf.scores[nextIdx] - conf.scores[curIdx])) * 100)) || 0;
             
-            // DUAL-COLOR XP BAR LOGIC
             let colorBase = 'var(--primary)';
             let colorNext = 'var(--primary)';
             if (dStr.includes('Bouldering') && conf.colors) {
@@ -1214,7 +1228,7 @@ const App = {
             if(xpBF) {
                 xpBF.style.width = `${pct}%`;
                 xpBF.style.background = `linear-gradient(90deg, ${colorBase}, ${colorNext})`;
-                xpBF.style.boxShadow = `0 0 15px ${colorNext}60`; // Glows with the target color
+                xpBF.style.boxShadow = `0 0 15px ${colorNext}60`; 
             }
         }
 
@@ -1225,7 +1239,6 @@ const App = {
             return;
         }
 
-        // Edge-To-Edge Table Builder
         let tableHtml = `
         <div class="table-responsive">
             <table class="log-table">
@@ -1257,7 +1270,7 @@ const App = {
             const cleanNotes = escapeHTML(l.Notes);
 
             return `
-            <tr class="table-row" id="dash-row-${l.ClimbID}" onclick="App.toggleDashRow('${l.ClimbID}')">
+            <tr class="table-row" id="dash-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'dash')">
                 <td class="col-date" style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate)}</td>
                 <td class="col-route" style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
                 <td class="col-grade" style="font-weight:800; color:${dotColor};">${cleanGrade}</td>
@@ -1347,7 +1360,6 @@ const App = {
             Notes: document.getElementById('input-notes') ? document.getElementById('input-notes').value.trim() : '', _synced: false 
         };
 
-        // NEW MULTIPITCH ACWR ENGINE & DATA COMPILER
         if (isMulti) {
             let totalScore = 0;
             State.activePitches.forEach(p => {
