@@ -11,8 +11,8 @@ const AppConfig = {
     discLabels: ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder', 'Multipitch'],
     styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
-    climbStyles: ['Endurance', 'Cruxy', 'Technical', 'Athletic'],
-    holds: ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs'],
+    climbStyles: ['Endurance', 'Cruxy', 'Technical', 'Athletic', 'Crack'],
+    holds: ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs', 'Cracks'],
     rpes: ['Breezy', 'Solid', 'Limit'],
     gearStyles: ['Sport', 'Trad', 'Mixed'],
     packWeights: ['Minimal', 'Standard', 'Heavy'],
@@ -33,7 +33,15 @@ const AppConfig = {
 
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
-const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
+
+// Upgraded Date Engine to fix the UTC Timezone trap from Google Sheets
+const getCleanDate = (dStr) => {
+    if (!dStr) return getLocalISO();
+    if (typeof dStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dStr)) return dStr;
+    const d = new Date(dStr);
+    if (!isNaN(d.getTime())) return getLocalISO(d);
+    return String(dStr).substring(0, 10);
+};
 
 const escapeHTML = (str) => {
     if (!str) return "";
@@ -43,14 +51,14 @@ const escapeHTML = (str) => {
 const getJournalDateObj = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
-    const dateObj = new Date(y, parseInt(m)-1, d);
-    return { main: `${d} ${AppConfig.months[parseInt(m)-1]}`, sub: AppConfig.days[dateObj.getDay()] };
+    const dateObj = new Date(y, parseInt(m, 10)-1, parseInt(d, 10));
+    return { main: `${parseInt(d, 10)} ${AppConfig.months[parseInt(m, 10)-1]}`, sub: AppConfig.days[dateObj.getDay()] };
 };
 
 const formatShortDate = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
-    return `${d} ${AppConfig.months[parseInt(m)-1]}`;
+    return `${parseInt(d, 10)} ${AppConfig.months[parseInt(m, 10)-1]}`;
 };
 
 const getScaleConfig = (disc) => {
@@ -379,7 +387,7 @@ const App = {
             const customPill = document.getElementById('pill-custom');
             if(customPill) {
                 customPill.classList.add('active');
-                customPill.innerText = `${AppConfig.months[parseInt(m)-1]} ${parseInt(d)}`;
+                customPill.innerText = `${AppConfig.months[parseInt(m, 10)-1]} ${parseInt(d, 10)}`;
             }
         }
     },
@@ -424,7 +432,6 @@ const App = {
         }
     },
 
-    // MULTIPITCH BUILDER - Hard-locked floor of 2 pitches
     adjPitchCount: (dir) => { 
         App.haptic(); 
         let pArr = [...State.activePitches];
