@@ -8,6 +8,7 @@ const AppConfig = {
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     grades: {
         ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
+        ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
@@ -66,6 +67,7 @@ const Dashboard = {
 
     toggleRow: (id) => {
         Dashboard.haptic();
+        
         document.querySelectorAll('.table-row.expanded').forEach(r => {
             if (r.id !== `row-${id}`) {
                 r.classList.remove('expanded');
@@ -77,7 +79,10 @@ const Dashboard = {
 
         const row = document.getElementById(`row-${id}`);
         const details = document.getElementById(`details-${id}`);
-        if(row && details) { row.classList.toggle('expanded'); details.classList.toggle('active'); }
+        if(row && details) { 
+            row.classList.toggle('expanded'); 
+            details.classList.toggle('active'); 
+        }
     },
 
     setActiveMulti: (id) => {
@@ -119,7 +124,6 @@ const Dashboard = {
         
         const cruxGrade = getBaseGrade(getV(climb, 'Grade'));
         
-        // Ground line
         svg += `<line x1="20%" y1="${currentY}" x2="80%" y2="${currentY}" stroke="#262626" stroke-width="2" stroke-dasharray="4 4" />`;
         svg += `<text x="${width/2}" y="${currentY + 20}" fill="#555" font-size="11" font-weight="800" text-anchor="middle" font-family="Inter" letter-spacing="1">GROUND</text>`;
 
@@ -477,36 +481,38 @@ document.addEventListener('DOMContentLoaded', () => {
         // TOGGLE BIG WALL MODE DOM ELEMENTS
         document.querySelectorAll('.standard-card').forEach(el => el.style.display = isMultiMode ? 'none' : 'block');
         document.getElementById('standard-stats-grid').style.display = isMultiMode ? 'none' : 'grid';
-        document.getElementById('multi-stats-grid').style.display = isMultiMode ? 'grid' : 'none';
+        document.getElementById('multi-stats-wrapper').style.display = isMultiMode ? 'block' : 'none';
         document.getElementById('multipitch-topo-card').style.display = isMultiMode ? 'block' : 'none';
+        document.getElementById('limit-log-card').style.display = isMultiMode ? 'none' : 'block';
 
         // --- MULTIPITCH BIG WALL STATS & TOPO ---
         if (isMultiMode) {
             document.getElementById('stat-multi-routes').innerText = currentFilteredLogs.length;
             
-            let totalPitches = 0;
+            let maxEpic = 0;
             let peakCrux = '-';
             let peakScore = 0;
-            let uniquePartners = new Set();
+            let wallDays = new Set();
 
             currentFilteredLogs.forEach(l => {
+                let pCount = 0;
                 const breakdown = String(getV(l, 'PitchBreakdown') || "");
-                if (breakdown) totalPitches += breakdown.split(',').length;
-                else totalPitches += Number(getV(l, 'Pitches')) || 2;
+                if (breakdown) pCount = breakdown.split(',').length;
+                else pCount = Number(getV(l, 'Pitches')) || 2;
+
+                if (pCount > maxEpic) maxEpic = pCount;
 
                 const score = Number(getV(l, 'Score')) || 0;
                 if (score > peakScore) { peakScore = score; peakCrux = getBaseGrade(getV(l, 'Grade')); }
 
-                const partnerStr = getV(l, 'Partner');
-                if (partnerStr) partnerStr.split(',').forEach(p => uniquePartners.add(p.trim()));
+                const dateStr = getV(l, 'Date');
+                if (dateStr) wallDays.add(dateStr);
             });
 
-            document.getElementById('stat-multi-pitches').innerText = totalPitches;
+            document.getElementById('stat-multi-epic').innerText = maxEpic;
             document.getElementById('stat-multi-peak').innerText = peakCrux;
             document.getElementById('stat-multi-peak').style.color = '#ef4444';
-            
-            const cleanCrewCount = uniquePartners.size > 0 ? (uniquePartners.has("") ? uniquePartners.size - 1 : uniquePartners.size) : 0;
-            document.getElementById('stat-multi-crew').innerText = cleanCrewCount;
+            document.getElementById('stat-multi-days').innerText = wallDays.size;
 
             const multiSelector = document.getElementById('multi-route-selector');
             const recentMultis = [...currentFilteredLogs].sort((a,b) => new Date(getV(b, 'Date')) - new Date(getV(a, 'Date')));
