@@ -8,7 +8,6 @@ const AppConfig = {
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     grades: {
         ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
-        ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
@@ -53,6 +52,7 @@ const Dashboard = {
     sortCol: 'Date',
     sortAsc: false,
     logLimit: 10, 
+    activeMultiClimbId: null,
     
     haptic: () => { if (navigator.vibrate) navigator.vibrate(40); },
     
@@ -66,8 +66,6 @@ const Dashboard = {
 
     toggleRow: (id) => {
         Dashboard.haptic();
-        
-        // ACCORDION LOGIC: Close any other open rows first
         document.querySelectorAll('.table-row.expanded').forEach(r => {
             if (r.id !== `row-${id}`) {
                 r.classList.remove('expanded');
@@ -79,10 +77,84 @@ const Dashboard = {
 
         const row = document.getElementById(`row-${id}`);
         const details = document.getElementById(`details-${id}`);
-        if(row && details) { 
-            row.classList.toggle('expanded'); 
-            details.classList.toggle('active'); 
+        if(row && details) { row.classList.toggle('expanded'); details.classList.toggle('active'); }
+    },
+
+    setActiveMulti: (id) => {
+        Dashboard.haptic();
+        Dashboard.activeMultiClimbId = id;
+        document.querySelectorAll('#multi-route-selector .filter-pill').forEach(p => p.classList.remove('active'));
+        const activePill = Array.from(document.querySelectorAll('#multi-route-selector .filter-pill')).find(p => p.getAttribute('onclick').includes(id));
+        if (activePill) activePill.classList.add('active');
+        
+        const selectedClimb = currentFilteredLogs.find(c => getV(c, 'ClimbID') === String(id));
+        Dashboard.renderTopo(selectedClimb);
+    },
+
+    renderTopo: (climb) => {
+        const canvas = document.getElementById('topo-canvas');
+        if (!climb) { canvas.innerHTML = '<div class="empty-msg">Select a route to view topo.</div>'; return; }
+
+        let pitches = [];
+        const breakdown = String(getV(climb, 'PitchBreakdown') || "");
+        if (breakdown) {
+            pitches = breakdown.split(',').map(p => {
+                const parts = p.trim().split(':');
+                return parts.length > 1 ? parts[1].trim() : parts[0].trim();
+            });
+        } else {
+            const pCount = Number(getV(climb, 'Pitches')) || 2;
+            for(let i=0; i<pCount; i++) pitches.push(getBaseGrade(getV(climb, 'Grade')));
         }
+
+        const width = 400; 
+        const pitchHeight = 65; 
+        const padding = 50;
+        const totalHeight = (pitches.length * pitchHeight) + padding * 2;
+        
+        let svg = `<svg width="100%" height="100%" viewBox="0 0 ${width} ${totalHeight}" style="max-height: 500px;" xmlns="http://www.w3.org/2000/svg">`;
+        
+        let currentX = width / 2;
+        let currentY = totalHeight - padding; 
+        
+        const cruxGrade = getBaseGrade(getV(climb, 'Grade'));
+        
+        // Ground line
+        svg += `<line x1="20%" y1="${currentY}" x2="80%" y2="${currentY}" stroke="#262626" stroke-width="2" stroke-dasharray="4 4" />`;
+        svg += `<text x="${width/2}" y="${currentY + 20}" fill="#555" font-size="11" font-weight="800" text-anchor="middle" font-family="Inter" letter-spacing="1">GROUND</text>`;
+
+        pitches.forEach((grade, index) => {
+            const cleanG = getBaseGrade(grade);
+            const isCrux = cleanG === cruxGrade;
+            const offsetX = (Math.random() - 0.5) * 80;
+            const nextX = Math.max(80, Math.min(width - 80, currentX + offsetX));
+            const nextY = currentY - pitchHeight;
+
+            let lineColor = '#10b981'; 
+            if (isCrux) lineColor = '#ef4444'; 
+            else {
+                 const num = parseInt(cleanG);
+                 if(num >= 7) lineColor = '#c084fc';
+                 else if (num === 6) lineColor = '#eab308';
+                 else if (num <= 5) lineColor = '#3b82f6';
+            }
+
+            svg += `<path d="M ${currentX} ${currentY} Q ${currentX} ${currentY - pitchHeight/2} ${nextX} ${nextY}" fill="none" stroke="${lineColor}" stroke-width="5" stroke-linecap="round" />`;
+            svg += `<circle cx="${nextX}" cy="${nextY}" r="7" fill="#121212" stroke="${lineColor}" stroke-width="3" />`;
+            
+            const isLeft = nextX > width/2;
+            const textAnchor = isLeft ? 'start' : 'end';
+            const textOffsetX = isLeft ? 18 : -18;
+            
+            svg += `<text x="${nextX + textOffsetX}" y="${nextY + 4}" fill="#e5e5e5" font-size="13" font-weight="800" font-family="Inter" text-anchor="${textAnchor}">P${index+1}: ${grade}</text>`;
+
+            currentX = nextX;
+            currentY = nextY;
+        });
+
+        svg += `<text x="${currentX}" y="${currentY - 20}" fill="#fbbf24" font-size="13" font-weight="800" text-anchor="middle" font-family="Inter" letter-spacing="1">SUMMIT</text>`;
+        svg += `</svg>`;
+        canvas.innerHTML = svg;
     },
 
     editClimb: (id) => {
@@ -280,18 +352,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return AppConfig.grades.ropes;
     };
 
-    const getPitchStyle = (grade) => {
-        const clean = getBaseGrade(grade);
-        const num = parseInt(clean);
-        if(isNaN(num)) return 'background: #262626; color: #a3a3a3; border: 1px solid #333;';
-        if(num <= 4) return 'background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); height: 20px;'; 
-        if(num === 5) return 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); height: 24px;'; 
-        if(num === 6) return 'background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3); height: 28px;'; 
-        if(num === 7) return 'background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); height: 32px;'; 
-        if(num >= 8) return 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); height: 36px;'; 
-        return 'background: #262626; color: #a3a3a3; border: 1px solid #333;';
-    };
-
     const logSearchInput = document.getElementById('logSearch');
     if (logSearchInput) {
         logSearchInput.addEventListener('input', () => {
@@ -396,6 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDashboard() {
         Dashboard.setupInsights();
         const now = new Date();
+        const isMultiMode = activeDisc === 'Outdoor Multipitch';
         
         const allTimeLogsFiltered = allLogs.filter(l => {
             const type = String(getV(l, 'Type') || "");
@@ -413,116 +474,258 @@ document.addEventListener('DOMContentLoaded', () => {
             return diffDays <= parseInt(activeTime);
         });
 
-        // --- HYBRID ACWR READINESS ENGINE (WITH DECAY MODEL) ---
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        let rawAcute = 0; 
-        let rawChronic = 0; 
+        // TOGGLE BIG WALL MODE DOM ELEMENTS
+        document.querySelectorAll('.standard-card').forEach(el => el.style.display = isMultiMode ? 'none' : 'block');
+        document.getElementById('standard-stats-grid').style.display = isMultiMode ? 'none' : 'grid';
+        document.getElementById('multi-stats-grid').style.display = isMultiMode ? 'grid' : 'none';
+        document.getElementById('multipitch-topo-card').style.display = isMultiMode ? 'block' : 'none';
 
-        currentFilteredLogs.forEach(l => {
-            const cDate = new Date(getCleanDate(getV(l, 'Date')));
-            cDate.setHours(0,0,0,0);
-            const diffTime = Math.abs(today - cDate);
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); // Use floor so today is 0
-            const score = Number(getV(l, 'Score')) || 0;
-
-            // FATIGUE DECAY: Drops by ~14% every day.
-            if (diffDays < 7) {
-                const weight = (7 - diffDays) / 7; 
-                rawAcute += (score * weight);
-            }
-            if (diffDays < 28) {
-                rawChronic += score;
-            }
-        });
-
-        // Normalize Acute Load (Sum of weights over 7 days = 4. 7/4 = 1.75)
-        rawAcute = rawAcute * 1.75;
-
-        // Divide by 100 to convert "XP" into professional "Load Units"
-        const acuteLoad = rawAcute / 100;
-        const chronicLoad = (rawChronic / 100) / 4; 
-        const acwr = chronicLoad > 0 ? (acuteLoad / chronicLoad) : 0;
-
-        const elRatio = document.getElementById('ui-acwr-ratio');
-        const elReadiness = document.getElementById('ui-readiness-pct');
-        const elCallout = document.getElementById('ui-acwr-callout');
-        const elMarker = document.getElementById('ui-acwr-marker');
-        const elDate = document.getElementById('ui-current-date');
-
-        if(elRatio && elCallout && elReadiness) {
-            document.getElementById('ui-acute-load').innerText = `${acuteLoad.toFixed(1)} Load`;
-            document.getElementById('ui-chronic-load').innerText = `${chronicLoad.toFixed(1)} Load/wk`;
-            elRatio.innerText = acwr.toFixed(2) + 'x';
+        // --- MULTIPITCH BIG WALL STATS & TOPO ---
+        if (isMultiMode) {
+            document.getElementById('stat-multi-routes').innerText = currentFilteredLogs.length;
             
-            if (elDate) {
-                const dateOpts = { weekday: 'short', month: 'short', day: 'numeric' };
-                elDate.innerText = today.toLocaleDateString('en-US', dateOpts).toUpperCase();
-            }
+            let totalPitches = 0;
+            let peakCrux = '-';
+            let peakScore = 0;
+            let uniquePartners = new Set();
 
-            let color = '#a3a3a3';
-            let message = 'Log more climbs to establish baseline.';
-            let markerPercent = 0;
-            let readinessPct = 100;
+            currentFilteredLogs.forEach(l => {
+                const breakdown = String(getV(l, 'PitchBreakdown') || "");
+                if (breakdown) totalPitches += breakdown.split(',').length;
+                else totalPitches += Number(getV(l, 'Pitches')) || 2;
 
-            if (chronicLoad > 0) {
-                markerPercent = Math.min((acwr / 2.0) * 100, 100);
-                
-                if (acwr <= 0.8) {
-                    readinessPct = 100;
-                } else if (acwr > 0.8 && acwr <= 1.5) {
-                    readinessPct = Math.round(100 - ((acwr - 0.8) / 0.7) * 60);
-                } else {
-                    readinessPct = 35;
+                const score = Number(getV(l, 'Score')) || 0;
+                if (score > peakScore) { peakScore = score; peakCrux = getBaseGrade(getV(l, 'Grade')); }
+
+                const partnerStr = getV(l, 'Partner');
+                if (partnerStr) partnerStr.split(',').forEach(p => uniquePartners.add(p.trim()));
+            });
+
+            document.getElementById('stat-multi-pitches').innerText = totalPitches;
+            document.getElementById('stat-multi-peak').innerText = peakCrux;
+            document.getElementById('stat-multi-peak').style.color = '#ef4444';
+            
+            const cleanCrewCount = uniquePartners.size > 0 ? (uniquePartners.has("") ? uniquePartners.size - 1 : uniquePartners.size) : 0;
+            document.getElementById('stat-multi-crew').innerText = cleanCrewCount;
+
+            const multiSelector = document.getElementById('multi-route-selector');
+            const recentMultis = [...currentFilteredLogs].sort((a,b) => new Date(getV(b, 'Date')) - new Date(getV(a, 'Date')));
+            
+            if (recentMultis.length > 0) {
+                if (!Dashboard.activeMultiClimbId || !recentMultis.find(c => getV(c, 'ClimbID') === Dashboard.activeMultiClimbId)) {
+                    Dashboard.activeMultiClimbId = getV(recentMultis[0], 'ClimbID');
                 }
 
-                elReadiness.innerText = readinessPct + '%';
+                multiSelector.innerHTML = recentMultis.map(l => {
+                    const id = getV(l, 'ClimbID');
+                    const rawName = String(getV(l, 'Name') || "Unknown");
+                    const name = escapeHTML(rawName.split('@')[0].trim());
+                    return `<div class="filter-pill ${String(id) === String(Dashboard.activeMultiClimbId) ? 'active' : ''}" onclick="Dashboard.setActiveMulti('${id}')">${name}</div>`;
+                }).join('');
 
-                if (acwr < 0.8) { 
-                    color = '#3b82f6'; 
-                    message = 'Undertraining detected. Increase training stimulus to build baseline capacity.'; 
-                }
-                else if (acwr < 1.3) { 
-                    color = '#10b981'; 
-                    message = 'Optimal training load. You are primed to perform and recovering well.'; 
-                }
-                else if (acwr < 1.5) { 
-                    color = '#eab308'; 
-                    message = 'High fatigue. You are overreaching. Proceed with caution and prioritize sleep.'; 
-                }
-                else { 
-                    color = '#ef4444'; 
-                    message = 'Danger zone. Significant injury risk. Mandatory rest recommended.'; 
-                }
+                const selectedClimb = recentMultis.find(c => getV(c, 'ClimbID') === Dashboard.activeMultiClimbId);
+                Dashboard.renderTopo(selectedClimb);
             } else {
-                elReadiness.innerText = '0%';
+                multiSelector.innerHTML = '';
+                document.getElementById('topo-canvas').innerHTML = '<div class="empty-msg" style="margin-top:40px;">No multipitch routes logged in this time frame.</div>';
             }
-
-            elRatio.style.color = color;
-            elReadiness.style.color = color;
-            elCallout.innerText = message;
-            elCallout.style.background = `${color}15`; 
-            elCallout.style.borderLeft = `4px solid ${color}`;
-            elCallout.style.color = color;
-            if (elMarker) elMarker.style.left = `${markerPercent}%`;
         }
 
-        // --- PREMIUM TOP 3 BELAYERS ENGINE ---
-        const belayerCounts = {};
+        // --- STANDARD MODE LOGIC (Skip charts if in Multi Mode) ---
+        if (!isMultiMode) {
+            // HYBRID ACWR READINESS ENGINE 
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            let rawAcute = 0; 
+            let rawChronic = 0; 
+
+            currentFilteredLogs.forEach(l => {
+                const cDate = new Date(getCleanDate(getV(l, 'Date')));
+                cDate.setHours(0,0,0,0);
+                const diffTime = Math.abs(today - cDate);
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
+                const score = Number(getV(l, 'Score')) || 0;
+
+                if (diffDays < 7) {
+                    const weight = (7 - diffDays) / 7; 
+                    rawAcute += (score * weight);
+                }
+                if (diffDays < 28) rawChronic += score;
+            });
+
+            rawAcute = rawAcute * 1.75;
+            const acuteLoad = rawAcute / 100;
+            const chronicLoad = (rawChronic / 100) / 4; 
+            const acwr = chronicLoad > 0 ? (acuteLoad / chronicLoad) : 0;
+
+            const elRatio = document.getElementById('ui-acwr-ratio');
+            const elReadiness = document.getElementById('ui-readiness-pct');
+            const elCallout = document.getElementById('ui-acwr-callout');
+            const elMarker = document.getElementById('ui-acwr-marker');
+            const elDate = document.getElementById('ui-current-date');
+
+            if(elRatio && elCallout && elReadiness) {
+                document.getElementById('ui-acute-load').innerText = `${acuteLoad.toFixed(1)} Load`;
+                document.getElementById('ui-chronic-load').innerText = `${chronicLoad.toFixed(1)} Load/wk`;
+                elRatio.innerText = acwr.toFixed(2) + 'x';
+                
+                if (elDate) {
+                    const dateOpts = { weekday: 'short', month: 'short', day: 'numeric' };
+                    elDate.innerText = today.toLocaleDateString('en-US', dateOpts).toUpperCase();
+                }
+
+                let color = '#a3a3a3';
+                let message = 'Log more climbs to establish baseline.';
+                let markerPercent = 0;
+                let readinessPct = 100;
+
+                if (chronicLoad > 0) {
+                    markerPercent = Math.min((acwr / 2.0) * 100, 100);
+                    
+                    if (acwr <= 0.8) readinessPct = 100;
+                    else if (acwr > 0.8 && acwr <= 1.5) readinessPct = Math.round(100 - ((acwr - 0.8) / 0.7) * 60);
+                    else readinessPct = 35;
+
+                    elReadiness.innerText = readinessPct + '%';
+
+                    if (acwr < 0.8) { color = '#3b82f6'; message = 'Undertraining detected. Increase training stimulus to build baseline capacity.'; }
+                    else if (acwr < 1.3) { color = '#10b981'; message = 'Optimal training load. You are primed to perform and recovering well.'; }
+                    else if (acwr < 1.5) { color = '#eab308'; message = 'High fatigue. You are overreaching. Proceed with caution and prioritize sleep.'; }
+                    else { color = '#ef4444'; message = 'Danger zone. Significant injury risk. Mandatory rest recommended.'; }
+                } else {
+                    elReadiness.innerText = '0%';
+                }
+
+                elRatio.style.color = color;
+                elReadiness.style.color = color;
+                elCallout.innerText = message;
+                elCallout.style.background = `${color}15`; 
+                elCallout.style.borderLeft = `4px solid ${color}`;
+                elCallout.style.color = color;
+                if (elMarker) elMarker.style.left = `${markerPercent}%`;
+            }
+
+            // STANDARD STATS
+            const elStatSends = document.getElementById('stat-sends');
+            if (elStatSends) elStatSends.innerText = currentFilteredLogs.length;
+            
+            const outDays = new Set(currentFilteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getV(l, 'Date'))).size;
+            const elStatOutdoor = document.getElementById('stat-outdoor');
+            if (elStatOutdoor) elStatOutdoor.innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
+            
+            let maxScore = 0, peakG = '-';
+            let dayC = {}, indoorCount = 0;
+            currentFilteredLogs.forEach(l => { 
+                const s = Number(getV(l, 'Score'));
+                const style = String(getV(l, 'Style') || "").toLowerCase();
+                const isSend = s && style !== 'worked' && style !== 'toprope' && style !== 'autobelay';
+                
+                if (isSend && s > maxScore) { maxScore = s; peakG = String(getV(l, 'Grade') || ""); } 
+                
+                const dateStr = getV(l, 'Date');
+                if (dateStr) { const d = new Date(dateStr).getDay(); dayC[AppConfig.days[d]] = (dayC[AppConfig.days[d]] || 0) + 1; }
+                if (String(getV(l, 'Type') || "").toLowerCase().includes('indoor')) indoorCount++;
+            });
+
+            const peakEl = document.getElementById('stat-peak');
+            if (peakEl) {
+                const cleanPeak = getBaseGrade(peakG);
+                peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
+                if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
+                    const conf = AppConfig.grades.bouldsIn;
+                    const idx = conf.labels.indexOf(cleanPeak);
+                    peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
+                } else peakEl.style.color = '#fff';
+            }
+
+            const topDay = Object.keys(dayC).length ? Object.keys(dayC).length > 0 ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-' : '-';
+            let envLabel = '-';
+            if (currentFilteredLogs.length > 0) {
+                const inRatio = indoorCount / currentFilteredLogs.length;
+                if (inRatio >= 0.8) envLabel = 'Gym Rat';
+                else if (inRatio <= 0.4) envLabel = 'Dirtbag';
+                else envLabel = 'Gumby';
+            }
+
+            const elIdDay = document.getElementById('id-day');
+            if (elIdDay) elIdDay.innerText = topDay;
+            const elIdEnv = document.getElementById('id-safe-space');
+            if (elIdEnv) elIdEnv.innerText = envLabel;
+
+            const currAttr = calcRPG(currentFilteredLogs);
+            const baseAttr = calcRPG(allTimeLogsFiltered);
+
+            let archetype = "The All-Rounder";
+            if (currentFilteredLogs.length > 0) {
+                const archMap = { 'Power': 'The Caveman', 'Endurance': 'The Juggernaut', 'Technique': 'The Technician', 'Fingers': 'The Scalpel', 'Headspace': 'The Assassin', 'Tenacity': 'The Pitbull' };
+                const topAttrs = Object.keys(currAttr).filter(k => currAttr[k] === 100);
+                archetype = topAttrs.length > 1 ? 'The All-Rounder' : archMap[topAttrs[0]];
+            }
+            const elIdArch = document.getElementById('id-arch');
+            if (elIdArch) elIdArch.innerText = archetype;
+
+            // RENDER CHARTS
+            Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
+            
+            const gradesForPyramid = {};
+            currentFilteredLogs.forEach(l => {
+                const style = String(getV(l, 'Style') || "").toLowerCase();
+                const isSend = Number(getV(l, 'Score')) && style !== 'worked' && style !== 'toprope' && style !== 'autobelay';
+                if (isSend) {
+                    const clean = getBaseGrade(String(getV(l, 'Grade') || ""));
+                    gradesForPyramid[clean] = (gradesForPyramid[clean] || 0) + 1;
+                }
+            });
+
+            const pyrCanvas = document.getElementById('pyramidChart');
+            if (pyrCanvas) {
+                if (activeDisc === 'All' || currentFilteredLogs.length === 0) {
+                    pyrCanvas.parentElement.parentElement.style.display = 'none';
+                } else {
+                    pyrCanvas.parentElement.parentElement.style.display = 'block';
+                    const conf = getScaleConfig(activeDisc);
+                    const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
+                    const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
+                    const pyrColors = sortedGrades.map(g => {
+                        const idx = conf.labels.indexOf(g);
+                        return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
+                    });
+
+                    window.charts.pyr = new Chart(pyrCanvas, {
+                        type: 'bar',
+                        data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
+                        options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { color: '#a3a3a3', font: { weight: '600' } }, grid: { display: false, drawBorder: false } } } }
+                    });
+                }
+            }
+
+            const radarCanvas = document.getElementById('attributeRadarChart');
+            if (radarCanvas) {
+                const radarLabels = Object.keys(currAttr).map(k => [k.toUpperCase(), currAttr[k].toString()]);
+                window.charts.radar = new Chart(radarCanvas, { 
+                    type: 'radar', 
+                    data: { labels: radarLabels, datasets: [ { label: 'Current Phase', data: Object.values(currAttr), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true }, { label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.02)', pointRadius: 0, borderWidth: 2, borderDash: [4, 4], fill: true } ] }, 
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } }, tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } } }, scales: { r: { min: 0, max: 100, ticks: { display: false, stepSize: 20 }, grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } } } } 
+                });
+            }
+        } // End !isMultiMode
+
+        // --- UNIVERSAL METRICS (Apply to both modes) ---
+        const partnerCounts = {};
         currentFilteredLogs.forEach(l => {
             const partnerStr = getV(l, 'Partner');
             if (partnerStr) {
                 const names = String(partnerStr).split(',').map(n => n.trim()).filter(n => n.length > 0);
-                names.forEach(n => { belayerCounts[n] = (belayerCounts[n] || 0) + 1; });
+                names.forEach(n => { partnerCounts[n] = (partnerCounts[n] || 0) + 1; });
             }
         });
 
-        const sortedBelayers = Object.keys(belayerCounts).sort((a, b) => belayerCounts[b] - belayerCounts[a]).slice(0, 3);
-        const belayerContainer = document.getElementById('belayer-container');
+        const sortedPartners = Object.keys(partnerCounts).sort((a, b) => partnerCounts[b] - partnerCounts[a]).slice(0, 3);
+        const partnerContainer = document.getElementById('belayer-container');
 
-        if (belayerContainer) {
-            if (sortedBelayers.length > 0) {
-                belayerContainer.innerHTML = sortedBelayers.map((name, index) => {
+        if (partnerContainer) {
+            if (sortedPartners.length > 0) {
+                partnerContainer.innerHTML = sortedPartners.map((name, index) => {
                     const rank = index + 1;
                     const podiumClass = `rank-${rank}`;
                     return `
@@ -531,21 +734,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="belayer-rank-icon">${rank}</div>
                                 <div class="belayer-name">${escapeHTML(name)}</div>
                             </div>
-                            <div class="belayer-count-badge">${belayerCounts[name]} climbs</div>
+                            <div class="belayer-count-badge">${partnerCounts[name]} climbs</div>
                         </div>
                     `;
                 }).join('');
             } else {
-                belayerContainer.innerHTML = '<div class="empty-msg">Not enough belayer data yet.</div>';
+                partnerContainer.innerHTML = '<div class="empty-msg">Not enough belayer data yet.</div>';
             }
         }
 
-
-        let maxScore = 0, peakG = '-';
-        let dayC = {}, indoorCount = 0;
-        const gradesForPyramid = {};
         const steepnessPeaks = { 'Slab': null, 'Vertical': null, 'Overhang': null, 'Roof': null };
-
         const locSessions = {};
         const locs = {};
 
@@ -553,35 +751,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const s = Number(getV(l, 'Score'));
             const style = String(getV(l, 'Style') || "").toLowerCase();
             const isSend = s && style !== 'worked' && style !== 'toprope' && style !== 'autobelay';
-            const gradeStr = String(getV(l, 'Grade') || "");
-            const typeStr = String(getV(l, 'Type') || "").toLowerCase();
-            const dateStr = getV(l, 'Date');
             const angleStr = String(getV(l, 'Angle') || "");
             let nameStr = String(getV(l, 'Name') || "");
             const sessionID = String(getV(l, 'SessionID') || "");
 
-            if (isSend && s > maxScore) { 
-                maxScore = s; 
-                peakG = gradeStr; 
-            } 
-
-            if (isSend) {
-                const clean = getBaseGrade(gradeStr);
-                gradesForPyramid[clean] = (gradesForPyramid[clean] || 0) + 1;
-            }
-
-            if (dateStr) {
-                const d = new Date(dateStr).getDay();
-                const dayName = AppConfig.days[d];
-                dayC[dayName] = (dayC[dayName] || 0) + 1; 
-            }
-            if (typeStr.includes('indoor')) indoorCount++;
-
             AppConfig.steepness.forEach(st => {
                 if (angleStr.includes(st) && isSend) {
-                    if (!steepnessPeaks[st] || s > Number(getV(steepnessPeaks[st], 'Score'))) {
-                        steepnessPeaks[st] = l;
-                    }
+                    if (!steepnessPeaks[st] || s > Number(getV(steepnessPeaks[st], 'Score'))) steepnessPeaks[st] = l;
                 }
             });
 
@@ -594,183 +770,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        Object.keys(locSessions).forEach(loc => {
-            locs[loc] = locSessions[loc].size;
-        });
+        Object.keys(locSessions).forEach(loc => { locs[loc] = locSessions[loc].size; });
 
-        const elStatSends = document.getElementById('stat-sends');
-        if (elStatSends) elStatSends.innerText = currentFilteredLogs.length;
-        
-        const outDays = new Set(currentFilteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getV(l, 'Date'))).size;
-        const elStatOutdoor = document.getElementById('stat-outdoor');
-        if (elStatOutdoor) elStatOutdoor.innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
-        
-        const peakEl = document.getElementById('stat-peak');
-        if (peakEl) {
-            const cleanPeak = getBaseGrade(peakG);
-            peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
-            
-            if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
-                const conf = AppConfig.grades.bouldsIn;
-                const idx = conf.labels.indexOf(cleanPeak);
-                peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
-            } else {
-                peakEl.style.color = '#fff';
-            }
-        }
-
-        const topDay = Object.keys(dayC).length ? Object.keys(dayC).length > 0 ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-' : '-';
-        let envLabel = '-';
-        if (currentFilteredLogs.length > 0) {
-            const inRatio = indoorCount / currentFilteredLogs.length;
-            if (inRatio >= 0.8) envLabel = 'Gym Rat';
-            else if (inRatio <= 0.4) envLabel = 'Dirtbag';
-            else envLabel = 'Gumby';
-        }
-
-        const elIdDay = document.getElementById('id-day');
-        if (elIdDay) elIdDay.innerText = topDay;
-        
-        const elIdEnv = document.getElementById('id-safe-space');
-        if (elIdEnv) elIdEnv.innerText = envLabel;
-
-        // --- MULTIPITCH TOPO LANDSCAPE ---
-        const multiLogs = currentFilteredLogs.filter(l => getV(l, 'Type') === 'Outdoor Multipitch');
-        const multiCard = document.getElementById('multipitchCard');
-
-        if (multiLogs.length > 0) {
-            if(multiCard) multiCard.style.display = 'block';
-
-            const displayMulti = multiLogs.sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date'))).slice(-15); 
-
-            const landHtml = displayMulti.map(l => {
-                const breakdown = String(getV(l, 'PitchBreakdown') || "");
-                let pitches = [];
-                if (breakdown) {
-                    pitches = breakdown.split(',').map(p => {
-                        const parts = p.trim().split(':');
-                        return parts.length > 1 ? parts[1] : parts[0];
-                    });
-                } else {
-                    const pCount = Number(getV(l, 'Pitches')) || 2;
-                    for(let i=0; i<pCount; i++) pitches.push(getBaseGrade(getV(l, 'Grade')));
-                }
-
-                if(pitches.length === 0) pitches = [getBaseGrade(getV(l, 'Grade'))];
-
-                const blocksHtml = pitches.reverse().map(g => {
-                    const blockStyle = getPitchStyle(g);
-                    return `<div class="pitch-block" style="${blockStyle}">${g}</div>`;
-                }).join('');
-
-                const rawName = String(getV(l, 'Name') || "Unknown");
-                const name = rawName.split('@')[0].trim();
-
-                return `
-                <div class="spire-col" onclick="Dashboard.toggleRow('${getV(l, 'ClimbID')}')">
-                    <div class="spire-blocks">
-                        ${blocksHtml}
-                    </div>
-                    <div class="spire-name">${escapeHTML(name)}</div>
-                    <div class="spire-date">${formatShortDate(getV(l, 'Date'))}</div>
-                </div>`;
-            }).join('');
-
-            document.getElementById('multipitchLandscape').innerHTML = landHtml;
-        } else {
-            if(multiCard) multiCard.style.display = 'none';
-        }
-
-        Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
-
-        const pyrCard = document.getElementById('pyramidCard');
-        const pyrCanvas = document.getElementById('pyramidChart');
-
-        if (pyrCard && pyrCanvas) {
-            if (activeDisc === 'All' || currentFilteredLogs.length === 0) {
-                pyrCard.style.display = 'none';
-            } else {
-                pyrCard.style.display = 'block';
-                const conf = getScaleConfig(activeDisc);
-                const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
-                const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
-                
-                const pyrColors = sortedGrades.map(g => {
-                    const idx = conf.labels.indexOf(g);
-                    return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
-                });
-
-                window.charts.pyr = new Chart(pyrCanvas, {
-                    type: 'bar',
-                    data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
-                    options: { 
-                        responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
-                        plugins: { legend: { display: false } }, 
-                        scales: { 
-                            x: { display: false },
-                            y: { ticks: { color: '#a3a3a3', font: { weight: '600' } }, grid: { display: false, drawBorder: false } }
-                        } 
-                    }
-                });
-            }
-        }
-
-        const currAttr = calcRPG(currentFilteredLogs);
-        const baseAttr = calcRPG(allTimeLogsFiltered);
-
-        let archetype = "The All-Rounder";
-        if (currentFilteredLogs.length > 0) {
-            const archMap = {
-                'Power': 'The Caveman', 'Endurance': 'The Juggernaut', 'Technique': 'The Technician',
-                'Fingers': 'The Scalpel', 'Headspace': 'The Assassin', 'Tenacity': 'The Pitbull'
-            };
-            const topAttrs = Object.keys(currAttr).filter(k => currAttr[k] === 100);
-            archetype = topAttrs.length > 1 ? 'The All-Rounder' : archMap[topAttrs[0]];
-        }
-        
-        const elIdArch = document.getElementById('id-arch');
-        if (elIdArch) elIdArch.innerText = archetype;
-
-        const radarCanvas = document.getElementById('attributeRadarChart');
-        if (radarCanvas) {
-            const radarLabels = Object.keys(currAttr).map(k => [k.toUpperCase(), currAttr[k].toString()]);
-            window.charts.radar = new Chart(radarCanvas, { 
-                type: 'radar', 
-                data: { 
-                    labels: radarLabels, 
-                    datasets: [
-                        { 
-                            label: 'Current Phase', data: Object.values(currAttr), borderColor: '#10b981', 
-                            backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true
-                        },
-                        { 
-                            label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.15)', 
-                            backgroundColor: 'rgba(255,255,255,0.02)', pointRadius: 0, borderWidth: 2, borderDash: [4, 4], fill: true
-                        }
-                    ] 
-                }, 
-                options: { 
-                    responsive: true, maintainAspectRatio: false, 
-                    plugins: { 
-                        legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } },
-                        tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } }
-                    }, 
-                    scales: { 
-                        r: { 
-                            min: 0, max: 100, ticks: { display: false, stepSize: 20 }, 
-                            grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, 
-                            pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } 
-                        } 
-                    } 
-                } 
-            });
-        }
-
-        // HTML SAFE LIST RENDERER
-        const renderList = (id, html) => { 
-            const el = document.getElementById(id);
-            if(el) el.innerHTML = html || '<div class="empty-msg">No data available for this phase.</div>'; 
-        };
+        const renderList = (id, html) => { const el = document.getElementById(id); if(el) el.innerHTML = html || '<div class="empty-msg">No data available for this phase.</div>'; };
         
         const hof = [...currentFilteredLogs].filter(l => Number(getV(l, 'Rating')) >= 4).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
         renderList('list-fame', hof.map(l => {
@@ -789,11 +791,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let steepHTML = '';
         AppConfig.steepness.forEach(st => {
             const peakLog = steepnessPeaks[st];
-            if(peakLog) {
-                steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="background: rgba(59,130,246,0.15); color:#3b82f6;">${getBaseGrade(getV(peakLog, 'Grade'))}</div></div>`;
-            } else {
-                steepHTML += `<div class="list-item"><div class="list-main" style="color:#555;">${st}</div><div class="list-badge" style="background:transparent; color:#555;">-</div></div>`;
-            }
+            if(peakLog) steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="background: rgba(59,130,246,0.15); color:#3b82f6;">${getBaseGrade(getV(peakLog, 'Grade'))}</div></div>`;
+            else steepHTML += `<div class="list-item"><div class="list-main" style="color:#555;">${st}</div><div class="list-badge" style="background:transparent; color:#555;">-</div></div>`;
         });
         renderList('list-steepness', steepHTML);
 
