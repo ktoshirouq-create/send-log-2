@@ -65,8 +65,9 @@ const getScaleConfig = (disc) => {
     return AppConfig.grades.ropesIn;
 };
 
-// TYPOGRAPHIC BADGES
+// TYPOGRAPHIC BADGES (Safely lowercases inputs to prevent undefined errors)
 const getStyleBadge = (style) => {
+    const lowerStyle = String(style || "").toLowerCase();
     const map = {
         'onsight': { text: 'OS', cls: 'badge-fl' },
         'flash': { text: 'FL', cls: 'badge-fl' },
@@ -79,7 +80,7 @@ const getStyleBadge = (style) => {
         'allfree': { text: 'AF', cls: 'badge-fl' },
         'bailed': { text: 'XX', cls: 'badge-ghost' }
     };
-    const b = map[style] || { text: 'RP', cls: 'badge-rp' };
+    const b = map[lowerStyle] || { text: 'RP', cls: 'badge-rp' };
     return `<span class="micro-badge ${b.cls}">${b.text}</span>`;
 };
 
@@ -417,7 +418,6 @@ const App = {
         State.activePitches = newVal < 1 ? 1 : newVal;
     },
 
-    // SMART PARTNER SYSTEM
     addPartner: (name) => {
         App.haptic();
         const input = document.getElementById('input-partner');
@@ -713,7 +713,6 @@ const App = {
     },
 
     renderUI: () => {
-        // Safe DOM Injection Helpers
         const safeHTML = (id, html) => { const e = document.getElementById(id); if(e) e.innerHTML = html; };
         const safeClass = (id, cls) => { const e = document.getElementById(id); if(e) e.className = cls; };
         const safeText = (id, txt) => { const e = document.getElementById(id); if(e) e.innerText = txt; };
@@ -807,6 +806,13 @@ const App = {
 
         const isOut = State.discipline.includes('Outdoor');
         const isMulti = State.discipline === 'Outdoor Multipitch';
+        const isBould = State.discipline.includes('Boulder');
+
+        // PARTNER CONTAINER AUTO-HIDE LOGIC
+        const partnerCont = document.getElementById('partner-container');
+        if (partnerCont) {
+            partnerCont.style.display = isBould ? 'none' : 'block';
+        }
 
         const ratingSec = document.getElementById('rating-section');
         const starParent = document.getElementById('starRating');
@@ -864,8 +870,8 @@ const App = {
             const dateInfo = getJournalDateObj(session.Date);
             
             let maxSentStr = "-", maxColor = '#fff';
-            const sends = children.filter(c => !['worked', 'toprope', 'autobelay', 'project', 'bailed'].includes(c.Style));
-            const projects = children.filter(c => ['worked', 'toprope', 'autobelay', 'project', 'bailed'].includes(c.Style));
+            const sends = children.filter(c => !['worked', 'toprope', 'autobelay', 'project', 'bailed'].includes(String(c.Style).toLowerCase()));
+            const projects = children.filter(c => ['worked', 'toprope', 'autobelay', 'project', 'bailed'].includes(String(c.Style).toLowerCase()));
             
             if (sends.length > 0) {
                 const maxSend = sends.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max);
@@ -880,8 +886,11 @@ const App = {
             const childrenHtml = children.map(l => {
                 const rawGrade = String(l.Grade || "");
                 const cleanGrade = getBaseGrade(rawGrade);
-                const isGhost = ['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(l.Style);
-                const isF = ['flash', 'onsight', 'allfree'].includes(l.Style);
+                const cleanStyleLower = String(l.Style || "").toLowerCase();
+                const displayStyle = AppConfig.styles[cleanStyleLower] || l.Style; // Solves the "undefined 1" bug
+                
+                const isGhost = ['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(cleanStyleLower);
+                const isF = ['flash', 'onsight', 'allfree'].includes(cleanStyleLower);
                 const perfClass = isGhost ? 'ghost' : (isF ? 'fl' : 'rp');
                 
                 let inlineColor = '';
@@ -901,7 +910,7 @@ const App = {
                     </div>
                     <div class="log-details">
                         <div class="log-details-grid">
-                            <div class="log-meta-item">STYLE<div class="log-meta-val">${AppConfig.styles[l.Style] || l.Style}</div></div>
+                            <div class="log-meta-item">STYLE<div class="log-meta-val">${displayStyle}</div></div>
                             ${l.Partner ? `<div class="log-meta-item" style="grid-column: span 2;">PARTNER<div class="log-meta-val">${l.Partner}</div></div>` : ''}
                             ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
                             ${l.Pitches ? `<div class="log-meta-item">PITCHES<div class="log-meta-val">${l.Pitches}</div></div>` : ''}
@@ -954,7 +963,7 @@ const App = {
     renderDashboardCharts: () => {
         const dStr = String(State.discipline || "");
         const conf = getScaleConfig(dStr);
-        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(l.Style));
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(String(l.Style).toLowerCase()));
         
         const chartTog = document.getElementById('chartToggle');
         if (chartTog) {
@@ -1088,7 +1097,7 @@ const App = {
 
     renderDashboardLogs: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
-        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(l.Style)).map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(String(l.Style).toLowerCase())).map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
         
         const lTT = document.getElementById('listToggleTop'); 
         if(lTT) lTT.className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
@@ -1175,6 +1184,9 @@ const App = {
         tableHtml += displayLogs.map(l => {
             const cleanGrade = getBaseGrade(String(l.Grade || ""));
             const type = String(l.Type || "");
+            const cleanStyleLower = String(l.Style || "").toLowerCase();
+            const displayStyle = AppConfig.styles[cleanStyleLower] || l.Style; // Fixes the "undefined 1" bug
+            
             let dotColor = '#737373';
             if (type === 'Indoor Rope Climbing') dotColor = '#10b981';
             else if (type === 'Indoor Bouldering') dotColor = '#3b82f6';
@@ -1191,7 +1203,7 @@ const App = {
                 <td style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate)}</td>
                 <td style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
                 <td style="font-weight:700; color:#fff;">${cleanGrade}</td>
-                <td class="col-style" style="color:#a3a3a3;">${AppConfig.styles[l.Style] || l.Style}</td>
+                <td class="col-style" style="color:#a3a3a3;">${displayStyle}</td>
                 <td class="align-right" style="color: #a3a3a3; font-weight: 600;">${l.Burns || 1}</td>
             </tr>
             <tr class="details-row" id="dash-details-${l.ClimbID}">
@@ -1225,6 +1237,7 @@ const App = {
     logClimb: () => {
         App.haptic(); 
         const isOut = State.discipline.includes('Outdoor');
+        const isBould = State.discipline.includes('Boulder');
         
         const inName = document.getElementById('input-name');
         const inCrag = document.getElementById('input-crag');
@@ -1272,7 +1285,7 @@ const App = {
             SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Grade: g, Score: s, Style: State.activeStyle, 
             Burns: State.activeBurns === '-' ? '' : State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE,
             Rating: State.activeRating || "", Holds: State.activeHolds.join(', '), ClimStyles: State.activeClimbStyles.join(', '),
-            Partner: document.getElementById('input-partner') ? document.getElementById('input-partner').value.trim() : '',
+            Partner: isBould ? '' : (document.getElementById('input-partner') ? document.getElementById('input-partner').value.trim() : ''),
             Notes: document.getElementById('input-notes') ? document.getElementById('input-notes').value.trim() : '', _synced: false 
         };
 
