@@ -1,4 +1,4 @@
-const CACHE_NAME = 'crag-logger-v75'; // BUMPED TO V66 TO FORCE UPDATE
+const CACHE_NAME = 'crag-logger-v82'; //
 const ASSETS = [
   '/',
   '/index.html',
