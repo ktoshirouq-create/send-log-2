@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return diffDays <= parseInt(activeTime);
         });
 
-        // --- HYBRID ACWR READINESS ENGINE ---
+        // --- HYBRID ACWR READINESS ENGINE (WITH DECAY MODEL) ---
         const today = new Date();
         today.setHours(0,0,0,0);
         let rawAcute = 0; 
@@ -408,12 +408,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const cDate = new Date(getCleanDate(getV(l, 'Date')));
             cDate.setHours(0,0,0,0);
             const diffTime = Math.abs(today - cDate);
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); // Use floor so today is 0
             const score = Number(getV(l, 'Score')) || 0;
 
-            if (diffDays <= 7) rawAcute += score;
-            if (diffDays <= 28) rawChronic += score;
+            // FATIGUE DECAY: Drops by ~14% every day.
+            if (diffDays < 7) {
+                const weight = (7 - diffDays) / 7; 
+                rawAcute += (score * weight);
+            }
+            if (diffDays < 28) {
+                rawChronic += score;
+            }
         });
+
+        // Normalize Acute Load (Sum of weights over 7 days = 4. 7/4 = 1.75)
+        rawAcute = rawAcute * 1.75;
 
         // Divide by 100 to convert "XP" into professional "Load Units"
         const acuteLoad = rawAcute / 100;
@@ -444,7 +453,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (chronicLoad > 0) {
                 markerPercent = Math.min((acwr / 2.0) * 100, 100);
                 
-                // Readiness Math Engine (Inverse correlation to ACWR)
                 if (acwr <= 0.8) {
                     readinessPct = 100;
                 } else if (acwr > 0.8 && acwr <= 1.5) {
@@ -478,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
             elRatio.style.color = color;
             elReadiness.style.color = color;
             elCallout.innerText = message;
-            elCallout.style.background = `${color}15`; // 15% opacity background
+            elCallout.style.background = `${color}15`; 
             elCallout.style.borderLeft = `4px solid ${color}`;
             elCallout.style.color = color;
             if (elMarker) elMarker.style.left = `${markerPercent}%`;
