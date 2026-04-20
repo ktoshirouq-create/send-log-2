@@ -1,156 +1,449 @@
-function doGet(e) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var climbsSheet = ss.getSheetByName("Climbs");
-    var sessionsSheet = ss.getSheetByName("Sessions");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Send Log</title>
+    <link rel="manifest" href="manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%230a0a0a%22/><text y=%2250%22 x=%2250%22 font-size=%2255%22 text-anchor=%22middle%22 dominant-baseline=%22central%22>⛰️</text></svg>">
+    <style>
+        /* Premium Typography & Deep Backgrounds */
+        :root { 
+            --primary: #10b981; --primary-fade: rgba(16,185,129,0.12); 
+            --flash: #db2777; --dark: #050505; --card-bg: #121212; --input-bg: #181818; --border: #1a1a1a; 
+            --text: #e5e5e5; --text-muted: #737373; --danger: #ef4444; --radius: 16px;
+        }
 
-    var climbs = getSheetDataAsObjects(climbsSheet);
-    var sessions = getSheetDataAsObjects(sessionsSheet);
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--dark); color: var(--text); margin: 0; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; }
+        .container { max-width: 850px; margin: 0 auto; padding: 24px 24px 120px 24px; }
+        
+        .card { background: var(--card-bg); padding: 24px; border-radius: var(--radius); border: none; margin-bottom: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); position: relative; }
+        
+        h1 { text-align: center; font-weight: 800; font-size: 1.6rem; margin-bottom: 24px; color: #fff; letter-spacing: -0.5px; }
+        h2 { font-size: 1.05rem; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin: 0 0 20px 0; display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
+        
+        .view { display: none; animation: fadeIn 0.3s ease; }
+        .view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    return ContentService.createTextOutput(JSON.stringify({
-      status: 'success',
-      climbs: climbs,
-      sessions: sessions
-    })).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({
-      status: 'error', 
-      message: error.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
+        .bottom-nav { position: fixed; bottom: 20px; width: 92%; max-width: 500px; left: 50%; transform: translateX(-50%); background: rgba(18, 18, 18, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; gap: 8px; padding: 8px; border-radius: 30px; border: 1px solid rgba(255,255,255,0.05); z-index: 1000; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
+        .nav-btn { flex: 1; background: transparent; color: var(--text-muted); border: none; padding: 12px 8px; border-radius: 20px; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: 0.3s; white-space: nowrap; }
+        .nav-btn.active { background: var(--primary); color: #000; box-shadow: 0 4px 15px rgba(16,185,129,0.4); }
 
-function doPost(e) {
-  try {
-    var payload = JSON.parse(e.postData.contents);
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+        label { font-weight: 700; font-size: 0.7rem; color: #555; display: block; margin: 20px 0 10px 0; text-transform: uppercase; letter-spacing: 1.5px; }
+        .sub-label { font-size: 0.7rem; color: #555; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; margin-top: 16px; }
+        
+        input[type="text"], input[type="number"], input[type="date"], textarea { width: 100%; padding: 16px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 12px; font-size: 1rem; background: var(--input-bg); color: #fff; outline: none; transition: 0.2s; font-family: 'Inter', sans-serif; font-weight: 500; }
+        input:focus, textarea:focus { border-color: rgba(16,185,129,0.5); box-shadow: 0 0 0 3px rgba(16,185,129,0.1); }
+        textarea { resize: vertical; min-height: 80px; }
+        
+        .btn-main { background: var(--primary); color: #000; border: none; padding: 18px; width: 100%; border-radius: 14px; font-weight: 800; font-size: 1.05rem; cursor: pointer; margin-top: 30px; transition: all 0.2s; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 8px; letter-spacing: 0.5px; }
+        .btn-main:active { transform: scale(0.97); }
+        .btn-main:disabled { background: #262626 !important; color: #555 !important; cursor: not-allowed; box-shadow: none; transform: none; }
+        
+        .btn-ghost { background: transparent; color: #a3a3a3; border: 1px solid rgba(255,255,255,0.1); padding: 14px; width: 100%; border-radius: 14px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: 0.2s; }
+        .btn-ghost:active { background: rgba(255,255,255,0.05); }
+
+        .dash-btn { background: linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05)); border: 1px solid rgba(16,185,129,0.3); color: var(--primary); margin-top: 0; margin-bottom: 30px; box-shadow: 0 8px 20px rgba(16,185,129,0.1); }
+
+        .pill-row { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 5px; scroll-snap-type: x mandatory; scrollbar-width: none; margin-bottom: 10px; }
+        .pill-row.wrap { flex-wrap: wrap; overflow-x: visible; }
+        .pill-row::-webkit-scrollbar { display: none; }
+        .pill { flex: 0 0 auto; padding: 14px 22px; background: var(--input-bg); border: 1px solid transparent; border-radius: 12px; font-weight: 700; font-size: 0.95rem; color: #888; scroll-snap-align: center; cursor: pointer; transition: all 0.2s ease; user-select: none; text-align: center; }
+        .pill.active { background: var(--primary-fade); color: var(--primary); border-color: rgba(16,185,129,0.4); box-shadow: 0 4px 12px rgba(16,185,129,0.1); }
+
+        .advanced-toggle { background: var(--input-bg); color: #fff; font-size: 0.8rem; font-weight: 700; text-align: center; margin: 30px 0 15px 0; cursor: pointer; text-transform: uppercase; padding: 16px; border: none; border-radius: 30px; transition: 0.2s; letter-spacing: 1px; }
+        .advanced-toggle:active { transform: scale(0.98); background: #262626; }
+        
+        .zone-divider { height: 1px; background: var(--border); margin: 30px 0; border: none; }
+
+        #rating-section { transition: opacity 0.2s ease; }
+        .star-rating { display: flex; gap: 12px; font-size: 2.2rem; color: var(--border); }
+        .star-rating span { cursor: pointer; transition: 0.2s; }
+        .star-rating span.active { color: #eab308; text-shadow: 0 0 15px rgba(234, 179, 8, 0.4); }
+        #dynamic-rating-text { min-height: 1.5rem; font-size: 0.9rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; transition: opacity 0.2s ease-in-out; opacity: 0; }
+
+        .boulder-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1px solid rgba(255,255,255,0.2); vertical-align: middle; }
+        
+        .sync-badge { position: absolute; top: 24px; right: 24px; width: 10px; height: 10px; border-radius: 50%; background: var(--primary); opacity: 0; transition: 0.3s; }
+        .sync-badge.syncing { opacity: 1; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.5); opacity: 1; } }
+
+        /* SMART MODAL */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 3000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); opacity: 0; pointer-events: none; transition: 0.3s; }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-content { background: var(--card-bg); padding: 30px; border-radius: var(--radius); width: 90%; max-width: 400px; border: 1px solid var(--border); transform: translateY(20px); transition: 0.3s; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+        .modal-overlay.active .modal-content { transform: translateY(0); }
+
+        .seg-ctrl { display: flex; background: var(--input-bg); border-radius: 12px; padding: 4px; position: relative; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.03); }
+        .seg-item { flex: 1; text-align: center; padding: 12px 0; font-size: 0.75rem; font-weight: 800; color: #737373; cursor: pointer; z-index: 2; transition: color 0.3s; text-transform: uppercase; letter-spacing: 0.5px; user-select: none; }
+        .seg-item.active { color: #fff; }
+        .seg-highlight { position: absolute; top: 4px; bottom: 4px; left: 0; background: #262626; border-radius: 8px; z-index: 1; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 12px rgba(0,0,0,0.4); opacity: 0; }
+
+        /* Continuous Horizontal Scrub Sliders */
+        .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .slider-label { font-weight: 800; font-size: 0.7rem; color: #737373; text-transform: uppercase; letter-spacing: 1.5px; }
+        .slider-output { font-weight: 800; font-size: 1.15rem; color: var(--primary); }
+        .slider-track-container { display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 15px 0; touch-action: pan-y; }
+        .slider-anchor { font-size: 0.7rem; color: #555; font-weight: 800; user-select: none; }
+        .slider-track { flex: 1; height: 6px; background: #262626; border-radius: 4px; position: relative; }
+        .slider-fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--primary); border-radius: 4px; width: 0%; pointer-events: none; }
+        .slider-thumb { position: absolute; top: 50%; left: 0%; transform: translate(-50%, -50%); width: 22px; height: 22px; background: #1a1a1a; border: 2px solid var(--primary); border-radius: 50%; box-shadow: 0 0 15px rgba(16,185,129,0.4); pointer-events: none; }
+
+        .toast { position: fixed; top: 20px; left: 50%; transform: translate(-50%, -20px); opacity: 0; background: rgba(24,24,24,0.95); backdrop-filter: blur(10px); color: #fff; padding: 14px 28px; border-radius: 30px; font-weight: 600; border: 1px solid var(--border); transition: 0.3s; z-index: 2000; pointer-events: none; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+        .burns-counter { display: flex; align-items: center; justify-content: space-between; background: var(--input-bg); border: none; border-radius: 14px; padding: 8px; width: 150px; margin-bottom: 15px; }
+        .burn-btn { background: #262626; border: none; color: var(--primary); font-size: 1.5rem; font-weight: 700; width: 44px; height: 44px; border-radius: 10px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; }
+        .burn-btn:active { background: #333; transform: scale(0.95); }
+        .burns-val { font-size: 1.25rem; font-weight: 800; color: #fff; width: 30px; text-align: center; }
+
+        /* MICRO-BADGES & NESTED CARDS */
+        .micro-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; font-weight: 800; vertical-align: middle; margin-right: 10px; letter-spacing: 0.5px; }
+        .badge-fl { background: rgba(219,39,119,0.15); color: #db2777; }
+        .badge-rp { background: rgba(16,185,129,0.15); color: #10b981; }
+        .badge-ghost { background: rgba(255,255,255,0.08); color: #888; }
+
+        .log-list { border-radius: 12px; overflow: hidden; padding: 4px; }
+        .log-entry { background: rgba(255,255,255,0.02); border-radius: 8px; border-left: 3px solid transparent; margin-bottom: 8px; position: relative; transition: background 0.2s; overflow: hidden; }
+        .log-entry:last-child { margin-bottom: 0; }
+        
+        .log-entry.rp { border-left-color: var(--primary); }
+        .log-entry.fl { border-left-color: var(--flash); }
+        .log-entry.ghost { border-left-color: #333; } 
+
+        .log-summary { display: flex; align-items: center; padding: 14px 16px; cursor: pointer; user-select: none; }
+        .log-summary:active { background: rgba(255,255,255,0.04); }
+        .log-date { font-size: 0.75rem; font-weight: 700; color: #737373; width: 55px; flex-shrink: 0; }
+        .log-info { flex: 1; min-width: 0; padding: 0 10px; display: flex; flex-direction: column; justify-content: center; }
+        .log-name { font-weight: 700; font-size: 0.95rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.2s; }
+        .log-entry.ghost .log-name { color: #888; }
+        
+        .log-ghost-tag { font-size: 0.65rem; color: #888; font-weight: 800; text-transform: uppercase; padding: 4px 8px; background: rgba(255,255,255,0.04); border-radius: 4px; margin-right: 10px; letter-spacing: 0.5px; }
+
+        .log-grade { font-size: 1.15rem; font-weight: 800; text-align: right; white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; }
+        .log-grade.rp { color: var(--primary); }
+        .log-grade.fl { color: var(--flash); }
+        .log-grade.ghost { color: #555; } 
+        
+        .log-details { display: none; padding: 0 16px 16px 16px; background: rgba(0,0,0,0.1); }
+        .log-entry.expanded .log-details { display: block; animation: fadeIn 0.2s ease; }
+        .log-details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+        .log-meta-item { font-size: 0.65rem; color: #737373; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+        .log-meta-val { font-size: 0.95rem; color: #fff; font-weight: 600; margin-top: 4px; text-transform: capitalize; }
+        .log-entry.ghost .log-meta-val { color: #aaa; }
+        .log-notes-box { margin-top: 16px; background: rgba(255,255,255,0.03); padding: 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem; font-style: italic; color: #a3a3a3; line-height: 1.5; }
+        
+        /* EDIT UX */
+        .log-actions { display: flex; gap: 12px; margin-top: 20px; }
+        .log-edit-btn { flex: 1; padding: 14px; background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: none; border-radius: 10px; font-weight: 800; font-size: 0.85rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; }
+        .log-del-btn { flex: 1; padding: 14px; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: none; border-radius: 10px; font-weight: 800; font-size: 0.85rem; cursor: pointer; transition: 0.2s; text-transform: uppercase; letter-spacing: 1px; }
+        .log-edit-btn:active, .log-del-btn:active { filter: brightness(1.2); transform: scale(0.97); }
+
+        /* SESSION CARDS */
+        .session-card { background: linear-gradient(145deg, #1a1e1c, #101412); border-radius: var(--radius); margin-bottom: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.9); overflow: hidden; transition: 0.3s; border-top: 1px solid rgba(255,255,255,0.08); border-left: 1px solid rgba(255,255,255,0.03); border-right: 1px solid rgba(255,255,255,0.03); border-bottom: 1px solid transparent; }
+        .session-header { padding: 20px 20px 12px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .s-date-block { display: flex; flex-direction: column; }
+        .s-date-main { font-size: 1.25rem; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+        .s-loc { font-size: 0.8rem; color: #a3a3a3; font-weight: 700; background: rgba(0,0,0,0.4); padding: 8px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        
+        .s-tags-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 20px 16px 20px; }
+        .s-tag { padding: 6px 10px; border-radius: 6px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; cursor: pointer; transition: 0.2s; letter-spacing: 0.5px; line-height: 1.3; }
+        .s-tag:active { transform: scale(0.95); }
+        .s-tag.focus-tag { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: none; } 
+        .s-tag.fatigue-tag { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: none; } 
+        .s-tag.warmup-tag { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: none; } 
+        .s-tag.approach-tag { background: rgba(20, 184, 166, 0.15); color: #14b8a6; border: none; } 
+        .s-tag.note-tag { background: rgba(255, 255, 255, 0.15); color: #fff; border: none; } 
+        .s-tag.empty-tag { background: rgba(255,255,255,0.05); color: #737373; border: none; }
+
+        /* Flattened Session Stats & Notes */
+        .s-flat-stats { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 0.8rem; font-weight: 700; color: #a3a3a3; padding: 12px 20px; background: rgba(0,0,0,0.2); border-top: 1px solid rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.02); }
+        .s-session-notes { padding: 16px 20px 0 20px; font-size: 0.85rem; font-style: italic; color: #888; line-height: 1.5; }
+        
+        .session-accordion-btn { width: 100%; background: transparent; color: #888; border: none; padding: 18px; font-size: 0.85rem; font-weight: 800; text-transform: uppercase; cursor: pointer; transition: 0.2s; letter-spacing: 1px; }
+        .session-accordion-btn:active { background: rgba(255,255,255,0.03); color: #fff; }
+        .session-children { display: none; background: rgba(0,0,0,0.6); border-top: 1px solid rgba(255,255,255,0.03); padding: 8px; }
+        .session-card.expanded .session-children { display: block; animation: fadeIn 0.2s ease; }
+
+        .chart-toggle-row { display: flex; justify-content: center; gap: 4px; margin-bottom: 24px; background: var(--input-bg); padding: 4px; border-radius: 12px; border: 1px solid var(--border); width: fit-content; margin: 0 auto; }
+        .chart-toggle-btn { padding: 10px 18px; border-radius: 8px; font-size: 0.75rem; font-weight: 800; color: #737373; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: 0.2s; }
+        .chart-toggle-btn.active { background: #262626; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+
+        .log-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .log-header-row h2 { border: none; padding: 0; margin: 0; }
+        
+        .log-toggle { display: flex; background: var(--input-bg); border-radius: 10px; padding: 4px; border: 1px solid var(--border); }
+        .log-toggle-btn { background: transparent; color: #737373; border: none; padding: 8px 14px; font-size: 0.75rem; font-weight: 800; border-radius: 6px; cursor: pointer; text-transform: uppercase; transition: 0.2s; letter-spacing: 0.5px; }
+        .log-toggle-btn.active { color: #fff; background: #262626; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+
+        .xp-container { margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px dashed var(--border); }
+        .xp-row-top { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+        .xp-title { font-size: 0.75rem; font-weight: 800; color: #737373; text-transform: uppercase; letter-spacing: 1.5px; display:flex; align-items:center; }
+        .xp-percent { font-size: 1.3rem; font-weight: 800; color: #fff; line-height: 1; transition: 0.3s; letter-spacing: -0.5px; }
+        .xp-row-bottom { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
+        .xp-grade { font-size: 1.2rem; font-weight: 800; color: var(--primary); width: 40px; transition: 0.3s; }
+        .xp-grade.right { text-align: right; }
+        .xp-bar-bg { flex: 1; height: 14px; background: #202020; border-radius: 8px; overflow: hidden; position: relative; border: inset 1px rgba(0,0,0,0.5); }
+        .xp-bar-fill { height: 100%; background: var(--primary); width: 0%; border-radius: 8px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s, box-shadow 0.3s; box-shadow: 0 0 15px rgba(16,185,129,0.4); }
+
+        .empty-msg { color: #555; font-style: italic; font-size: 0.9rem; text-align: center; padding: 30px 0; font-weight: 500; }
+        .flex { display: flex; gap: 12px; } .flex > div { flex: 1; } .hidden { display: none !important; }
+
+        .info-icon { display:inline-block; margin-left:8px; color:var(--primary); font-size:0.9rem; font-weight:800; cursor:pointer; background:rgba(16,185,129,0.15); border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px; vertical-align:middle; transition:0.2s; }
+        .info-icon:active { transform:scale(0.9); }
+    </style>
+</head>
+<body>
+    <nav class="bottom-nav">
+        <button class="nav-btn active" id="nav-log" onclick="App.haptic(); State.view='log'">✍️ Log</button>
+        <button class="nav-btn" id="nav-journal" onclick="App.haptic(); State.view='journal'">📓 Journal</button>
+        <button class="nav-btn" id="nav-dash" onclick="App.haptic(); State.view='dash'">📊 Dashboard</button>
+    </nav>
+
+    <div id="toast" class="toast">Action Successful</div>
+
+    <div id="insightModal" class="modal-overlay" onclick="if(event.target===this) this.classList.remove('active')">
+        <div class="modal-content">
+            <h2 id="insightTitle" style="color:var(--primary); border:none; margin-bottom:15px; font-size:1.2rem;">Insight</h2>
+            <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0; white-space:pre-wrap;"></p>
+            <button class="btn-main" style="margin-top:24px; padding:14px;" onclick="document.getElementById('insightModal').classList.remove('active'); App.haptic();">Got it</button>
+        </div>
+    </div>
+
+    <div id="sessionModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 id="modalTitle" style="border:none; margin-bottom: 24px; color:var(--primary); font-size: 1.3rem;">Session Editor</h2>
+            <input type="hidden" id="modalSessionId">
+            <input type="hidden" id="modalFocusVal">
+            <input type="hidden" id="modalFatigueVal">
+            <input type="hidden" id="modalWarmUpVal">
+            <input type="hidden" id="modalApproachVal">
+            
+            <div id="sec-focus" class="hidden">
+                <div class="seg-ctrl" id="focus-segmented">
+                    <div class="seg-highlight"></div>
+                    <div class="seg-item" data-val="Limit" onclick="App.setModalFocus('Limit')">Limit</div>
+                    <div class="seg-item" data-val="Endurance" onclick="App.setModalFocus('Endurance')">Endur.</div>
+                    <div class="seg-item" data-val="Volume" onclick="App.setModalFocus('Volume')">Volume</div>
+                    <div class="seg-item" data-val="Fun" onclick="App.setModalFocus('Fun')">Fun</div>
+                </div>
+            </div>
+
+            <div id="sec-fatigue" class="hidden">
+                <div class="slider-header">
+                    <span class="slider-label">Intensity Level</span>
+                    <span class="slider-output" id="fatigue-output">- / 10</span>
+                </div>
+                <div class="slider-track-container" id="fatigue-track-container">
+                    <span class="slider-anchor">1</span>
+                    <div class="slider-track" id="fatigue-track">
+                        <div class="slider-fill" id="fatigue-fill"></div>
+                        <div class="slider-thumb" id="fatigue-thumb" style="display:none;"></div>
+                    </div>
+                    <span class="slider-anchor">10</span>
+                </div>
+            </div>
+
+            <div id="sec-warmup" class="hidden">
+                <div class="seg-ctrl" id="warmup-segmented">
+                    <div class="seg-highlight"></div>
+                    <div class="seg-item" data-val="Full" onclick="App.setModalWarmUp('Full')">Full</div>
+                    <div class="seg-item" data-val="Rushed" onclick="App.setModalWarmUp('Rushed')">Rushed</div>
+                    <div class="seg-item" data-val="None" onclick="App.setModalWarmUp('None')">None</div>
+                </div>
+            </div>
+            
+            <div id="sec-approach" class="hidden">
+                <div class="seg-ctrl" id="approach-segmented">
+                    <div class="seg-highlight"></div>
+                    <div class="seg-item" data-val="Roadside" onclick="App.setModalApproach('Roadside')">Roadside</div>
+                    <div class="seg-item" data-val="Moderate" onclick="App.setModalApproach('Moderate')">Moderate</div>
+                    <div class="seg-item" data-val="Brutal" onclick="App.setModalApproach('Brutal')">Brutal</div>
+                </div>
+            </div>
+
+            <div class="sub-label" id="sec-notes-label">Session Summary</div>
+            <textarea id="modalNotesVal" placeholder="How did the day feel?"></textarea>
+
+            <div class="flex" style="margin-top: 24px; gap: 12px;">
+                <button class="btn-ghost" onclick="document.getElementById('sessionModal').classList.remove('active');">Cancel</button>
+                <button class="btn-main" style="margin-top: 0; padding: 14px;" onclick="App.saveSessionModal()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="view-log" class="view active">
+            <h1>Send Log</h1>
+            <div class="card">
+                <div class="sync-badge"></div>
+                <div class="pill-row" id="typeSelector"></div>
+                <div id="climbForm">
+                    <label>Date</label>
+                    <div class="pill-row" id="datePicker">
+                        <div class="pill active" id="pill-today" onclick="App.setDate('today')">Today</div>
+                        <div class="pill" id="pill-yest" onclick="App.setDate('yesterday')">Yesterday</div>
+                        <div class="pill" id="pill-custom" onclick="document.getElementById('native-date').showPicker()">Custom Date</div>
+                    </div>
+                    <input type="date" id="native-date" class="hidden" onchange="App.setDate('custom', this.value)">
+                    
+                    <div id="input-indoor">
+                        <label>Select Gym</label>
+                        <div id="gymPicker" class="pill-row"></div>
+                    </div>
+                    
+                    <div id="input-outdoor" class="hidden">
+                        <div class="flex">
+                            <div><label>Route Name</label><input type="text" id="input-name" placeholder="Silence" oninput="App.validateForm()"></div>
+                            <div><label>Crag</label><input type="text" id="input-crag" placeholder="Flatanger" oninput="App.validateForm()"></div>
+                        </div>
+                    </div>
+
+                    <label>Partner(s)</label>
+                    <input type="text" id="input-partner" placeholder="Who's on belay?" oninput="App.validateForm()">
+                    <div id="partnerPicker" class="pill-row" style="margin-top: 8px;"></div>
+                    
+                    <label id="gradeLabel">Grade</label>
+                    <div id="gradePicker" class="pill-row"></div>
+
+                    <label>Style / Result</label>
+                    <div class="pill-row" id="styleSelector"></div>
+                    
+                    <div id="multipitch-container" class="hidden" style="margin-top: 15px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+                        <label style="margin-top:0;">Total Pitches</label>
+                        <div class="burns-counter" style="margin-bottom: 20px;">
+                            <button class="burn-btn" onclick="App.adjPitches(-1)">-</button>
+                            <span id="pitches-val" class="burns-val">2</span>
+                            <button class="burn-btn" onclick="App.adjPitches(1)">+</button>
+                        </div>
+                        
+                        <label>Gear Style</label>
+                        <div class="pill-row" id="gearStyleSelector"></div>
+                        
+                        <label>Pack Weight</label>
+                        <div class="pill-row" id="packWeightSelector"></div>
+                        
+                        <label>Pitch Breakdown (Optional)</label>
+                        <input type="text" id="input-pitch-breakdown" placeholder="e.g. 4-, 5-, 6b+ crux, 5a" oninput="App.validateForm()">
+                    </div>
+                    
+                    <div id="highPointContainer" class="hidden" style="margin-top: 15px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+                        <div class="slider-header">
+                            <span class="slider-label">High Point</span>
+                            <span class="slider-output" id="hp-output">50%</span>
+                        </div>
+                        <div class="slider-track-container" id="hp-track-container">
+                            <span class="slider-anchor">0</span>
+                            <div class="slider-track" id="hp-track">
+                                <div class="slider-fill" id="hp-fill" style="width: 50%;"></div>
+                                <div class="slider-thumb" id="hp-thumb" style="left: 50%;"></div>
+                            </div>
+                            <span class="slider-anchor">100</span>
+                        </div>
+                    </div>
+                    
+                    <div id="burns-container" class="hidden">
+                        <label>Burns Today</label>
+                        <div class="burns-counter">
+                            <button class="burn-btn" onclick="App.adjBurns(-1)">-</button>
+                            <span id="burns-val" class="burns-val">-</span>
+                            <button class="burn-btn" onclick="App.adjBurns(1)">+</button>
+                        </div>
+                    </div>
+                    
+                    <button class="advanced-toggle" onclick="const c = document.getElementById('advanced-content'); c.classList.toggle('hidden'); this.innerText = c.classList.contains('hidden') ? '+ Add Details' : '- Hide Details'; App.haptic();">+ Add Details</button>
+                    
+                    <div id="advanced-content" class="hidden">
+                        
+                        <div class="sub-label" style="margin-top:0;">My Effort</div>
+                        <div class="pill-row" id="rpeSelector"></div>
+                        
+                        <div id="rating-section">
+                            <div class="sub-label">Route Rating</div>
+                            <div class="star-rating" id="starRating">
+                                <span onclick="App.setRating(1)">★</span>
+                                <span onclick="App.setRating(2)">★</span>
+                                <span onclick="App.setRating(3)">★</span>
+                                <span onclick="App.setRating(4)">★</span>
+                                <span onclick="App.setRating(5)">★</span>
+                            </div>
+                            <div id="dynamic-rating-text"></div>
+                        </div>
+
+                        <hr class="zone-divider">
+
+                        <label>Steepness</label>
+                        <div class="pill-row" id="steepnessSelector"></div>
+
+                        <label>Climbing Style</label>
+                        <div class="pill-row" id="climbStyleSelector"></div>
+
+                        <label>Hold Types</label>
+                        <div class="pill-row" id="holdsSelector"></div>
+
+                        <hr class="zone-divider">
+
+                        <label>Notes</label>
+                        <textarea id="input-notes" placeholder="beta and headspace..."></textarea>
+                    </div>
+                    
+                    <button id="saveClimbBtn" class="btn-main" onclick="App.logClimb()">Save to Cloud</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-journal" class="view">
+            <h1>Training Journal</h1>
+            <div class="sync-badge"></div>
+            <div id="journalList"></div>
+        </div>
+
+        <div id="view-dash" class="view">
+            <h1>Dashboard</h1>
+            <div class="card">
+                <button class="btn-main dash-btn" onclick="window.location.href='dashboard.html'">🧠 Open Nerd Dashboard</button>
+                <div class="sync-badge"></div>
+                <div class="pill-row" id="dashSelector" style="margin-bottom: 30px;"></div>
+                
+                <div class="chart-toggle-row" id="chartToggle"></div>
+                <div class="chart-container">
+                    <div id="noDataMsg" style="color: var(--text-muted); font-style: italic; text-align: center; padding-top: 40px; display: none; font-weight: 500;">Log sends to view progression</div>
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="log-header-row">
+                    <h2 id="logListTitle">Last 60 Days</h2>
+                    <div class="log-toggle">
+                        <button class="log-toggle-btn active" id="listToggleTop" onclick="App.haptic(); State.listMode='top10';">Top 10</button>
+                        <button class="log-toggle-btn" id="listToggleRecent" onclick="App.haptic(); State.listMode='recent';">Recent</button>
+                    </div>
+                </div>
+                
+                <div id="xpContainer" class="xp-container hidden">
+                    <div class="xp-row-top">
+                        <div class="xp-title">Working Capacity <span class="info-icon" onclick="App.showInsight('capacity')">ⓘ</span></div>
+                        <div class="xp-percent" id="xpPercent">0%</div>
+                    </div>
+                    <div class="xp-row-bottom">
+                        <div class="xp-grade" id="xpBaseGrade">-</div>
+                        <div class="xp-bar-bg"><div class="xp-bar-fill" id="xpBarFill"></div></div>
+                        <div class="xp-grade right" id="xpNextGrade">-</div>
+                    </div>
+                </div>
+
+                <div id="logList" class="log-list"></div>
+            </div>
+        </div>
+    </div>
     
-    // Auto-create sheets if they somehow got deleted
-    var climbsSheet = ss.getSheetByName("Climbs") || ss.insertSheet("Climbs");
-    var sessionsSheet = ss.getSheetByName("Sessions") || ss.insertSheet("Sessions");
-
-    if (payload.action === "sync_all") {
-      
-      // 1. Process Deletions First
-      if (payload.deletedClimbs && payload.deletedClimbs.length > 0) {
-        deleteRows(climbsSheet, "ClimbID", payload.deletedClimbs);
-      }
-      if (payload.deletedSessions && payload.deletedSessions.length > 0) {
-        deleteRows(sessionsSheet, "SessionID", payload.deletedSessions);
-      }
-
-      // 2. Process Session Updates/Inserts
-      if (payload.sessions && payload.sessions.length > 0) {
-        upsertData(sessionsSheet, payload.sessions, "SessionID");
-      }
-
-      // 3. Process Climb Updates/Inserts
-      if (payload.climbs && payload.climbs.length > 0) {
-        upsertData(climbsSheet, payload.climbs, "ClimbID");
-      }
-
-      return ContentService.createTextOutput(JSON.stringify({status: 'success'})).setMimeType(ContentService.MimeType.JSON);
-    }
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({
-      status: 'error', 
-      message: error.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-// --- HELPER FUNCTIONS ---
-
-function getSheetDataAsObjects(sheet) {
-  if (!sheet) return [];
-  var data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
-  
-  var headers = data[0];
-  var result = [];
-  
-  for (var i = 1; i < data.length; i++) {
-    var obj = {};
-    for (var j = 0; j < headers.length; j++) {
-      if (data[i][j] !== "") { // Ignore empty cells to save payload size
-        obj[headers[j]] = data[i][j];
-      }
-    }
-    result.push(obj);
-  }
-  return result;
-}
-
-function upsertData(sheet, items, idKey) {
-  var data = sheet.getDataRange().getValues();
-  var headers = data.length > 0 ? data[0] : [];
-
-  // 1. Scan incoming items and auto-create any missing columns
-  var newHeaders = [];
-  items.forEach(function(item) {
-    Object.keys(item).forEach(function(key) {
-      // Ignore the local sync flag, only save real data
-      if (key !== '_synced' && headers.indexOf(key) === -1 && newHeaders.indexOf(key) === -1) {
-        newHeaders.push(key);
-      }
-    });
-  });
-
-  if (newHeaders.length > 0) {
-    if (headers.length === 0) {
-      headers = newHeaders;
-      sheet.appendRow(headers);
-    } else {
-      sheet.getRange(1, headers.length + 1, 1, newHeaders.length).setValues([newHeaders]);
-      headers = headers.concat(newHeaders);
-    }
-  }
-
-  // 2. Map existing IDs to their Row Numbers to enable fast Updates
-  var idMap = {};
-  var idColIndex = headers.indexOf(idKey);
-  if (idColIndex !== -1 && data.length > 1) {
-    for (var i = 1; i < data.length; i++) {
-      idMap[String(data[i][idColIndex])] = i + 1; // +1 because sheet rows start at 1
-    }
-  }
-
-  // 3. Insert or Update the rows
-  items.forEach(function(item) {
-    var rowData = headers.map(function(h) { 
-      return item[h] !== undefined ? item[h] : ""; 
-    });
-    
-    var id = String(item[idKey]);
-
-    if (idMap[id]) {
-      // UPDATE: ID exists, overwrite the row
-      sheet.getRange(idMap[id], 1, 1, rowData.length).setValues([rowData]);
-    } else {
-      // INSERT: ID doesn't exist, add it to the bottom
-      sheet.appendRow(rowData);
-      idMap[id] = sheet.getLastRow(); // Add to map in case of duplicates in payload
-    }
-  });
-}
-
-function deleteRows(sheet, idKey, idsToDelete) {
-  var data = sheet.getDataRange().getValues();
-  if (data.length < 2) return;
-  
-  var headers = data[0];
-  var idColIndex = headers.indexOf(idKey);
-  if (idColIndex === -1) return;
-
-  var rowsToDelete = [];
-  for (var i = 1; i < data.length; i++) {
-    if (idsToDelete.indexOf(String(data[i][idColIndex])) !== -1) {
-      rowsToDelete.push(i + 1);
-    }
-  }
-
-  // Delete from bottom up so row indexes don't shift during deletion
-  rowsToDelete.sort(function(a, b) { return b - a; }).forEach(function(rowIndex) {
-    sheet.deleteRow(rowIndex);
-  });
-}
+    <script src="app.js?v=82"></script>
+</body>
+</html>
