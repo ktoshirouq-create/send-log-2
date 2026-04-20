@@ -41,6 +41,7 @@ const formatShortDate = (dStr) => {
     const [y, m, d] = clean.split('-');
     return `${d} ${AppConfig.months[parseInt(m)-1]}`;
 };
+const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : new Date().toISOString().substring(0, 10);
 
 const ArchetypeDefs = {
     'The Caveman': "You are a dynamic powerhouse. You treat every route like a board climb, favoring explosive movement, big deadpoints, and campus beta. While others waste time analyzing micro-beta, you prefer to just drag yourself up the wall like a caveman. Subtlety is a suggestion; raw pulling power is your weapon of choice.",
@@ -123,7 +124,6 @@ const Dashboard = {
             document.body.insertAdjacentHTML('beforeend', modalHTML);
         }
 
-        // SCALPEL DOM INJECTION: Finds pure text nodes and injects inline without touching parent CSS
         const addIcon = (textMatches, type) => {
             const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
             let node;
@@ -203,6 +203,7 @@ const Dashboard = {
             else if (type === 'Indoor Bouldering') dotColor = '#3b82f6';
             else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316';
             else if (type === 'Outdoor Bouldering') dotColor = '#a855f7';
+            else if (type === 'Outdoor Multipitch') dotColor = '#ef4444';
             
             const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
             
@@ -392,6 +393,88 @@ document.addEventListener('DOMContentLoaded', () => {
             return diffDays <= parseInt(activeTime);
         });
 
+        // --- ACWR READINESS ENGINE ---
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        let acuteLoad = 0; 
+        let chronicTotalLoad = 0; 
+
+        currentFilteredLogs.forEach(l => {
+            const cDate = new Date(getCleanDate(getV(l, 'Date')));
+            cDate.setHours(0,0,0,0);
+            const diffTime = Math.abs(today - cDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const score = Number(getV(l, 'Score')) || 0;
+
+            if (diffDays <= 7) acuteLoad += score;
+            if (diffDays <= 28) chronicTotalLoad += score;
+        });
+
+        const chronicLoad = chronicTotalLoad / 4;
+        const acwr = chronicLoad > 0 ? (acuteLoad / chronicLoad) : 0;
+
+        const elRatio = document.getElementById('ui-acwr-ratio');
+        const elStatus = document.getElementById('ui-acwr-status');
+        const elMarker = document.getElementById('ui-acwr-marker');
+
+        if(elRatio) {
+            document.getElementById('ui-acute-load').innerText = `${Math.round(acuteLoad).toLocaleString()} XP`;
+            document.getElementById('ui-chronic-load').innerText = `${Math.round(chronicLoad).toLocaleString()} XP/wk`;
+            elRatio.innerText = acwr.toFixed(2);
+
+            let acwrColor = '#a3a3a3';
+            let acwrText = 'No Data';
+            let markerPercent = 0;
+
+            if (chronicLoad > 0) {
+                markerPercent = Math.min((acwr / 2.0) * 100, 100);
+                if (acwr < 0.8) { acwrColor = '#3b82f6'; acwrText = 'Deloading'; }
+                else if (acwr < 1.3) { acwrColor = '#10b981'; acwrText = 'Prime Zone'; }
+                else if (acwr < 1.5) { acwrColor = '#eab308'; acwrText = 'Overreaching'; }
+                else { acwrColor = '#ef4444'; acwrText = 'Danger Zone'; }
+            }
+
+            elRatio.style.color = acwrColor;
+            elStatus.innerText = acwrText;
+            elStatus.style.color = acwrColor;
+            elStatus.style.border = `1px solid ${acwrColor}40`;
+            if (elMarker) elMarker.style.left = `${markerPercent}%`;
+        }
+
+        // --- TOP PARTNERS ENGINE ---
+        const partnerCounts = {};
+        currentFilteredLogs.forEach(l => {
+            const partnerStr = getV(l, 'Partner');
+            if (partnerStr) {
+                const names = String(partnerStr).split(',').map(n => n.trim()).filter(n => n.length > 0);
+                names.forEach(n => { partnerCounts[n] = (partnerCounts[n] || 0) + 1; });
+            }
+        });
+
+        const sortedPartners = Object.keys(partnerCounts).sort((a, b) => partnerCounts[b] - partnerCounts[a]).slice(0, 3);
+        const partnerContainer = document.getElementById('partner-container');
+
+        if (partnerContainer) {
+            if (sortedPartners.length > 0) {
+                partnerContainer.innerHTML = sortedPartners.map((name, index) => {
+                    const rankClass = `rank-${index + 1}`;
+                    const rankSymbol = index === 0 ? '1' : (index === 1 ? '2' : '3');
+                    return `
+                        <div class="partner-row">
+                            <div class="partner-left">
+                                <div class="partner-rank ${rankClass}">${rankSymbol}</div>
+                                <div class="partner-name">${escapeHTML(name)}</div>
+                            </div>
+                            <div class="partner-count">${partnerCounts[name]} <span style="font-size:0.7rem; color:#10b981;">logs</span></div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                partnerContainer.innerHTML = '<div class="empty-msg">Not enough partner data yet.</div>';
+            }
+        }
+
+
         let maxScore = 0, peakG = '-';
         let dayC = {}, indoorCount = 0;
         const gradesForPyramid = {};
@@ -554,7 +637,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(0, this)"><div style="width:12px; height:12px; border-radius:50%; background:#10b981;"></div> Peak Send</div>
                     <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(1, this)"><div style="width:12px; height:12px; border-radius:4px; background:#333;"></div> Avg Fatigue</div>
                 `;
-                // SCALPEL INJECTION: Place it before the relative Chart wrapper, not inside it
                 chartWrapper.parentElement.insertBefore(legendDiv, chartWrapper);
             }
         }
@@ -574,7 +656,6 @@ document.addEventListener('DOMContentLoaded', () => {
             options: { 
                 responsive: true, maintainAspectRatio: false, 
                 interaction: { mode: 'index', intersect: false },
-                // TERNARY FIX: Don't divide empty data, just return the -/10 string
                 plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + (ctx.raw > 0 ? ctx.raw.toFixed(1) + '/10' : '- / 10') } } }, 
                 scales: { 
                     y: { display: false, position: 'left' }, 
