@@ -726,6 +726,9 @@ const App = {
 
         safeHTML('typeSelector', AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join(''));
         
+        // ADDED THIS LINE BACK TO FIX THE DASHBOARD BUTTONS
+        safeHTML('dashSelector', AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join(''));
+        
         safeClass('input-outdoor', isOut ? '' : 'hidden');
         safeClass('input-indoor', isOut ? 'hidden' : '');
         
