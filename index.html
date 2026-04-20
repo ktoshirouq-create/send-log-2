@@ -61,11 +61,8 @@
         
         .zone-divider { height: 1px; background: var(--border); margin: 30px 0; border: none; }
 
-        #rating-section { transition: opacity 0.2s ease; }
-        .star-rating { display: flex; gap: 12px; font-size: 2.2rem; color: var(--border); }
-        .star-rating span { cursor: pointer; transition: 0.2s; }
+        .star-rating { display: flex; gap: 12px; font-size: 2.2rem; color: var(--border); margin-bottom: 15px; }
         .star-rating span.active { color: #eab308; text-shadow: 0 0 15px rgba(234, 179, 8, 0.4); }
-        #dynamic-rating-text { min-height: 1.5rem; font-size: 0.9rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; transition: opacity 0.2s ease-in-out; opacity: 0; }
 
         .boulder-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1px solid rgba(255,255,255,0.2); vertical-align: middle; }
         
@@ -88,7 +85,7 @@
         .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .slider-label { font-weight: 800; font-size: 0.7rem; color: #737373; text-transform: uppercase; letter-spacing: 1.5px; }
         .slider-output { font-weight: 800; font-size: 1.15rem; color: var(--primary); }
-        .slider-track-container { display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 15px 0; touch-action: pan-y; }
+        .slider-track-container { display: flex; align-items: center; gap: 14px; cursor: pointer; padding: 15px 0; touch-action: none; }
         .slider-anchor { font-size: 0.7rem; color: #555; font-weight: 800; user-select: none; }
         .slider-track { flex: 1; height: 6px; background: #262626; border-radius: 4px; position: relative; }
         .slider-fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--primary); border-radius: 4px; width: 0%; pointer-events: none; }
@@ -303,29 +300,11 @@
                         </div>
                     </div>
                     
-                    <label id="gradeLabel">Grade</label>
+                    <label>Grade</label>
                     <div id="gradePicker" class="pill-row"></div>
 
                     <label>Style / Result</label>
                     <div class="pill-row" id="styleSelector"></div>
-                    
-                    <div id="multipitch-container" class="hidden" style="margin-top: 15px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
-                        <label style="margin-top:0;">Total Pitches</label>
-                        <div class="burns-counter" style="margin-bottom: 20px;">
-                            <button class="burn-btn" onclick="App.adjPitches(-1)">-</button>
-                            <span id="pitches-val" class="burns-val">2</span>
-                            <button class="burn-btn" onclick="App.adjPitches(1)">+</button>
-                        </div>
-                        
-                        <label>Gear Style</label>
-                        <div class="pill-row" id="gearStyleSelector"></div>
-                        
-                        <label>Pack Weight</label>
-                        <div class="pill-row" id="packWeightSelector"></div>
-                        
-                        <label>Pitch Breakdown (Optional)</label>
-                        <input type="text" id="input-pitch-breakdown" placeholder="e.g. 4-, 5-, 6b+ crux, 5a" oninput="App.validateForm()">
-                    </div>
                     
                     <div id="highPointContainer" class="hidden" style="margin-top: 15px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
                         <div class="slider-header">
@@ -358,16 +337,13 @@
                         <div class="sub-label" style="margin-top:0;">My Effort</div>
                         <div class="pill-row" id="rpeSelector"></div>
                         
-                        <div id="rating-section">
-                            <div class="sub-label">Route Rating</div>
-                            <div class="star-rating" id="starRating">
-                                <span onclick="App.setRating(1)">★</span>
-                                <span onclick="App.setRating(2)">★</span>
-                                <span onclick="App.setRating(3)">★</span>
-                                <span onclick="App.setRating(4)">★</span>
-                                <span onclick="App.setRating(5)">★</span>
-                            </div>
-                            <div id="dynamic-rating-text"></div>
+                        <div class="sub-label">Route Rating <span class="info-icon" onclick="App.showInsight('rating')">ⓘ</span></div>
+                        <div class="star-rating" id="starRating">
+                            <span onclick="App.setRating(1)">★</span>
+                            <span onclick="App.setRating(2)">★</span>
+                            <span onclick="App.setRating(3)">★</span>
+                            <span onclick="App.setRating(4)">★</span>
+                            <span onclick="App.setRating(5)">★</span>
                         </div>
 
                         <hr class="zone-divider">
@@ -404,14 +380,12 @@
                 <button class="btn-main dash-btn" onclick="window.location.href='dashboard.html'">🧠 Open Nerd Dashboard</button>
                 <div class="sync-badge"></div>
                 <div class="pill-row" id="dashSelector" style="margin-bottom: 30px;"></div>
-                
                 <div class="chart-toggle-row" id="chartToggle"></div>
                 <div class="chart-container">
                     <div id="noDataMsg" style="color: var(--text-muted); font-style: italic; text-align: center; padding-top: 40px; display: none; font-weight: 500;">Log sends to view progression</div>
                     <canvas id="progressChart"></canvas>
                 </div>
             </div>
-            
             <div class="card">
                 <div class="log-header-row">
                     <h2 id="logListTitle">Last 60 Days</h2>
@@ -438,6 +412,6 @@
         </div>
     </div>
     
-    <script src="app.js?v=78"></script>
+    <script src="app.js?v=75"></script>
 </body>
 </html>
