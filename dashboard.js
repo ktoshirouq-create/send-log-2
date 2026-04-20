@@ -3,11 +3,12 @@ const AppConfig = {
     gyms: ["OKS", "Torshov", "Løkka", "Bryn", "Gneiss", "Other"],
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'],
-    styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked' },
+    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering', 'Outdoor Multipitch'],
+    styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     grades: {
-        ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
+        ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
+        ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
@@ -275,7 +276,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const getScaleConfig = (disc) => {
         if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
         if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
+        if (disc === 'Outdoor Multipitch' || disc === 'Outdoor Rope Climbing') return AppConfig.grades.ropesOut || AppConfig.grades.ropes;
         return AppConfig.grades.ropes;
+    };
+
+    const getPitchStyle = (grade) => {
+        const clean = getBaseGrade(grade);
+        const num = parseInt(clean);
+        if(isNaN(num)) return 'background: #262626; color: #a3a3a3; border: 1px solid #333;';
+        if(num <= 4) return 'background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); height: 20px;'; 
+        if(num === 5) return 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); height: 24px;'; 
+        if(num === 6) return 'background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3); height: 28px;'; 
+        if(num === 7) return 'background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); height: 32px;'; 
+        if(num >= 8) return 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); height: 36px;'; 
+        return 'background: #262626; color: #a3a3a3; border: 1px solid #333;';
     };
 
     const logSearchInput = document.getElementById('logSearch');
@@ -350,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
             if (type.includes('Bouldering')) attr.Power += 1;
 
-            if (type.includes('Rope')) attr.Endurance += 1;
+            if (type.includes('Rope') || type.includes('Multipitch')) attr.Endurance += 1;
             if (styleTag.includes('endurance') || styleTag.includes('volume')) attr.Endurance += 3;
             if ((styleResult === 'toprope' || styleResult === 'autobelay') && (styleTag.includes('endurance') || styleTag.includes('volume'))) attr.Endurance += 3;
 
@@ -365,9 +379,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (score > 600) attr.Fingers += 1; 
             }
 
-            if (styleResult === 'flash' || styleResult === 'onsight') attr.Headspace += 3;
+            if (styleResult === 'flash' || styleResult === 'onsight' || styleResult === 'allfree') attr.Headspace += 3;
             if (effort.includes('Limit')) attr.Headspace += 2;
-            if (isOutdoor && type.includes('Rope')) attr.Headspace += 2; 
+            if (isOutdoor && (type.includes('Rope') || type.includes('Multipitch'))) attr.Headspace += 2; 
 
             if (styleResult === 'project' || styleResult === 'worked') attr.Tenacity += 3;
             if (burns >= 3) attr.Tenacity += 1;
@@ -610,15 +624,62 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentFilteredLogs.length > 0) {
             const inRatio = indoorCount / currentFilteredLogs.length;
             if (inRatio >= 0.8) envLabel = 'Gym Rat';
-            else if (inRatio <= 0.4) envLabel = 'Crag Hound';
-            else envLabel = 'Weekend Warrior';
+            else if (inRatio <= 0.4) envLabel = 'Dirtbag';
+            else envLabel = 'Gumby';
         }
 
         const elIdDay = document.getElementById('id-day');
         if (elIdDay) elIdDay.innerText = topDay;
         
-        const elIdEnv = document.getElementById('id-env');
+        const elIdEnv = document.getElementById('id-safe-space');
         if (elIdEnv) elIdEnv.innerText = envLabel;
+
+        // --- MULTIPITCH TOPO LANDSCAPE ---
+        const multiLogs = currentFilteredLogs.filter(l => getV(l, 'Type') === 'Outdoor Multipitch');
+        const multiCard = document.getElementById('multipitchCard');
+
+        if (multiLogs.length > 0) {
+            if(multiCard) multiCard.style.display = 'block';
+
+            const displayMulti = multiLogs.sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date'))).slice(-15); 
+
+            const landHtml = displayMulti.map(l => {
+                const breakdown = String(getV(l, 'PitchBreakdown') || "");
+                let pitches = [];
+                if (breakdown) {
+                    pitches = breakdown.split(',').map(p => {
+                        const parts = p.trim().split(':');
+                        return parts.length > 1 ? parts[1] : parts[0];
+                    });
+                } else {
+                    const pCount = Number(getV(l, 'Pitches')) || 2;
+                    for(let i=0; i<pCount; i++) pitches.push(getBaseGrade(getV(l, 'Grade')));
+                }
+
+                if(pitches.length === 0) pitches = [getBaseGrade(getV(l, 'Grade'))];
+
+                const blocksHtml = pitches.reverse().map(g => {
+                    const blockStyle = getPitchStyle(g);
+                    return `<div class="pitch-block" style="${blockStyle}">${g}</div>`;
+                }).join('');
+
+                const rawName = String(getV(l, 'Name') || "Unknown");
+                const name = rawName.split('@')[0].trim();
+
+                return `
+                <div class="spire-col" onclick="Dashboard.toggleRow('${getV(l, 'ClimbID')}')">
+                    <div class="spire-blocks">
+                        ${blocksHtml}
+                    </div>
+                    <div class="spire-name">${escapeHTML(name)}</div>
+                    <div class="spire-date">${formatShortDate(getV(l, 'Date'))}</div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('multipitchLandscape').innerHTML = landHtml;
+        } else {
+            if(multiCard) multiCard.style.display = 'none';
+        }
 
         Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
 
