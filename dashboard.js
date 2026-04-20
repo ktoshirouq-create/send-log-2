@@ -26,12 +26,7 @@ const getV = (obj, prop) => {
 
 const escapeHTML = (str) => {
     if (!str) return "";
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 };
 
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
@@ -159,7 +154,10 @@ const Dashboard = {
 
     renderLogbook: () => {
         const tbody = document.getElementById('masterLogbookBody');
-        const q = document.getElementById('logSearch').value.toLowerCase();
+        const logCount = document.getElementById('logCount');
+        if (!tbody) return; 
+
+        const q = (document.getElementById('logSearch') ? document.getElementById('logSearch').value.toLowerCase() : "");
         
         let displayData = currentFilteredLogs.filter(l => {
             if (!q) return true;
@@ -167,7 +165,7 @@ const Dashboard = {
             return searchString.includes(q);
         });
 
-        document.getElementById('logCount').innerText = `${displayData.length} LOGS`;
+        if (logCount) logCount.innerText = `${displayData.length} LOGS`;
 
         displayData.sort((a, b) => {
             let valA, valB;
@@ -279,13 +277,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return AppConfig.grades.ropes;
     };
 
-    document.getElementById('logSearch').addEventListener('input', () => {
-        Dashboard.logLimit = 10; 
-        Dashboard.renderLogbook();
-    });
+    const logSearchInput = document.getElementById('logSearch');
+    if (logSearchInput) {
+        logSearchInput.addEventListener('input', () => {
+            Dashboard.logLimit = 10; 
+            Dashboard.renderLogbook();
+        });
+    }
 
     const syncText = document.getElementById('syncStatus');
-    syncText.innerText = "(Syncing)";
+    if (syncText) syncText.innerText = "(Syncing)";
 
     fetch(AppConfig.api)
         .then(res => res.json())
@@ -300,14 +301,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     allSessionsMaster = allSessions;
                     localStorage.setItem('crag_sessions_master', JSON.stringify(allSessions));
                 }
-                syncText.innerText = "● LIVE";
-                setTimeout(() => syncText.innerText = "", 3000);
+                if (syncText) {
+                    syncText.innerText = "● LIVE";
+                    setTimeout(() => syncText.innerText = "", 3000);
+                }
                 renderDashboard(); 
             }
         }).catch(err => {
             console.log("Dashboard background sync failed", err);
-            syncText.innerText = "○ OFFLINE";
-            syncText.style.color = "#737373";
+            if(syncText) {
+                syncText.innerText = "○ OFFLINE";
+                syncText.style.color = "#737373";
+            }
         });
 
     const attachFilters = (id, propName, className) => {
@@ -393,11 +398,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return diffDays <= parseInt(activeTime);
         });
 
-        // --- ACWR READINESS ENGINE ---
+        // --- HYBRID ACWR READINESS ENGINE ---
         const today = new Date();
         today.setHours(0,0,0,0);
-        let acuteLoad = 0; 
-        let chronicTotalLoad = 0; 
+        let rawAcute = 0; 
+        let rawChronic = 0; 
 
         currentFilteredLogs.forEach(l => {
             const cDate = new Date(getCleanDate(getV(l, 'Date')));
@@ -406,38 +411,76 @@ document.addEventListener('DOMContentLoaded', () => {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             const score = Number(getV(l, 'Score')) || 0;
 
-            if (diffDays <= 7) acuteLoad += score;
-            if (diffDays <= 28) chronicTotalLoad += score;
+            if (diffDays <= 7) rawAcute += score;
+            if (diffDays <= 28) rawChronic += score;
         });
 
-        const chronicLoad = chronicTotalLoad / 4;
+        // Divide by 100 to convert "XP" into professional "Load Units"
+        const acuteLoad = rawAcute / 100;
+        const chronicLoad = (rawChronic / 100) / 4; 
         const acwr = chronicLoad > 0 ? (acuteLoad / chronicLoad) : 0;
 
         const elRatio = document.getElementById('ui-acwr-ratio');
-        const elStatus = document.getElementById('ui-acwr-status');
+        const elReadiness = document.getElementById('ui-readiness-pct');
+        const elCallout = document.getElementById('ui-acwr-callout');
         const elMarker = document.getElementById('ui-acwr-marker');
+        const elDate = document.getElementById('ui-current-date');
 
-        if(elRatio) {
-            document.getElementById('ui-acute-load').innerText = `${Math.round(acuteLoad).toLocaleString()} XP`;
-            document.getElementById('ui-chronic-load').innerText = `${Math.round(chronicLoad).toLocaleString()} XP/wk`;
-            elRatio.innerText = acwr.toFixed(2);
+        if(elRatio && elCallout && elReadiness) {
+            document.getElementById('ui-acute-load').innerText = `${acuteLoad.toFixed(1)} Load`;
+            document.getElementById('ui-chronic-load').innerText = `${chronicLoad.toFixed(1)} Load/wk`;
+            elRatio.innerText = acwr.toFixed(2) + 'x';
+            
+            if (elDate) {
+                const dateOpts = { weekday: 'short', month: 'short', day: 'numeric' };
+                elDate.innerText = today.toLocaleDateString('en-US', dateOpts).toUpperCase();
+            }
 
-            let acwrColor = '#a3a3a3';
-            let acwrText = 'No Data';
+            let color = '#a3a3a3';
+            let message = 'Log more climbs to establish baseline.';
             let markerPercent = 0;
+            let readinessPct = 100;
 
             if (chronicLoad > 0) {
                 markerPercent = Math.min((acwr / 2.0) * 100, 100);
-                if (acwr < 0.8) { acwrColor = '#3b82f6'; acwrText = 'Deloading'; }
-                else if (acwr < 1.3) { acwrColor = '#10b981'; acwrText = 'Prime Zone'; }
-                else if (acwr < 1.5) { acwrColor = '#eab308'; acwrText = 'Overreaching'; }
-                else { acwrColor = '#ef4444'; acwrText = 'Danger Zone'; }
+                
+                // Readiness Math Engine (Inverse correlation to ACWR)
+                if (acwr <= 0.8) {
+                    readinessPct = 100;
+                } else if (acwr > 0.8 && acwr <= 1.5) {
+                    readinessPct = Math.round(100 - ((acwr - 0.8) / 0.7) * 60);
+                } else {
+                    readinessPct = 35;
+                }
+
+                elReadiness.innerText = readinessPct + '%';
+
+                if (acwr < 0.8) { 
+                    color = '#3b82f6'; 
+                    message = 'Undertraining detected. Increase training stimulus to build baseline capacity.'; 
+                }
+                else if (acwr < 1.3) { 
+                    color = '#10b981'; 
+                    message = 'Optimal training load. You are primed to perform and recovering well.'; 
+                }
+                else if (acwr < 1.5) { 
+                    color = '#eab308'; 
+                    message = 'High fatigue. You are overreaching. Proceed with caution and prioritize sleep.'; 
+                }
+                else { 
+                    color = '#ef4444'; 
+                    message = 'Danger zone. Significant injury risk. Mandatory rest recommended.'; 
+                }
+            } else {
+                elReadiness.innerText = '0%';
             }
 
-            elRatio.style.color = acwrColor;
-            elStatus.innerText = acwrText;
-            elStatus.style.color = acwrColor;
-            elStatus.style.border = `1px solid ${acwrColor}40`;
+            elRatio.style.color = color;
+            elReadiness.style.color = color;
+            elCallout.innerText = message;
+            elCallout.style.background = `${color}15`; // 15% opacity background
+            elCallout.style.borderLeft = `4px solid ${color}`;
+            elCallout.style.color = color;
             if (elMarker) elMarker.style.left = `${markerPercent}%`;
         }
 
@@ -532,20 +575,25 @@ document.addEventListener('DOMContentLoaded', () => {
             locs[loc] = locSessions[loc].size;
         });
 
-        document.getElementById('stat-sends').innerText = currentFilteredLogs.length;
+        const elStatSends = document.getElementById('stat-sends');
+        if (elStatSends) elStatSends.innerText = currentFilteredLogs.length;
+        
         const outDays = new Set(currentFilteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getV(l, 'Date'))).size;
-        document.getElementById('stat-outdoor').innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
+        const elStatOutdoor = document.getElementById('stat-outdoor');
+        if (elStatOutdoor) elStatOutdoor.innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
         
         const peakEl = document.getElementById('stat-peak');
-        const cleanPeak = getBaseGrade(peakG);
-        peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
-        
-        if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
-            const conf = AppConfig.grades.bouldsIn;
-            const idx = conf.labels.indexOf(cleanPeak);
-            peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
-        } else {
-            peakEl.style.color = '#fff';
+        if (peakEl) {
+            const cleanPeak = getBaseGrade(peakG);
+            peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
+            
+            if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
+                const conf = AppConfig.grades.bouldsIn;
+                const idx = conf.labels.indexOf(cleanPeak);
+                peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
+            } else {
+                peakEl.style.color = '#fff';
+            }
         }
 
         const topDay = Object.keys(dayC).length ? Object.keys(dayC).length > 0 ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-' : '-';
@@ -557,39 +605,44 @@ document.addEventListener('DOMContentLoaded', () => {
             else envLabel = 'Weekend Warrior';
         }
 
-        document.getElementById('id-day').innerText = topDay;
-        document.getElementById('id-env').innerText = envLabel;
+        const elIdDay = document.getElementById('id-day');
+        if (elIdDay) elIdDay.innerText = topDay;
+        
+        const elIdEnv = document.getElementById('id-env');
+        if (elIdEnv) elIdEnv.innerText = envLabel;
 
         Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
 
         const pyrCard = document.getElementById('pyramidCard');
         const pyrCanvas = document.getElementById('pyramidChart');
 
-        if (activeDisc === 'All' || currentFilteredLogs.length === 0) {
-            pyrCard.style.display = 'none';
-        } else {
-            pyrCard.style.display = 'block';
-            const conf = getScaleConfig(activeDisc);
-            const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
-            const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
-            
-            const pyrColors = sortedGrades.map(g => {
-                const idx = conf.labels.indexOf(g);
-                return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
-            });
+        if (pyrCard && pyrCanvas) {
+            if (activeDisc === 'All' || currentFilteredLogs.length === 0) {
+                pyrCard.style.display = 'none';
+            } else {
+                pyrCard.style.display = 'block';
+                const conf = getScaleConfig(activeDisc);
+                const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
+                const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
+                
+                const pyrColors = sortedGrades.map(g => {
+                    const idx = conf.labels.indexOf(g);
+                    return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
+                });
 
-            window.charts.pyr = new Chart(pyrCanvas, {
-                type: 'bar',
-                data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
-                options: { 
-                    responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
-                    plugins: { legend: { display: false } }, 
-                    scales: { 
-                        x: { display: false },
-                        y: { ticks: { color: '#a3a3a3', font: { weight: '600' } }, grid: { display: false, drawBorder: false } }
-                    } 
-                }
-            });
+                window.charts.pyr = new Chart(pyrCanvas, {
+                    type: 'bar',
+                    data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
+                    options: { 
+                        responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
+                        plugins: { legend: { display: false } }, 
+                        scales: { 
+                            x: { display: false },
+                            y: { ticks: { color: '#a3a3a3', font: { weight: '600' } }, grid: { display: false, drawBorder: false } }
+                        } 
+                    }
+                });
+            }
         }
 
         const sortedCNS = [...currentFilteredLogs].filter(l => getV(l, 'Score') && getV(l, 'Style') !== 'worked' && getV(l, 'Style') !== 'toprope' && getV(l, 'Style') !== 'autobelay').sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date')));
@@ -639,31 +692,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 chartWrapper.parentElement.insertBefore(legendDiv, chartWrapper);
             }
-        }
 
-        let gL = document.getElementById('cnsLineChart').getContext('2d').createLinearGradient(0,0,0,250); 
-        gL.addColorStop(0, 'rgba(16, 185, 129, 0.4)'); gL.addColorStop(1, 'transparent');
-        
-        window.charts.line = new Chart(document.getElementById('cnsLineChart'), {
-            type: 'line', 
-            data: { 
-                labels: cnsData.labels, 
-                datasets: [
-                    { type: 'line', label: 'Peak Send', data: cnsData.peak, borderColor: '#10b981', backgroundColor: gL, fill: true, tension: 0.4, spanGaps: true, pointBackgroundColor: '#121212', pointBorderWidth: 2, yAxisID: 'y' },
-                    { type: 'bar', label: 'Avg Fatigue', data: cnsData.fatigue, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 4, yAxisID: 'y1' }
-                ] 
-            },
-            options: { 
-                responsive: true, maintainAspectRatio: false, 
-                interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + (ctx.raw > 0 ? ctx.raw.toFixed(1) + '/10' : '- / 10') } } }, 
-                scales: { 
-                    y: { display: false, position: 'left' }, 
-                    y1: { display: false, position: 'right', min: 0, max: 10 },
-                    x: { grid: { display: false }, ticks: { color: '#737373', font: { weight: '600' } } } 
-                } 
-            }
-        });
+            let gL = canvasElement.getContext('2d').createLinearGradient(0,0,0,250); 
+            gL.addColorStop(0, 'rgba(16, 185, 129, 0.4)'); gL.addColorStop(1, 'transparent');
+            
+            window.charts.line = new Chart(canvasElement, {
+                type: 'line', 
+                data: { 
+                    labels: cnsData.labels, 
+                    datasets: [
+                        { type: 'line', label: 'Peak Send', data: cnsData.peak, borderColor: '#10b981', backgroundColor: gL, fill: true, tension: 0.4, spanGaps: true, pointBackgroundColor: '#121212', pointBorderWidth: 2, yAxisID: 'y' },
+                        { type: 'bar', label: 'Avg Fatigue', data: cnsData.fatigue, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 4, yAxisID: 'y1' }
+                    ] 
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, 
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + (ctx.raw > 0 ? ctx.raw.toFixed(1) + '/10' : '- / 10') } } }, 
+                    scales: { 
+                        y: { display: false, position: 'left' }, 
+                        y1: { display: false, position: 'right', min: 0, max: 10 },
+                        x: { grid: { display: false }, ticks: { color: '#737373', font: { weight: '600' } } } 
+                    } 
+                }
+            });
+        }
 
         const currAttr = calcRPG(currentFilteredLogs);
         const baseAttr = calcRPG(allTimeLogsFiltered);
@@ -678,42 +731,49 @@ document.addEventListener('DOMContentLoaded', () => {
             archetype = topAttrs.length > 1 ? 'The All-Rounder' : archMap[topAttrs[0]];
         }
         
-        document.getElementById('id-arch').innerText = archetype;
+        const elIdArch = document.getElementById('id-arch');
+        if (elIdArch) elIdArch.innerText = archetype;
 
-        const radarLabels = Object.keys(currAttr).map(k => [k.toUpperCase(), currAttr[k].toString()]);
-
-        window.charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
-            type: 'radar', 
-            data: { 
-                labels: radarLabels, 
-                datasets: [
-                    { 
-                        label: 'Current Phase', data: Object.values(currAttr), borderColor: '#10b981', 
-                        backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true
-                    },
-                    { 
-                        label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.15)', 
-                        backgroundColor: 'rgba(255,255,255,0.02)', pointRadius: 0, borderWidth: 2, borderDash: [4, 4], fill: true
-                    }
-                ] 
-            }, 
-            options: { 
-                responsive: true, maintainAspectRatio: false, 
-                plugins: { 
-                    legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } },
-                    tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } }
+        const radarCanvas = document.getElementById('attributeRadarChart');
+        if (radarCanvas) {
+            const radarLabels = Object.keys(currAttr).map(k => [k.toUpperCase(), currAttr[k].toString()]);
+            window.charts.radar = new Chart(radarCanvas, { 
+                type: 'radar', 
+                data: { 
+                    labels: radarLabels, 
+                    datasets: [
+                        { 
+                            label: 'Current Phase', data: Object.values(currAttr), borderColor: '#10b981', 
+                            backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true
+                        },
+                        { 
+                            label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.15)', 
+                            backgroundColor: 'rgba(255,255,255,0.02)', pointRadius: 0, borderWidth: 2, borderDash: [4, 4], fill: true
+                        }
+                    ] 
                 }, 
-                scales: { 
-                    r: { 
-                        min: 0, max: 100, ticks: { display: false, stepSize: 20 }, 
-                        grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, 
-                        pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } 
+                options: { 
+                    responsive: true, maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } },
+                        tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } }
+                    }, 
+                    scales: { 
+                        r: { 
+                            min: 0, max: 100, ticks: { display: false, stepSize: 20 }, 
+                            grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, 
+                            pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } 
+                        } 
                     } 
                 } 
-            } 
-        });
+            });
+        }
 
-        const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No data available for this phase.</div>'; };
+        // HTML SAFE LIST RENDERER
+        const renderList = (id, html) => { 
+            const el = document.getElementById(id);
+            if(el) el.innerHTML = html || '<div class="empty-msg">No data available for this phase.</div>'; 
+        };
         
         const hof = [...currentFilteredLogs].filter(l => Number(getV(l, 'Rating')) >= 4).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
         renderList('list-fame', hof.map(l => {
