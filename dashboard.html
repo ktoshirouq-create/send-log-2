@@ -119,11 +119,16 @@
         .modal-btn { background: #1a1a1a; color: white; border: none; padding: 14px; border-radius: 8px; cursor: pointer; font-weight: 700; width: 100%; margin-top: 24px; transition: background 0.2s; font-family: inherit; }
         .modal-btn:hover { background: #262626; }
 
+        /* MULTI-PLATFORM RESPONSIVENESS */
         @media (max-width: 768px) { 
             .grid-2 { grid-template-columns: 1fr; } 
             .log-table th, .log-table td { padding: 14px 4px; font-size: 0.85rem; }
             .col-style { font-size: 0.75rem; } 
             .dash-card { padding: 18px; }
+            
+            /* NEW: Breaks the Identity Grid into 2 rows, expanding the Archetype into a full-width banner */
+            .identity-grid { grid-template-columns: 1fr 1fr; }
+            .identity-card:last-child { grid-column: span 2; }
         }
     </style>
 </head>
@@ -274,6 +279,6 @@
         </div>
     </div>
 
-    <script src="dashboard.js?v=68"></script> 
+    <script src="dashboard.js?v=69"></script> 
 </body>
 </html>
