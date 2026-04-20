@@ -108,7 +108,6 @@ const State = new Proxy({
             const conf = getScaleConfig(value);
             const isOutdoor = value.includes('Outdoor') || value.includes('Multipitch');
             
-            // Prevents crashes if array scale is shorter than current selection
             if (conf && conf.labels && !conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
                 target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
             }
@@ -117,7 +116,6 @@ const State = new Proxy({
                 target.activeGym = 'OKS';
             }
 
-            // Edit-Mode Cleanser / Data Bleed Patch
             if (!isOutdoor) {
                 target.activeRating = 0;
                 target.activeApproach = null;
@@ -183,17 +181,18 @@ const SyncManager = {
                 SyncManager.pushAll(unsyncedSessions, unsyncedClimbs);
             }
 
-            // Cloud Defender Patch: Never overwrite local multipitch rich data with cloud nulls
             State.climbs = [...cloudClimbs, ...unsyncedClimbs].reduce((acc, current) => {
                 const existingIdx = acc.findIndex(item => String(item.ClimbID) === String(current.ClimbID));
                 if (existingIdx === -1) return acc.concat([current]);
 
                 const existing = acc[existingIdx];
+                // CLOUD DEFENDER: Protects local custom fields from being overwritten by null cloud fields
                 if (!current.Pitches && existing.Pitches) {
                     current.Pitches = existing.Pitches;
                     current.GearStyle = existing.GearStyle;
                     current.PackWeight = existing.PackWeight;
                     current.PitchBreakdown = existing.PitchBreakdown;
+                    current.Partner = existing.Partner; 
                 }
                 
                 acc[existingIdx] = (current._synced === false) ? current : { ...existing, ...current, _synced: existing._synced };
@@ -295,6 +294,9 @@ const App = {
         } else {
             State.activeGym = climb.Name || 'OKS';
         }
+        
+        const inPartner = document.getElementById('input-partner');
+        if (inPartner) inPartner.value = climb.Partner || '';
 
         const conf = getScaleConfig(State.discipline);
         const cleanGrade = getBaseGrade(climb.Grade);
@@ -404,6 +406,47 @@ const App = {
         App.haptic(); 
         let newVal = State.activePitches + dir;
         State.activePitches = newVal < 1 ? 1 : newVal;
+    },
+
+    // SMART PARTNER SYSTEM
+    addPartner: (name) => {
+        App.haptic();
+        const input = document.getElementById('input-partner');
+        if (!input) return;
+        
+        if (State.discipline === 'Outdoor Multipitch') {
+            const current = input.value.trim();
+            if (current && !current.includes(name)) {
+                input.value = `${current}, ${name}`;
+            } else if (!current) {
+                input.value = name;
+            }
+        } else {
+            input.value = name;
+        }
+        App.validateForm();
+    },
+    
+    renderPartnerPills: () => {
+        const picker = document.getElementById('partnerPicker');
+        if (!picker) return;
+        
+        let counts = {};
+        State.climbs.forEach(c => {
+            if (c.Partner) {
+                const names = c.Partner.split(',').map(n => n.trim());
+                names.forEach(n => { if (n) counts[n] = (counts[n] || 0) + 1; });
+            }
+        });
+        
+        const topPartners = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 5);
+        
+        if (topPartners.length === 0) {
+            picker.style.display = 'none';
+        } else {
+            picker.style.display = 'flex';
+            picker.innerHTML = topPartners.map(p => `<div class="pill" onclick="App.addPartner('${p}')">${p}</div>`).join('');
+        }
     },
 
     handleHPSlide: (e) => {
@@ -674,7 +717,6 @@ const App = {
         const buildPills = (arr, activeVal, clickAction) => arr.map(item => `<div class="pill ${item === activeVal ? 'active' : ''}" data-val="${item}" onclick="${clickAction}='${item}';">${item}</div>`).join('');
 
         safeHTML('typeSelector', AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join(''));
-        safeHTML('dashSelector', AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join(''));
         
         safeClass('input-outdoor', isOut ? '' : 'hidden');
         safeClass('input-indoor', isOut ? 'hidden' : '');
@@ -723,6 +765,7 @@ const App = {
         safeHTML('climbStyleSelector', AppConfig.climbStyles.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('style', '${s}')">${s}</div>`).join(''));
         safeHTML('holdsSelector', AppConfig.holds.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" data-val="${h}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join(''));
         
+        // Silence old charts to prevent UI errors on main log view
         const cTog = document.getElementById('chartToggle');
         if (cTog) cTog.style.display = 'none'; 
         const pChart = document.getElementById('progressChart');
@@ -730,6 +773,7 @@ const App = {
         const ndMsg = document.getElementById('noDataMsg');
         if (ndMsg) ndMsg.style.display = 'none';
 
+        App.renderPartnerPills();
         App.updateUISelections(); 
         App.validateForm();
         if (State.view === 'dash') App.renderDashboard();
@@ -857,6 +901,7 @@ const App = {
                     <div class="log-details">
                         <div class="log-details-grid">
                             <div class="log-meta-item">STYLE<div class="log-meta-val">${AppConfig.styles[l.Style] || l.Style}</div></div>
+                            ${l.Partner ? `<div class="log-meta-item" style="grid-column: span 2;">PARTNER(S)<div class="log-meta-val">${l.Partner}</div></div>` : ''}
                             ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
                             ${l.Pitches ? `<div class="log-meta-item">PITCHES<div class="log-meta-val">${l.Pitches}</div></div>` : ''}
                             ${l.GearStyle ? `<div class="log-meta-item">GEAR<div class="log-meta-val">${l.GearStyle}</div></div>` : ''}
@@ -874,6 +919,7 @@ const App = {
 
             const isIndoorGym = AppConfig.gyms.includes(session.Location);
 
+            // Material CSS Lift applied here via inline classes
             return `
             <div class="session-card">
                 <div class="session-header">
@@ -903,127 +949,8 @@ const App = {
     },
     
     renderDashboard: () => { 
-        App.renderDashboardCharts(); 
+        // Forward logging view below the Nerd Dashboard button
         App.renderDashboardLogs(); 
-    },
-
-    renderDashboardCharts: () => {
-        const dStr = String(State.discipline || "");
-        const conf = getScaleConfig(dStr);
-        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(l.Style));
-        
-        const chartTog = document.getElementById('chartToggle');
-        if (chartTog) {
-            chartTog.style.display = 'flex';
-            chartTog.innerHTML = `
-                <div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" data-val="max" onclick="App.haptic(); State.chartMode='max'">Max Grade</div>
-                <div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" data-val="avg" onclick="App.haptic(); State.chartMode='avg'">Volume (Avg)</div>
-            `;
-        }
-
-        const ctxCanvas = document.getElementById('progressChart');
-        const noDataMsg = document.getElementById('noDataMsg');
-        
-        if (viewLogs.length === 0) {
-            if(ctxCanvas) ctxCanvas.style.display = 'none';
-            if(noDataMsg) noDataMsg.style.display = 'block';
-            return;
-        } else {
-            if(ctxCanvas) ctxCanvas.style.display = 'block';
-            if(noDataMsg) noDataMsg.style.display = 'none';
-        }
-
-        // --- STRICT MONTHLY GROUPING LOGIC ---
-        const grouped = {};
-        viewLogs.forEach(l => {
-            const cleanD = getCleanDate(l.Date);
-            if (!cleanD) return;
-            
-            const d = new Date(cleanD);
-            if (isNaN(d.getTime())) return;
-            
-            const monthKey = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-
-            if (!grouped[monthKey]) grouped[monthKey] = [];
-            grouped[monthKey].push(Number(l.Score) || 0);
-        });
-
-        const sortedMonths = Object.keys(grouped).sort((a,b) => Number(a) - Number(b)).slice(-12);
-        
-        const chartLabels = sortedMonths.map(ts => {
-            const d = new Date(Number(ts));
-            return `${AppConfig.months[d.getMonth()]} '${d.getFullYear().toString().slice(-2)}`; 
-        });
-        
-        const chartData = sortedMonths.map(ts => {
-            if (State.chartMode === 'max') return Math.max(...grouped[ts]);
-            const sum = grouped[ts].reduce((a,b) => a+b, 0);
-            return Math.round(sum / grouped[ts].length);
-        });
-
-        if (window.mainChart) window.mainChart.destroy();
-        if (ctxCanvas) {
-            const ctx = ctxCanvas.getContext('2d');
-            window.mainChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: chartLabels,
-                    datasets: [{
-                        data: chartData,
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        borderWidth: 3,
-                        pointBackgroundColor: '#10b981',
-                        pointRadius: 5,
-                        pointBorderColor: '#0a0a0a',
-                        pointBorderWidth: 2,
-                        fill: true,
-                        tension: 0.35
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: 'rgba(10,10,10,0.9)',
-                            titleColor: '#888',
-                            bodyColor: '#fff',
-                            bodyFont: { weight: 'bold', size: 14 },
-                            padding: 12,
-                            borderColor: '#262626',
-                            borderWidth: 1,
-                            callbacks: {
-                                label: function(context) {
-                                    if(!conf || !conf.scores) return ` ${context.raw} XP`;
-                                    const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - context.raw) < Math.abs(prev - context.raw) ? curr : prev);
-                                    const idx = conf.scores.indexOf(closest);
-                                    return ` ${conf.labels[idx]} (${context.raw} XP)`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: { grid: { display: false, drawBorder: false }, ticks: { color: '#737373', font: { size: 10, weight: '600' } } },
-                        y: { 
-                            grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, 
-                            beginAtZero: false,
-                            ticks: { 
-                                color: '#737373', 
-                                font: { size: 10, weight: '700' },
-                                maxTicksLimit: 6,
-                                callback: function(value) {
-                                    if(!conf || !conf.scores) return value;
-                                    const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev);
-                                    const idx = conf.scores.indexOf(closest);
-                                    return conf.labels[idx] || '';
-                                }
-                            } 
-                        }
-                    }
-                }
-            });
-        }
     },
 
     renderDashboardLogs: () => {
@@ -1063,10 +990,32 @@ const App = {
             const nextIdx = Math.min(curIdx + 1, conf.scores.length - 1);
             const pct = Math.min(100, Math.max(0, ((avgS - conf.scores[curIdx]) / (conf.scores[nextIdx] - conf.scores[curIdx])) * 100)) || 0;
             
-            const xpBG = document.getElementById('xpBaseGrade'); if(xpBG) xpBG.innerText = conf.labels[curIdx];
-            const xpNG = document.getElementById('xpNextGrade'); if(xpNG) xpNG.innerText = conf.labels[nextIdx];
-            const xpP = document.getElementById('xpPercent'); if(xpP) xpP.innerText = `${Math.round(pct)}%`;
-            const xpBF = document.getElementById('xpBarFill'); if(xpBF) xpBF.style.width = `${pct}%`;
+            // Dynamic XP Colors implementation
+            let xpColor = 'var(--primary)';
+            if (dStr === 'Indoor Bouldering' && conf.colors && conf.colors[curIdx]) {
+                xpColor = conf.colors[curIdx];
+            }
+
+            const xpBG = document.getElementById('xpBaseGrade'); 
+            if(xpBG) {
+                xpBG.innerText = conf.labels[curIdx];
+                xpBG.style.color = xpColor;
+            }
+            
+            const xpNG = document.getElementById('xpNextGrade'); 
+            if(xpNG) {
+                xpNG.innerText = conf.labels[nextIdx];
+            }
+
+            const xpP = document.getElementById('xpPercent'); 
+            if(xpP) xpP.innerText = `${Math.round(pct)}%`;
+            
+            const xpBF = document.getElementById('xpBarFill'); 
+            if(xpBF) {
+                xpBF.style.width = `${pct}%`;
+                xpBF.style.backgroundColor = xpColor;
+                xpBF.style.boxShadow = `0 0 15px ${xpColor}60`;
+            }
         }
 
         const lList = document.getElementById('logList');
@@ -1091,6 +1040,7 @@ const App = {
                     <div class="log-details">
                         <div class="log-details-grid">
                             <div class="log-meta-item">STYLE<div class="log-meta-val">${AppConfig.styles[l.Style] || l.Style}</div></div>
+                            ${l.Partner ? `<div class="log-meta-item" style="grid-column: span 2;">PARTNER<div class="log-meta-val">${l.Partner}</div></div>` : ''}
                             ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
                             ${l.Pitches ? `<div class="log-meta-item">PITCHES<div class="log-meta-val">${l.Pitches}</div></div>` : ''}
                             ${l.GearStyle ? `<div class="log-meta-item">GEAR<div class="log-meta-val">${l.GearStyle}</div></div>` : ''}
@@ -1156,6 +1106,7 @@ const App = {
             SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Grade: g, Score: s, Style: State.activeStyle, 
             Burns: State.activeBurns === '-' ? '' : State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE,
             Rating: State.activeRating || "", Holds: State.activeHolds.join(', '), ClimStyles: State.activeClimbStyles.join(', '),
+            Partner: document.getElementById('input-partner') ? document.getElementById('input-partner').value.trim() : '',
             Notes: document.getElementById('input-notes') ? document.getElementById('input-notes').value.trim() : '', _synced: false 
         };
 
@@ -1172,6 +1123,9 @@ const App = {
         const inNotes = document.getElementById('input-notes');
         if (inNotes) inNotes.value = '';
         if (isOut && inName) inName.value = '';
+        
+        const inPart = document.getElementById('input-partner');
+        if (inPart) inPart.value = '';
         
         const pbInput = document.getElementById('input-pitch-breakdown');
         if (pbInput) pbInput.value = '';
@@ -1205,6 +1159,7 @@ const App = {
             setTimeout(() => { 
                 App.isSaving = false; 
                 App.validateForm(); 
+                App.renderPartnerPills(); // Re-scan memory
             }, 2000);
         }, 400); 
     }
