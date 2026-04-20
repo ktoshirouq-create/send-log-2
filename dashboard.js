@@ -3,12 +3,11 @@ const AppConfig = {
     gyms: ["OKS", "Torshov", "Løkka", "Bryn", "Gneiss", "Other"],
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering', 'Outdoor Multipitch'],
-    styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
+    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering'],
+    styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     grades: {
-        ropesIn: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
-        ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
+        ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
@@ -36,9 +35,6 @@ const escapeHTML = (str) => {
 };
 
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
-const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
-const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
-
 const formatShortDate = (dStr) => {
     const clean = dStr ? String(dStr).substring(0, 10) : "";
     if(!clean) return "";
@@ -103,12 +99,13 @@ const Dashboard = {
     showInsight: (type) => {
         Dashboard.haptic();
         const copy = {
+            'cns': { title: 'CNS Peak Output', desc: 'Tracks your maximum physical output (Peak Send) against your systemic tiredness (Average Session Fatigue) over the last 4 weeks. A rising fatigue bar with a dropping peak line is an early warning sign of overtraining.' },
             'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' }
         };
         const modal = document.getElementById('insightModal');
         if(modal && copy[type]) {
             document.getElementById('insightTitle').innerText = copy[type].title;
-            document.getElementById('insightDesc').innerHTML = copy[type].desc;
+            document.getElementById('insightDesc').innerText = copy[type].desc;
             modal.classList.add('active');
         }
     },
@@ -119,13 +116,14 @@ const Dashboard = {
             <div id="insightModal" class="modal-overlay" style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.9); z-index:3000; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(8px); opacity:0; pointer-events:none; transition:0.3s;" onclick="if(event.target===this) this.classList.remove('active')">
                 <div class="modal-content" style="background:#121212; padding:30px; border-radius:16px; width:90%; max-width:400px; border:1px solid #1a1a1a; transform:translateY(20px); transition:0.3s; box-shadow:0 20px 50px rgba(0,0,0,0.8);">
                     <h2 id="insightTitle" style="color:#10b981; border:none; margin-bottom:15px; font-size:1.2rem; font-weight:800;">Insight</h2>
-                    <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0; font-family:'Inter',sans-serif;"></p>
+                    <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0; font-family:'Inter',sans-serif; white-space:pre-wrap;"></p>
                     <button style="background:#10b981; color:#000; border:none; padding:14px; width:100%; border-radius:14px; font-weight:800; font-size:1.05rem; cursor:pointer; margin-top:24px;" onclick="document.getElementById('insightModal').classList.remove('active'); Dashboard.haptic();">Got it</button>
                 </div>
             </div>`;
             document.body.insertAdjacentHTML('beforeend', modalHTML);
         }
 
+        // SCALPEL DOM INJECTION: Finds pure text nodes and injects inline without touching parent CSS
         const addIcon = (textMatches, type) => {
             const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
             let node;
@@ -144,7 +142,19 @@ const Dashboard = {
                 }
             }
         };
+        addIcon('CNS PEAK OUTPUT TRACKER', 'cns');
         addIcon('CLIMBER PROFILE', 'profile');
+    },
+
+    toggleDataset: (idx, el) => {
+        Dashboard.haptic();
+        if (!window.charts || !window.charts.line) return;
+        const chart = window.charts.line;
+        const meta = chart.getDatasetMeta(idx);
+        meta.hidden = meta.hidden === null ? true : null;
+        chart.update();
+        el.style.opacity = meta.hidden ? '0.4' : '1';
+        el.style.textDecoration = meta.hidden ? 'line-through' : 'none';
     },
 
     renderLogbook: () => {
@@ -193,7 +203,6 @@ const Dashboard = {
             else if (type === 'Indoor Bouldering') dotColor = '#3b82f6';
             else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316';
             else if (type === 'Outdoor Bouldering') dotColor = '#a855f7';
-            else if (type === 'Outdoor Multipitch') dotColor = '#ef4444';
             
             const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
             
@@ -220,10 +229,6 @@ const Dashboard = {
                             <div><div class="d-lbl">RPE (Effort)</div><div class="d-val">${getV(l, 'Effort') || '-'}</div></div>
                             <div><div class="d-lbl">Session Fatigue</div><div class="d-val" style="color:#fb923c;">${fatigue}</div></div>
                             <div><div class="d-lbl">Session Focus</div><div class="d-val" style="color:#60a5fa;">${focus}</div></div>
-                            ${getV(l, 'Pitches') ? `<div><div class="d-lbl">Pitches</div><div class="d-val">${getV(l, 'Pitches')}</div></div>` : ''}
-                            ${getV(l, 'GearStyle') ? `<div><div class="d-lbl">Gear Style</div><div class="d-val">${getV(l, 'GearStyle')}</div></div>` : ''}
-                            ${getV(l, 'PackWeight') ? `<div><div class="d-lbl">Pack Weight</div><div class="d-val">${getV(l, 'PackWeight')}</div></div>` : ''}
-                            ${getV(l, 'PitchBreakdown') ? `<div class="d-notes" style="grid-column: span 3;">Pitches: ${getV(l, 'PitchBreakdown')}</div>` : ''}
                         </div>
                         ${cleanNotes ? `<div class="d-notes">"${cleanNotes}"</div>` : ''}
                         <div class="log-actions" style="display:flex; gap:12px; margin-top:20px;">
@@ -247,13 +252,20 @@ const Dashboard = {
     }
 };
 
-window.charts = { radar: null, pyr: null };
+window.charts = { radar: null, line: null, pyr: null };
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
 
     let allLogs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
+    if (allLogs.length === 0) {
+        allLogs = JSON.parse(localStorage.getItem('climbingLogs') || localStorage.getItem('climbLogs') || '[]');
+    }
+
     let allSessions = JSON.parse(localStorage.getItem('crag_sessions_master') || '[]');
+    if (allSessions.length === 0) {
+        allSessions = JSON.parse(localStorage.getItem('sessionLogs') || '[]');
+    }
     
     allSessionsMaster = allSessions; 
     
@@ -263,62 +275,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const getScaleConfig = (disc) => {
         if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
         if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
-        if (disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Multipitch') return AppConfig.grades.ropesOut;
-        return AppConfig.grades.ropesIn;
+        return AppConfig.grades.ropes;
     };
 
-    const searchInput = document.getElementById('logSearch');
-    if (searchInput) {
-        searchInput.addEventListener('input', () => {
-            Dashboard.logLimit = 10; 
-            Dashboard.renderLogbook();
-        });
-    }
+    document.getElementById('logSearch').addEventListener('input', () => {
+        Dashboard.logLimit = 10; 
+        Dashboard.renderLogbook();
+    });
 
     const syncText = document.getElementById('syncStatus');
-    if (syncText) syncText.innerText = "(Syncing)";
+    syncText.innerText = "(Syncing)";
 
     fetch(AppConfig.api)
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
                 if (data.climbs && data.climbs.length > 0) {
-                    const localClimbs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
-                    // Cloud Defender Patch for Dashboard: Safely merge to protect local multipitch fields
-                    allLogs = data.climbs.map(cloudLog => {
-                        let localLog = localClimbs.find(c => String(getV(c, 'ClimbID')) === String(getV(cloudLog, 'ClimbID')));
-                        if (localLog) {
-                            if (getV(localLog, 'Pitches') && !getV(cloudLog, 'Pitches')) cloudLog.Pitches = getV(localLog, 'Pitches');
-                            if (getV(localLog, 'PackWeight') && !getV(cloudLog, 'PackWeight')) cloudLog.PackWeight = getV(localLog, 'PackWeight');
-                            if (getV(localLog, 'GearStyle') && !getV(cloudLog, 'GearStyle')) cloudLog.GearStyle = getV(localLog, 'GearStyle');
-                            if (getV(localLog, 'PitchBreakdown') && !getV(cloudLog, 'PitchBreakdown')) cloudLog.PitchBreakdown = getV(localLog, 'PitchBreakdown');
-                            return { ...localLog, ...cloudLog }; 
-                        }
-                        return cloudLog;
-                    });
-                    
-                    // Retain purely local (unsynced) climbs so they don't vanish on dashboard load
-                    const unsynced = localClimbs.filter(c => c._synced === false && !allLogs.some(l => String(getV(l, 'ClimbID')) === String(getV(c, 'ClimbID'))));
-                    allLogs = [...allLogs, ...unsynced];
+                    allLogs = data.climbs;
                     localStorage.setItem('crag_climbs_master', JSON.stringify(allLogs));
                 }
-                
                 if (data.sessions && data.sessions.length > 0) {
                     allSessions = data.sessions;
                     allSessionsMaster = allSessions;
                     localStorage.setItem('crag_sessions_master', JSON.stringify(allSessions));
                 }
-                
-                if (syncText) syncText.innerText = "● LIVE";
-                setTimeout(() => { if(syncText) syncText.innerText = ""; }, 3000);
+                syncText.innerText = "● LIVE";
+                setTimeout(() => syncText.innerText = "", 3000);
                 renderDashboard(); 
             }
         }).catch(err => {
             console.log("Dashboard background sync failed", err);
-            if (syncText) {
-                syncText.innerText = "○ OFFLINE";
-                syncText.style.color = "#737373";
-            }
+            syncText.innerText = "○ OFFLINE";
+            syncText.style.color = "#737373";
         });
 
     const attachFilters = (id, propName, className) => {
@@ -336,105 +324,6 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFilters('disc-filter', 'disc', 'filter-pill');
     attachFilters('time-filter', 'time', 'time-tab');
 
-    // ==========================================
-    // SPORTS SCIENCE ENGINE (ACWR) - Dashboard
-    // ==========================================
-    const ReadinessEngine = {
-        cleanseData: (sessions) => {
-            return sessions.filter(session => allLogs.some(c => String(getV(c, 'SessionID')) === String(getV(session, 'SessionID'))));
-        },
-        getHistoricalAverageFatigue: (sessions) => {
-            const fScores = sessions.filter(s => getV(s, 'Fatigue') && getV(s, 'Fatigue') !== "0").map(s => Number(getV(s, 'Fatigue')));
-            if (fScores.length === 0) return 5;
-            return fScores.reduce((a, b) => a + b, 0) / fScores.length;
-        },
-        calculateDailyLoad: (targetDate, validSessions) => {
-            const daySessions = validSessions.filter(s => getCleanDate(getV(s, 'Date')) === targetDate);
-            if (daySessions.length === 0) return { load: 0, missingFatigue: false };
-
-            let totalVolume = 0;
-            let maxFatigue = 0;
-            let missingFatigue = false;
-            const avgFatigue = ReadinessEngine.getHistoricalAverageFatigue(validSessions);
-
-            daySessions.forEach(session => {
-                const sFatigue = getV(session, 'Fatigue');
-                if (!sFatigue || sFatigue === "0") missingFatigue = true;
-                let sessionFatigue = (sFatigue && sFatigue !== "0") ? Number(sFatigue) : avgFatigue;
-                
-                if (sessionFatigue > maxFatigue) maxFatigue = sessionFatigue;
-
-                const sessionClimbs = allLogs.filter(c => String(getV(c, 'SessionID')) === String(getV(session, 'SessionID')));
-                sessionClimbs.forEach(climb => {
-                    const conf = getScaleConfig(getV(climb, 'Type'));
-                    const cleanGrade = getBaseGrade(getV(climb, 'Grade'));
-                    const gradeIdx = conf.labels.indexOf(cleanGrade);
-                    const baseXP = gradeIdx > -1 ? conf.scores[gradeIdx] : 0;
-                    const pitches = getV(climb, 'Pitches') ? Number(getV(climb, 'Pitches')) : 1;
-                    const style = getV(climb, 'Style');
-                    
-                    if (['Project', 'Worked', 'project', 'worked'].includes(style)) {
-                        let hpFactor = getV(climb, 'HighPoint') ? (Number(getV(climb, 'HighPoint')) / 100) : 0.5;
-                        let burns = (getV(climb, 'Burns') && getV(climb, 'Burns') !== '-') ? Number(getV(climb, 'Burns')) : 1;
-                        totalVolume += (baseXP * hpFactor * burns) * pitches;
-                    } else {
-                        totalVolume += Number(getV(climb, 'Score') || 0) * pitches;
-                    }
-                });
-            });
-
-            return { load: totalVolume * maxFatigue, missingFatigue };
-        },
-        generateACWR: () => {
-            const validSessions = ReadinessEngine.cleanseData(allSessionsMaster);
-            let acuteLoad = 0; 
-            let chronicLoad = 0;
-            let blockedByAcuteFatigue = false;
-            let daysActiveAcute = 0;
-
-            const today = new Date();
-            today.setHours(0,0,0,0);
-
-            for (let i = 0; i < 28; i++) {
-                let targetDate = new Date(today);
-                targetDate.setDate(targetDate.getDate() - i);
-                let dateString = getLocalISO(targetDate);
-                
-                let { load, missingFatigue } = ReadinessEngine.calculateDailyLoad(dateString, validSessions);
-                
-                if (load > 0 && i < 7) daysActiveAcute++;
-
-                if (i < 7) {
-                    acuteLoad += load;
-                    if (missingFatigue) blockedByAcuteFatigue = true;
-                }
-                chronicLoad += load;
-            }
-
-            if (blockedByAcuteFatigue) {
-                return { status: 'LOCKED', percent: '- %', ratio: '---', color: '#737373', msg: "⚠️ Missing Session Fatigue. Update recent logs in Journal to unlock Readiness Score." };
-            }
-
-            chronicLoad = chronicLoad / 4;
-
-            if (chronicLoad < 2000) {
-                return { status: 'CALIBRATING', percent: '...', ratio: '---', color: '#3b82f6', msg: "Building Base: Volume too low for accurate ACWR. Focus on steady accumulation." };
-            }
-
-            const ratioNum = acuteLoad / chronicLoad;
-            const ratio = ratioNum.toFixed(2);
-
-            // COLOR AESTHETIC FIX: Swapped glaring yellows for dark mode friendly Burnt Amber and Cool Blue.
-            if (ratioNum > 1.5) return { status: 'DANGER', percent: '30%', color: '#ff4d4d', ratio: ratio + 'x', msg: "Overtraining risk. High injury probability. Strict rest recommended." };
-            if (ratioNum > 1.3) return { status: 'WARNING', percent: '55%', color: '#f59e0b', ratio: ratio + 'x', msg: "High systemic load. Focus on volume, avoid limit projecting." };
-            
-            if (ratioNum < 0.8 && daysActiveAcute >= 2) return { status: 'PRIME', percent: '100%', color: '#00d084', ratio: ratio + 'x', msg: "Fully Recovered. Prime for Limit Effort." };
-            if (ratioNum < 0.8) return { status: 'UNDER', percent: '75%', color: '#3b82f6', ratio: ratio + 'x', msg: "Undertraining detected. Increase training stimulus." };
-            
-            return { status: 'OPTIMAL', percent: '85%', color: '#00d084', ratio: ratio + 'x', msg: "Balanced training. Optimal zone for power generation." };
-        }
-    };
-
     const calcRPG = (logs) => {
         let attr = { Power: 0, Endurance: 0, Technique: 0, Fingers: 0, Headspace: 0, Tenacity: 0 };
         if (logs.length === 0) return { Power: 40, Endurance: 40, Technique: 40, Fingers: 40, Headspace: 40, Tenacity: 40 };
@@ -449,10 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const type = String(getV(l, 'Type') || "");
             const isOutdoor = type.toLowerCase().includes('outdoor');
             const score = Number(getV(l, 'Score')) || 0;
-            
-            const pitches = Number(getV(l, 'Pitches')) || 1;
-            const gear = String(getV(l, 'GearStyle') || "");
-            const pack = String(getV(l, 'PackWeight') || "");
 
             if (angle.includes('Overhang') || angle.includes('Roof')) attr.Power += 2;
             if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
@@ -480,12 +365,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (styleResult === 'project' || styleResult === 'worked') attr.Tenacity += 3;
             if (burns >= 3) attr.Tenacity += 1;
             if (burns >= 5) attr.Tenacity += 2;
-            
-            if (type === 'Outdoor Multipitch') {
-                attr.Endurance += pitches;
-                if (pack === 'Heavy' || pack === 'Standard') attr.Tenacity += 3;
-                if (gear === 'Trad' || gear === 'Mixed') attr.Headspace += 4;
-            }
         });
         
         const maxVal = Math.max(...Object.values(attr), 1);
@@ -524,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentFilteredLogs.forEach(l => { 
             const s = Number(getV(l, 'Score'));
             const style = String(getV(l, 'Style') || "").toLowerCase();
-            const isSend = s && style !== 'worked' && style !== 'toprope' && style !== 'autobelay' && style !== 'bailed';
+            const isSend = s && style !== 'worked' && style !== 'toprope' && style !== 'autobelay';
             const gradeStr = String(getV(l, 'Grade') || "");
             const typeStr = String(getV(l, 'Type') || "").toLowerCase();
             const dateStr = getV(l, 'Date');
@@ -570,110 +449,140 @@ document.addEventListener('DOMContentLoaded', () => {
             locs[loc] = locSessions[loc].size;
         });
 
-        // ==========================================
-        // RENDER READINESS HUD (POGO Style)
-        // ==========================================
-        const acwr = ReadinessEngine.generateACWR();
-        const hudWrapper = document.getElementById('readiness-hud-wrapper');
-        
-        if (hudWrapper) {
-            const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
-            const todayStr = new Date().toLocaleDateString('en-US', dateOptions).toUpperCase();
-
-            hudWrapper.innerHTML = `
-            <div class="section-header hud-header">
-                <span class="hud-header-title">TODAY'S READINESS</span>
-                <span class="hud-date">${todayStr}</span>
-            </div>
-            <div class="readiness-hud-card">
-                ${acwr.status === 'DANGER' ? `
-                <div class="warning-banner">
-                    ⚠️ OVERTRAINING RISK: Reduce load today.
-                </div>` : ''}
-                
-                <div class="hud-split">
-                    <div class="hud-left">
-                        <span class="hud-val" style="color: ${acwr.color};">${acwr.percent}</span>
-                        <span class="hud-label">READINESS</span>
-                    </div>
-                    <div class="hud-right">
-                        <span class="hud-val" style="color: ${acwr.color};">${acwr.ratio}</span>
-                        <span class="hud-label">LOAD RATIO</span>
-                    </div>
-                </div>
-
-                <div class="hud-prescription" style="border-left-color: ${acwr.color};">
-                    ${acwr.msg}
-                </div>
-            </div>`;
-        }
-
-        const statsS = document.getElementById('stat-sends'); if(statsS) statsS.innerText = currentFilteredLogs.length;
+        document.getElementById('stat-sends').innerText = currentFilteredLogs.length;
         const outDays = new Set(currentFilteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getV(l, 'Date'))).size;
-        const statsO = document.getElementById('stat-outdoor'); if(statsO) statsO.innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
+        document.getElementById('stat-outdoor').innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
         
         const peakEl = document.getElementById('stat-peak');
-        if (peakEl) {
-            const cleanPeak = getBaseGrade(peakG);
-            peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
-            
-            if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
-                const conf = AppConfig.grades.bouldsIn;
-                const idx = conf.labels.indexOf(cleanPeak);
-                peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
-            } else {
-                peakEl.style.color = '#fff';
-            }
+        const cleanPeak = getBaseGrade(peakG);
+        peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
+        
+        if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
+            const conf = AppConfig.grades.bouldsIn;
+            const idx = conf.labels.indexOf(cleanPeak);
+            peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
+        } else {
+            peakEl.style.color = '#fff';
         }
 
         const topDay = Object.keys(dayC).length ? Object.keys(dayC).length > 0 ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-' : '-';
-        
         let envLabel = '-';
-        const totalS = allSessionsMaster.length;
-        if (totalS > 0) {
-            const outS = allSessionsMaster.filter(s => !AppConfig.gyms.includes(getV(s, 'Location'))).length;
-            const outRatio = outS / totalS;
-            if (outRatio > 0.6) envLabel = 'Crag Hound';
-            else if (outRatio < 0.2) envLabel = 'Gym Rat';
-            else envLabel = 'All-Terrain';
+        if (currentFilteredLogs.length > 0) {
+            const inRatio = indoorCount / currentFilteredLogs.length;
+            if (inRatio >= 0.8) envLabel = 'Gym Rat';
+            else if (inRatio <= 0.4) envLabel = 'Crag Hound';
+            else envLabel = 'Weekend Warrior';
         }
 
-        const idDay = document.getElementById('id-day'); if(idDay) idDay.innerText = topDay;
-        const idEnv = document.getElementById('id-env'); if(idEnv) idEnv.innerText = envLabel;
+        document.getElementById('id-day').innerText = topDay;
+        document.getElementById('id-env').innerText = envLabel;
 
         Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
 
         const pyrCard = document.getElementById('pyramidCard');
         const pyrCanvas = document.getElementById('pyramidChart');
 
-        if (pyrCard && pyrCanvas) {
-            if (activeDisc === 'All' || currentFilteredLogs.length === 0) {
-                pyrCard.style.display = 'none';
-            } else {
-                pyrCard.style.display = 'block';
-                const conf = getScaleConfig(activeDisc);
-                const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
-                const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
-                
-                const pyrColors = sortedGrades.map(g => {
-                    const idx = conf.labels.indexOf(g);
-                    return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
-                });
+        if (activeDisc === 'All' || currentFilteredLogs.length === 0) {
+            pyrCard.style.display = 'none';
+        } else {
+            pyrCard.style.display = 'block';
+            const conf = getScaleConfig(activeDisc);
+            const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
+            const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
+            
+            const pyrColors = sortedGrades.map(g => {
+                const idx = conf.labels.indexOf(g);
+                return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
+            });
 
-                window.charts.pyr = new Chart(pyrCanvas, {
-                    type: 'bar',
-                    data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
-                    options: { 
-                        responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
-                        plugins: { legend: { display: false } }, 
-                        scales: { 
-                            x: { display: false },
-                            y: { ticks: { color: '#a3a3a3', font: { weight: '600' } }, grid: { display: false, drawBorder: false } }
-                        } 
-                    }
-                });
+            window.charts.pyr = new Chart(pyrCanvas, {
+                type: 'bar',
+                data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
+                    plugins: { legend: { display: false } }, 
+                    scales: { 
+                        x: { display: false },
+                        y: { ticks: { color: '#a3a3a3', font: { weight: '600' } }, grid: { display: false, drawBorder: false } }
+                    } 
+                }
+            });
+        }
+
+        const sortedCNS = [...currentFilteredLogs].filter(l => getV(l, 'Score') && getV(l, 'Style') !== 'worked' && getV(l, 'Style') !== 'toprope' && getV(l, 'Style') !== 'autobelay').sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date')));
+        const cnsData = { labels: ['W4', 'W3', 'W2', 'W1'], peak: [null, null, null, null], grades: ['-','-','-','-'], fatigue: [0,0,0,0] };
+        const weekBins = [[],[],[],[]]; 
+        const sessionBins = [[],[],[],[]];
+
+        sortedCNS.forEach(l => {
+            const diffDays = Math.floor((now - new Date(getV(l, 'Date'))) / (1000 * 60 * 60 * 24));
+            if (diffDays <= 7) weekBins[3].push(l); 
+            else if (diffDays <= 14) weekBins[2].push(l); 
+            else if (diffDays <= 21) weekBins[1].push(l); 
+            else if (diffDays <= 28) weekBins[0].push(l);
+        });
+
+        allSessionsMaster.forEach(s => {
+            const diffDays = Math.floor((now - new Date(getV(s, 'Date'))) / (1000 * 60 * 60 * 24));
+            const f = getV(s, 'Fatigue');
+            if (diffDays <= 28 && f) {
+                let binIdx = -1;
+                if (diffDays <= 7) binIdx = 3; else if (diffDays <= 14) binIdx = 2; else if (diffDays <= 21) binIdx = 1; else if (diffDays <= 28) binIdx = 0;
+                sessionBins[binIdx].push(Number(f));
+            }
+        });
+
+        weekBins.forEach((bin, i) => {
+            if (bin.length > 0) {
+                const maxLog = bin.reduce((max, cur) => Number(getV(cur, 'Score')) > Number(getV(max, 'Score')) ? cur : max);
+                cnsData.peak[i] = Number(getV(maxLog, 'Score')); 
+                cnsData.grades[i] = getBaseGrade(getV(maxLog, 'Grade'));
+            }
+            if (sessionBins[i].length > 0) {
+                cnsData.fatigue[i] = sessionBins[i].reduce((a,b)=>a+b, 0) / sessionBins[i].length;
+            }
+        });
+
+        const canvasElement = document.getElementById('cnsLineChart');
+        if (canvasElement) {
+            const chartWrapper = canvasElement.parentElement;
+            if (!document.getElementById('cnsLegend') && chartWrapper && chartWrapper.parentElement) {
+                const legendDiv = document.createElement('div');
+                legendDiv.id = 'cnsLegend';
+                legendDiv.style.cssText = 'display:flex; justify-content:center; gap:24px; width:100%; margin-bottom:16px; font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:1px;';
+                legendDiv.innerHTML = `
+                    <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(0, this)"><div style="width:12px; height:12px; border-radius:50%; background:#10b981;"></div> Peak Send</div>
+                    <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(1, this)"><div style="width:12px; height:12px; border-radius:4px; background:#333;"></div> Avg Fatigue</div>
+                `;
+                // SCALPEL INJECTION: Place it before the relative Chart wrapper, not inside it
+                chartWrapper.parentElement.insertBefore(legendDiv, chartWrapper);
             }
         }
+
+        let gL = document.getElementById('cnsLineChart').getContext('2d').createLinearGradient(0,0,0,250); 
+        gL.addColorStop(0, 'rgba(16, 185, 129, 0.4)'); gL.addColorStop(1, 'transparent');
+        
+        window.charts.line = new Chart(document.getElementById('cnsLineChart'), {
+            type: 'line', 
+            data: { 
+                labels: cnsData.labels, 
+                datasets: [
+                    { type: 'line', label: 'Peak Send', data: cnsData.peak, borderColor: '#10b981', backgroundColor: gL, fill: true, tension: 0.4, spanGaps: true, pointBackgroundColor: '#121212', pointBorderWidth: 2, yAxisID: 'y' },
+                    { type: 'bar', label: 'Avg Fatigue', data: cnsData.fatigue, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 4, yAxisID: 'y1' }
+                ] 
+            },
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                interaction: { mode: 'index', intersect: false },
+                // TERNARY FIX: Don't divide empty data, just return the -/10 string
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + (ctx.raw > 0 ? ctx.raw.toFixed(1) + '/10' : '- / 10') } } }, 
+                scales: { 
+                    y: { display: false, position: 'left' }, 
+                    y1: { display: false, position: 'right', min: 0, max: 10 },
+                    x: { grid: { display: false }, ticks: { color: '#737373', font: { weight: '600' } } } 
+                } 
+            }
+        });
 
         const currAttr = calcRPG(currentFilteredLogs);
         const baseAttr = calcRPG(allTimeLogsFiltered);
@@ -688,48 +597,42 @@ document.addEventListener('DOMContentLoaded', () => {
             archetype = topAttrs.length > 1 ? 'The All-Rounder' : archMap[topAttrs[0]];
         }
         
-        const idArch = document.getElementById('id-arch'); if(idArch) idArch.innerText = archetype;
+        document.getElementById('id-arch').innerText = archetype;
 
         const radarLabels = Object.keys(currAttr).map(k => [k.toUpperCase(), currAttr[k].toString()]);
-        const radarCanvas = document.getElementById('attributeRadarChart');
 
-        if (radarCanvas) {
-            window.charts.radar = new Chart(radarCanvas, { 
-                type: 'radar', 
-                data: { 
-                    labels: radarLabels, 
-                    datasets: [
-                        { 
-                            label: 'Current Phase', data: Object.values(currAttr), borderColor: '#10b981', 
-                            backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true
-                        },
-                        { 
-                            label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.15)', 
-                            backgroundColor: 'rgba(255,255,255,0.02)', pointRadius: 0, borderWidth: 2, borderDash: [4, 4], fill: true
-                        }
-                    ] 
+        window.charts.radar = new Chart(document.getElementById('attributeRadarChart'), { 
+            type: 'radar', 
+            data: { 
+                labels: radarLabels, 
+                datasets: [
+                    { 
+                        label: 'Current Phase', data: Object.values(currAttr), borderColor: '#10b981', 
+                        backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true
+                    },
+                    { 
+                        label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.15)', 
+                        backgroundColor: 'rgba(255,255,255,0.02)', pointRadius: 0, borderWidth: 2, borderDash: [4, 4], fill: true
+                    }
+                ] 
+            }, 
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                plugins: { 
+                    legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } },
+                    tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } }
                 }, 
-                options: { 
-                    responsive: true, maintainAspectRatio: false, 
-                    plugins: { 
-                        legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } },
-                        tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } }
-                    }, 
-                    scales: { 
-                        r: { 
-                            min: 0, max: 100, ticks: { display: false, stepSize: 20 }, 
-                            grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, 
-                            pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } 
-                        } 
+                scales: { 
+                    r: { 
+                        min: 0, max: 100, ticks: { display: false, stepSize: 20 }, 
+                        grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, 
+                        pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } 
                     } 
                 } 
-            });
-        }
+            } 
+        });
 
-        const renderList = (id, html) => { 
-            const el = document.getElementById(id); 
-            if(el) el.innerHTML = html || '<div class="empty-msg">No data available for this phase.</div>'; 
-        };
+        const renderList = (id, html) => { document.getElementById(id).innerHTML = html || '<div class="empty-msg">No data available for this phase.</div>'; };
         
         const hof = [...currentFilteredLogs].filter(l => Number(getV(l, 'Rating')) >= 4).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
         renderList('list-fame', hof.map(l => {
