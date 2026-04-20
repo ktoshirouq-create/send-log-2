@@ -423,12 +423,14 @@ const App = {
             State.activeBurns = newVal < 1 ? '-' : newVal;
         }
     },
+
+    // MULTIPITCH BUILDER - Hard-locked floor of 2 pitches
     adjPitchCount: (dir) => { 
         App.haptic(); 
         let pArr = [...State.activePitches];
         if (dir > 0) {
             pArr.push({ type: 'Lead', grade: State.activeGrade.text || AppConfig.grades.ropesOut.labels[5] });
-        } else if (dir < 0 && pArr.length > 1) {
+        } else if (dir < 0 && pArr.length > 2) { 
             pArr.pop();
         }
         State.activePitches = pArr;
@@ -1001,9 +1003,9 @@ const App = {
                                 ${l.PitchBreakdown ? `<div class="d-notes" style="grid-column: 1 / -1;">Pitches: ${l.PitchBreakdown}</div>` : ''}
                             </div>
                             ${cleanNotes ? `<div class="d-notes">"${cleanNotes}"</div>` : ''}
-                            <div class="log-actions" style="display:flex; gap:12px; margin-top:20px;">
+                            <div class="log-actions">
                                 <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
-                                <button class="log-del-btn" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
+                                <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
                             </div>
                         </div>
                     </td>
@@ -1292,9 +1294,9 @@ const App = {
                             ${l.PitchBreakdown ? `<div class="d-notes" style="grid-column: 1 / -1;">Pitches: ${l.PitchBreakdown}</div>` : ''}
                         </div>
                         ${cleanNotes ? `<div class="d-notes">"${cleanNotes}"</div>` : ''}
-                        <div class="log-actions" style="display:flex; gap:12px; margin-top:20px;">
+                        <div class="log-actions">
                             <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
-                            <button class="log-del-btn" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
+                            <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
                         </div>
                     </div>
                 </td>
