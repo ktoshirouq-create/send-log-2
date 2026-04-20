@@ -108,7 +108,8 @@ const State = new Proxy({
             const conf = getScaleConfig(value);
             const isOutdoor = value.includes('Outdoor') || value.includes('Multipitch');
             
-            if (!conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
+            // Prevents crashes if array scale is shorter than current selection
+            if (conf && conf.labels && !conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
                 target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
             }
 
@@ -116,6 +117,7 @@ const State = new Proxy({
                 target.activeGym = 'OKS';
             }
 
+            // Edit-Mode Cleanser / Data Bleed Patch
             if (!isOutdoor) {
                 target.activeRating = 0;
                 target.activeApproach = null;
@@ -145,6 +147,7 @@ const State = new Proxy({
             ];
             if (softPaintTriggers.includes(prop)) {
                 App.updateUISelections(); 
+                if (prop === 'chartMode' && target.view === 'dash') App.renderDashboardCharts();
             }
         }
 
@@ -180,6 +183,7 @@ const SyncManager = {
                 SyncManager.pushAll(unsyncedSessions, unsyncedClimbs);
             }
 
+            // Cloud Defender Patch: Never overwrite local multipitch rich data with cloud nulls
             State.climbs = [...cloudClimbs, ...unsyncedClimbs].reduce((acc, current) => {
                 const existingIdx = acc.findIndex(item => String(item.ClimbID) === String(current.ClimbID));
                 if (existingIdx === -1) return acc.concat([current]);
@@ -489,7 +493,9 @@ const App = {
         App.haptic();
         const s = State.sessions.find(x => String(x.SessionID) === String(sessionId));
         if(!s) return;
-        document.getElementById('modalSessionId').value = s.SessionID;
+        
+        const mSessionId = document.getElementById('modalSessionId');
+        if (mSessionId) mSessionId.value = s.SessionID;
         
         ['sec-focus', 'sec-fatigue', 'sec-warmup', 'sec-approach'].forEach(id => {
             const el = document.getElementById(id);
@@ -612,12 +618,19 @@ const App = {
     
     saveSessionModal: () => {
         App.haptic();
-        const sessionId = document.getElementById('modalSessionId').value;
-        const focus = document.getElementById('modalFocusVal').value;
-        const fatigue = document.getElementById('modalFatigueVal').value;
-        const warmup = document.getElementById('modalWarmUpVal').value;
-        const approach = document.getElementById('modalApproachVal').value;
-        const notes = document.getElementById('modalNotesVal').value.trim();
+        const mSessionId = document.getElementById('modalSessionId');
+        const mFocus = document.getElementById('modalFocusVal');
+        const mFatigue = document.getElementById('modalFatigueVal');
+        const mWarmup = document.getElementById('modalWarmUpVal');
+        const mApproach = document.getElementById('modalApproachVal');
+        const mNotesVal = document.getElementById('modalNotesVal');
+
+        const sessionId = mSessionId ? mSessionId.value : '';
+        const focus = mFocus ? mFocus.value : '';
+        const fatigue = mFatigue ? mFatigue.value : '';
+        const warmup = mWarmup ? mWarmup.value : '';
+        const approach = mApproach ? mApproach.value : '';
+        const notes = mNotesVal ? mNotesVal.value.trim() : '';
         
         State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: focus, Fatigue: fatigue, WarmUp: warmup, Approach: approach, Notes: notes, _synced: false} : s);
         SyncManager.pushAll(State.sessions.filter(s => s._synced === false), []);
@@ -648,6 +661,11 @@ const App = {
     },
 
     renderUI: () => {
+        // Safe DOM Injection Helpers
+        const safeHTML = (id, html) => { const e = document.getElementById(id); if(e) e.innerHTML = html; };
+        const safeClass = (id, cls) => { const e = document.getElementById(id); if(e) e.className = cls; };
+        const safeText = (id, txt) => { const e = document.getElementById(id); if(e) e.innerText = txt; };
+
         const dStr = String(State.discipline || "");
         const isOut = dStr.includes('Outdoor'), isRope = dStr.includes('Rope'), isBould = dStr.includes('Boulder');
         const isMulti = dStr === 'Outdoor Multipitch';
@@ -655,17 +673,11 @@ const App = {
 
         const buildPills = (arr, activeVal, clickAction) => arr.map(item => `<div class="pill ${item === activeVal ? 'active' : ''}" data-val="${item}" onclick="${clickAction}='${item}';">${item}</div>`).join('');
 
-        const ts = document.getElementById('typeSelector');
-        if(ts) ts.innerHTML = AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join('');
+        safeHTML('typeSelector', AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join(''));
+        safeHTML('dashSelector', AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join(''));
         
-        const ds = document.getElementById('dashSelector');
-        if(ds) ds.innerHTML = AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join('');
-        
-        const inO = document.getElementById('input-outdoor'); 
-        if(inO) inO.className = isOut ? '' : 'hidden';
-        
-        const inI = document.getElementById('input-indoor');  
-        if(inI) inI.className = isOut ? 'hidden' : '';
+        safeClass('input-outdoor', isOut ? '' : 'hidden');
+        safeClass('input-indoor', isOut ? 'hidden' : '');
         
         const inN = document.getElementById('input-name');
         if(inN) inN.placeholder = isBould ? 'La Marie Rose' : (isMulti ? 'Vestpillaren' : 'Silence');
@@ -673,19 +685,16 @@ const App = {
         const inC = document.getElementById('input-crag');
         if(inC) inC.placeholder = isBould ? 'Sector, Crag 🇬🇷' : (isMulti ? 'Presten, Lofoten' : 'Flatanger');
         
-        const gL = document.getElementById('gradeLabel');
-        if(gL) gL.innerText = isMulti ? 'Crux Grade' : 'Grade';
+        safeText('gradeLabel', isMulti ? 'Crux Grade' : 'Grade');
 
         const currentGyms = (dStr === 'Indoor Rope Climbing') ? AppConfig.gyms.filter(g => g !== 'Løkka' && g !== 'Bryn') : AppConfig.gyms;
-        const gP = document.getElementById('gymPicker');
-        if(gP) gP.innerHTML = buildPills(currentGyms, State.activeGym, "App.haptic(); State.activeGym");
+        safeHTML('gymPicker', buildPills(currentGyms, State.activeGym, "App.haptic(); State.activeGym"));
         
-        const grP = document.getElementById('gradePicker');
-        if(grP) {
-            grP.innerHTML = conf.labels.map((g, i) => {
+        if (conf && conf.labels) {
+            safeHTML('gradePicker', conf.labels.map((g, i) => {
                 const dot = (conf.colors && conf.colors[i]) ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
                 return `<div class="pill ${String(g) === String(State.activeGrade.text) ? 'active' : ''}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
-            }).join('');
+            }).join(''));
         }
 
         let styles = [];
@@ -699,36 +708,21 @@ const App = {
         }
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = isMulti ? 'topped' : 'quick';
         
-        const sS = document.getElementById('styleSelector');
-        if(sS) {
-            sS.innerHTML = styles.map(s => {
-                return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
-                    if(['flash', 'onsight', 'toprope', 'autobelay'].includes('${s[0]}')){ State.activeBurns = 1; }
-                    else if('${s[0]}' === 'quick' && (State.activeBurns === 1 || State.activeBurns === '-')){ State.activeBurns = 2; }
-                    else if(['project', 'worked', 'topped', 'allfree', 'bailed'].includes('${s[0]}')){ State.activeBurns = '-'; }
-                ">${s[1]}</div>`;
-            }).join('');
-        }
+        safeHTML('styleSelector', styles.map(s => {
+            return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
+                if(['flash', 'onsight', 'toprope', 'autobelay'].includes('${s[0]}')){ State.activeBurns = 1; }
+                else if('${s[0]}' === 'quick' && (State.activeBurns === 1 || State.activeBurns === '-')){ State.activeBurns = 2; }
+                else if(['project', 'worked', 'topped', 'allfree', 'bailed'].includes('${s[0]}')){ State.activeBurns = '-'; }
+            ">${s[1]}</div>`;
+        }).join(''));
 
-        const gSS = document.getElementById('gearStyleSelector');
-        if(gSS) gSS.innerHTML = AppConfig.gearStyles.map(s => `<div class="pill ${State.activeGearStyle === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activeGearStyle='${s}';">${s}</div>`).join('');
+        safeHTML('gearStyleSelector', AppConfig.gearStyles.map(s => `<div class="pill ${State.activeGearStyle === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activeGearStyle='${s}';">${s}</div>`).join(''));
+        safeHTML('packWeightSelector', AppConfig.packWeights.map(s => `<div class="pill ${State.activePackWeight === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activePackWeight='${s}';">${s}</div>`).join(''));
+        safeHTML('rpeSelector', buildPills(AppConfig.rpes, State.activeRPE, "App.haptic(); State.activeRPE"));
+        safeHTML('steepnessSelector', AppConfig.steepness.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('steepness', '${s}')">${s}</div>`).join(''));
+        safeHTML('climbStyleSelector', AppConfig.climbStyles.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('style', '${s}')">${s}</div>`).join(''));
+        safeHTML('holdsSelector', AppConfig.holds.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" data-val="${h}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join(''));
         
-        const pWS = document.getElementById('packWeightSelector');
-        if(pWS) pWS.innerHTML = AppConfig.packWeights.map(s => `<div class="pill ${State.activePackWeight === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activePackWeight='${s}';">${s}</div>`).join('');
-
-        const rpS = document.getElementById('rpeSelector'); 
-        if(rpS) rpS.innerHTML = buildPills(AppConfig.rpes, State.activeRPE, "App.haptic(); State.activeRPE");
-        
-        const stS = document.getElementById('steepnessSelector'); 
-        if(stS) stS.innerHTML = AppConfig.steepness.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('steepness', '${s}')">${s}</div>`).join('');
-        
-        const cSS = document.getElementById('climbStyleSelector'); 
-        if(cSS) cSS.innerHTML = AppConfig.climbStyles.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('style', '${s}')">${s}</div>`).join('');
-        
-        const hS = document.getElementById('holdsSelector'); 
-        if(hS) hS.innerHTML = AppConfig.holds.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" data-val="${h}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join('');
-        
-        // Silence old charts to prevent UI errors on main log view
         const cTog = document.getElementById('chartToggle');
         if (cTog) cTog.style.display = 'none'; 
         const pChart = document.getElementById('progressChart');
@@ -769,8 +763,10 @@ const App = {
         const isOut = State.discipline.includes('Outdoor');
         const isMulti = State.discipline === 'Outdoor Multipitch';
 
-        const ratingSec = document.getElementById('rating-section') || document.getElementById('starRating')?.parentElement;
+        const ratingSec = document.getElementById('rating-section');
+        const starParent = document.getElementById('starRating');
         if (ratingSec) ratingSec.style.display = isOut ? 'block' : 'none';
+        else if (starParent && starParent.parentElement) starParent.parentElement.style.display = isOut ? 'block' : 'none';
 
         const mC = document.getElementById('multipitch-container');
         const bC = document.getElementById('burns-container');
@@ -830,7 +826,7 @@ const App = {
                 const maxSend = sends.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max);
                 maxSentStr = getBaseGrade(maxSend.Grade);
                 const sConf = getScaleConfig(maxSend.Type);
-                if (maxSend.Type.includes('Bouldering') && sConf.colors) {
+                if (maxSend.Type.includes('Bouldering') && sConf && sConf.colors) {
                     const mIdx = sConf.labels.indexOf(maxSentStr);
                     maxColor = sConf.colors[mIdx] || '#fff';
                 } else if (maxSend.Type.includes('Rope') || maxSend.Type.includes('Multipitch')) maxColor = 'var(--primary)';
@@ -907,16 +903,138 @@ const App = {
     },
     
     renderDashboard: () => { 
-        // Forward logging view below the Nerd Dashboard button
+        App.renderDashboardCharts(); 
         App.renderDashboardLogs(); 
+    },
+
+    renderDashboardCharts: () => {
+        const dStr = String(State.discipline || "");
+        const conf = getScaleConfig(dStr);
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(l.Style));
+        
+        const chartTog = document.getElementById('chartToggle');
+        if (chartTog) {
+            chartTog.style.display = 'flex';
+            chartTog.innerHTML = `
+                <div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" data-val="max" onclick="App.haptic(); State.chartMode='max'">Max Grade</div>
+                <div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" data-val="avg" onclick="App.haptic(); State.chartMode='avg'">Volume (Avg)</div>
+            `;
+        }
+
+        const ctxCanvas = document.getElementById('progressChart');
+        const noDataMsg = document.getElementById('noDataMsg');
+        
+        if (viewLogs.length === 0) {
+            if(ctxCanvas) ctxCanvas.style.display = 'none';
+            if(noDataMsg) noDataMsg.style.display = 'block';
+            return;
+        } else {
+            if(ctxCanvas) ctxCanvas.style.display = 'block';
+            if(noDataMsg) noDataMsg.style.display = 'none';
+        }
+
+        // --- STRICT MONTHLY GROUPING LOGIC ---
+        const grouped = {};
+        viewLogs.forEach(l => {
+            const cleanD = getCleanDate(l.Date);
+            if (!cleanD) return;
+            
+            const d = new Date(cleanD);
+            if (isNaN(d.getTime())) return;
+            
+            const monthKey = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+
+            if (!grouped[monthKey]) grouped[monthKey] = [];
+            grouped[monthKey].push(Number(l.Score) || 0);
+        });
+
+        const sortedMonths = Object.keys(grouped).sort((a,b) => Number(a) - Number(b)).slice(-12);
+        
+        const chartLabels = sortedMonths.map(ts => {
+            const d = new Date(Number(ts));
+            return `${AppConfig.months[d.getMonth()]} '${d.getFullYear().toString().slice(-2)}`; 
+        });
+        
+        const chartData = sortedMonths.map(ts => {
+            if (State.chartMode === 'max') return Math.max(...grouped[ts]);
+            const sum = grouped[ts].reduce((a,b) => a+b, 0);
+            return Math.round(sum / grouped[ts].length);
+        });
+
+        if (window.mainChart) window.mainChart.destroy();
+        if (ctxCanvas) {
+            const ctx = ctxCanvas.getContext('2d');
+            window.mainChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        data: chartData,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#10b981',
+                        pointRadius: 5,
+                        pointBorderColor: '#0a0a0a',
+                        pointBorderWidth: 2,
+                        fill: true,
+                        tension: 0.35
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(10,10,10,0.9)',
+                            titleColor: '#888',
+                            bodyColor: '#fff',
+                            bodyFont: { weight: 'bold', size: 14 },
+                            padding: 12,
+                            borderColor: '#262626',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    if(!conf || !conf.scores) return ` ${context.raw} XP`;
+                                    const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - context.raw) < Math.abs(prev - context.raw) ? curr : prev);
+                                    const idx = conf.scores.indexOf(closest);
+                                    return ` ${conf.labels[idx]} (${context.raw} XP)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false, drawBorder: false }, ticks: { color: '#737373', font: { size: 10, weight: '600' } } },
+                        y: { 
+                            grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, 
+                            beginAtZero: false,
+                            ticks: { 
+                                color: '#737373', 
+                                font: { size: 10, weight: '700' },
+                                maxTicksLimit: 6,
+                                callback: function(value) {
+                                    if(!conf || !conf.scores) return value;
+                                    const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev);
+                                    const idx = conf.scores.indexOf(closest);
+                                    return conf.labels[idx] || '';
+                                }
+                            } 
+                        }
+                    }
+                }
+            });
+        }
     },
 
     renderDashboardLogs: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
         const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(l.Style)).map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
         
-        const lTT = document.getElementById('listToggleTop'); if(lTT) lTT.className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
-        const lTR = document.getElementById('listToggleRecent'); if(lTR) lTR.className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
+        const lTT = document.getElementById('listToggleTop'); 
+        if(lTT) lTT.className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
+        
+        const lTR = document.getElementById('listToggleRecent'); 
+        if(lTR) lTR.className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
         
         let displayLogs = [];
         const titleEl = document.getElementById('logListTitle');
@@ -939,51 +1057,53 @@ const App = {
         const xpCont = document.getElementById('xpContainer');
         if(xpCont) xpCont.classList.toggle('hidden', State.listMode !== 'top10' || displayLogs.length === 0);
         
-        if (State.listMode === 'top10' && displayLogs.length > 0) {
+        if (State.listMode === 'top10' && displayLogs.length > 0 && conf) {
             const avgS = Math.round(displayLogs.reduce((s, l) => s + Number(l.Score), 0) / displayLogs.length);
             const curIdx = conf.scores.indexOf(conf.scores.slice().reverse().find(s => s <= avgS) || conf.scores[0]);
             const nextIdx = Math.min(curIdx + 1, conf.scores.length - 1);
             const pct = Math.min(100, Math.max(0, ((avgS - conf.scores[curIdx]) / (conf.scores[nextIdx] - conf.scores[curIdx])) * 100)) || 0;
-            const xBG = document.getElementById('xpBaseGrade'); if(xBG) xBG.innerText = conf.labels[curIdx];
-            const xNG = document.getElementById('xpNextGrade'); if(xNG) xNG.innerText = conf.labels[nextIdx];
-            const xP = document.getElementById('xpPercent'); if(xP) xP.innerText = `${Math.round(pct)}%`;
-            const xBF = document.getElementById('xpBarFill'); if(xBF) xBF.style.width = `${pct}%`;
+            
+            const xpBG = document.getElementById('xpBaseGrade'); if(xpBG) xpBG.innerText = conf.labels[curIdx];
+            const xpNG = document.getElementById('xpNextGrade'); if(xpNG) xpNG.innerText = conf.labels[nextIdx];
+            const xpP = document.getElementById('xpPercent'); if(xpP) xpP.innerText = `${Math.round(pct)}%`;
+            const xpBF = document.getElementById('xpBarFill'); if(xpBF) xpBF.style.width = `${pct}%`;
         }
 
         const lList = document.getElementById('logList');
-        if(!lList) return;
-        lList.innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
-            const cleanGrade = getBaseGrade(String(l.Grade || ""));
-            const isF = ['flash', 'onsight', 'allfree'].includes(l.Style);
-            const perfClass = isF ? 'fl' : 'rp';
-            let inlineColor = '';
-            if (l.Type === 'Indoor Bouldering') {
-                const idx = AppConfig.grades.bouldsIn.labels.indexOf(cleanGrade);
-                if (idx > -1) inlineColor = `color: ${AppConfig.grades.bouldsIn.colors[idx]} !important;`;
-            }
+        if(lList) {
+            lList.innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
+                const cleanGrade = getBaseGrade(String(l.Grade || ""));
+                const isF = ['flash', 'onsight', 'allfree'].includes(l.Style);
+                const perfClass = isF ? 'fl' : 'rp';
+                let inlineColor = '';
+                if (l.Type === 'Indoor Bouldering') {
+                    const idx = AppConfig.grades.bouldsIn.labels.indexOf(cleanGrade);
+                    if (idx > -1) inlineColor = `color: ${AppConfig.grades.bouldsIn.colors[idx]} !important;`;
+                }
 
-            return `
-            <div class="log-entry ${perfClass}">
-                <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">
-                    <div class="log-date">${formatShortDate(l.cleanDate)}</div>
-                    <div class="log-info"><div class="log-name">${l.Name.split(' @ ')[0]}</div></div>
-                    <div class="log-grade ${perfClass}" style="${inlineColor}">${getStyleBadge(l.Style)}${cleanGrade}</div>
-                </div>
-                <div class="log-details">
-                    <div class="log-details-grid">
-                        <div class="log-meta-item">STYLE<div class="log-meta-val">${AppConfig.styles[l.Style] || l.Style}</div></div>
-                        ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
-                        ${l.Pitches ? `<div class="log-meta-item">PITCHES<div class="log-meta-val">${l.Pitches}</div></div>` : ''}
-                        ${l.GearStyle ? `<div class="log-meta-item">GEAR<div class="log-meta-val">${l.GearStyle}</div></div>` : ''}
+                return `
+                <div class="log-entry ${perfClass}">
+                    <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">
+                        <div class="log-date">${formatShortDate(l.cleanDate)}</div>
+                        <div class="log-info"><div class="log-name">${l.Name.split(' @ ')[0]}</div></div>
+                        <div class="log-grade ${perfClass}" style="${inlineColor}">${getStyleBadge(l.Style)}${cleanGrade}</div>
                     </div>
-                    ${l.Notes ? `<div class="log-notes-box">"${l.Notes}"</div>` : ''}
-                    <div class="log-actions">
-                        <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
-                        <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
+                    <div class="log-details">
+                        <div class="log-details-grid">
+                            <div class="log-meta-item">STYLE<div class="log-meta-val">${AppConfig.styles[l.Style] || l.Style}</div></div>
+                            ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
+                            ${l.Pitches ? `<div class="log-meta-item">PITCHES<div class="log-meta-val">${l.Pitches}</div></div>` : ''}
+                            ${l.GearStyle ? `<div class="log-meta-item">GEAR<div class="log-meta-val">${l.GearStyle}</div></div>` : ''}
+                        </div>
+                        ${l.Notes ? `<div class="log-notes-box">"${l.Notes}"</div>` : ''}
+                        <div class="log-actions">
+                            <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
+                            <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
+                        </div>
                     </div>
-                </div>
-            </div>`;
-        }).join('') + `</div>`;
+                </div>`;
+            }).join('') + `</div>`;
+        }
     },
     
     logClimb: () => {
