@@ -35,6 +35,16 @@ const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢�
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : getLocalISO();
 
+const escapeHTML = (str) => {
+    if (!str) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+};
+
 const getJournalDateObj = (dStr) => {
     const clean = getCleanDate(dStr);
     const [y, m, d] = clean.split('-');
@@ -186,7 +196,6 @@ const SyncManager = {
                 if (existingIdx === -1) return acc.concat([current]);
 
                 const existing = acc[existingIdx];
-                // CLOUD DEFENDER: Protects local custom fields from being overwritten by null cloud fields
                 if (!current.Pitches && existing.Pitches) {
                     current.Pitches = existing.Pitches;
                     current.GearStyle = existing.GearStyle;
@@ -764,14 +773,6 @@ const App = {
         safeHTML('steepnessSelector', AppConfig.steepness.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('steepness', '${s}')">${s}</div>`).join(''));
         safeHTML('climbStyleSelector', AppConfig.climbStyles.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('style', '${s}')">${s}</div>`).join(''));
         safeHTML('holdsSelector', AppConfig.holds.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" data-val="${h}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join(''));
-        
-        // Silence old charts to prevent UI errors on main log view
-        const cTog = document.getElementById('chartToggle');
-        if (cTog) cTog.style.display = 'none'; 
-        const pChart = document.getElementById('progressChart');
-        if (pChart) pChart.style.display = 'none';
-        const ndMsg = document.getElementById('noDataMsg');
-        if (ndMsg) ndMsg.style.display = 'none';
 
         App.renderPartnerPills();
         App.updateUISelections(); 
@@ -901,12 +902,10 @@ const App = {
                     <div class="log-details">
                         <div class="log-details-grid">
                             <div class="log-meta-item">STYLE<div class="log-meta-val">${AppConfig.styles[l.Style] || l.Style}</div></div>
-                            ${l.Partner ? `<div class="log-meta-item" style="grid-column: span 2;">PARTNER(S)<div class="log-meta-val">${l.Partner}</div></div>` : ''}
+                            ${l.Partner ? `<div class="log-meta-item" style="grid-column: span 2;">PARTNER<div class="log-meta-val">${l.Partner}</div></div>` : ''}
                             ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
                             ${l.Pitches ? `<div class="log-meta-item">PITCHES<div class="log-meta-val">${l.Pitches}</div></div>` : ''}
                             ${l.GearStyle ? `<div class="log-meta-item">GEAR<div class="log-meta-val">${l.GearStyle}</div></div>` : ''}
-                            ${l.PackWeight ? `<div class="log-meta-item">PACK<div class="log-meta-val">${l.PackWeight}</div></div>` : ''}
-                            ${l.PitchBreakdown ? `<div class="log-meta-item">BREAKDOWN<div class="log-meta-val" style="text-transform:none;">${l.PitchBreakdown}</div></div>` : ''}
                         </div>
                         ${l.Notes ? `<div class="log-notes-box">"${l.Notes}"</div>` : ''}
                         <div class="log-actions">
@@ -919,7 +918,6 @@ const App = {
 
             const isIndoorGym = AppConfig.gyms.includes(session.Location);
 
-            // Material CSS Lift applied here via inline classes
             return `
             <div class="session-card">
                 <div class="session-header">
@@ -949,8 +947,143 @@ const App = {
     },
     
     renderDashboard: () => { 
-        // Forward logging view below the Nerd Dashboard button
+        App.renderDashboardCharts(); 
         App.renderDashboardLogs(); 
+    },
+
+    renderDashboardCharts: () => {
+        const dStr = String(State.discipline || "");
+        const conf = getScaleConfig(dStr);
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(l.Style));
+        
+        const chartTog = document.getElementById('chartToggle');
+        if (chartTog) {
+            chartTog.style.display = 'flex';
+            chartTog.innerHTML = `
+                <div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" data-val="max" onclick="App.haptic(); State.chartMode='max'">Max Grade</div>
+                <div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" data-val="avg" onclick="App.haptic(); State.chartMode='avg'">Volume (Avg)</div>
+            `;
+        }
+
+        const ctxCanvas = document.getElementById('progressChart');
+        const noDataMsg = document.getElementById('noDataMsg');
+        
+        if (viewLogs.length === 0) {
+            if(ctxCanvas) ctxCanvas.style.display = 'none';
+            if(noDataMsg) noDataMsg.style.display = 'block';
+            return;
+        } else {
+            if(ctxCanvas) ctxCanvas.style.display = 'block';
+            if(noDataMsg) noDataMsg.style.display = 'none';
+        }
+
+        const grouped = {};
+        viewLogs.forEach(l => {
+            const cleanD = getCleanDate(l.Date);
+            if (!cleanD) return;
+            
+            const d = new Date(cleanD);
+            if (isNaN(d.getTime())) return;
+            
+            const monthKey = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+
+            if (!grouped[monthKey]) grouped[monthKey] = [];
+            grouped[monthKey].push(Number(l.Score) || 0);
+        });
+
+        const sortedMonths = Object.keys(grouped).sort((a,b) => Number(a) - Number(b)).slice(-12);
+        
+        const chartLabels = sortedMonths.map(ts => {
+            const d = new Date(Number(ts));
+            return `${AppConfig.months[d.getMonth()]} '${d.getFullYear().toString().slice(-2)}`; 
+        });
+        
+        const chartData = sortedMonths.map(ts => {
+            if (State.chartMode === 'max') return Math.max(...grouped[ts]);
+            const sum = grouped[ts].reduce((a,b) => a+b, 0);
+            return Math.round(sum / grouped[ts].length);
+        });
+
+        if (window.mainChart) window.mainChart.destroy();
+        if (ctxCanvas) {
+            const ctx = ctxCanvas.getContext('2d');
+            window.mainChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        data: chartData,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#10b981',
+                        pointRadius: 5,
+                        pointBorderColor: '#0a0a0a',
+                        pointBorderWidth: 2,
+                        fill: true,
+                        tension: 0.35
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(10,10,10,0.9)',
+                            titleColor: '#888',
+                            bodyColor: '#fff',
+                            bodyFont: { weight: 'bold', size: 14 },
+                            padding: 12,
+                            borderColor: '#262626',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    if(!conf || !conf.scores) return ` ${context.raw} XP`;
+                                    const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - context.raw) < Math.abs(prev - context.raw) ? curr : prev);
+                                    const idx = conf.scores.indexOf(closest);
+                                    return ` ${conf.labels[idx]} (${context.raw} XP)`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false, drawBorder: false }, ticks: { color: '#737373', font: { size: 10, weight: '600' } } },
+                        y: { 
+                            grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, 
+                            beginAtZero: false,
+                            ticks: { 
+                                color: '#737373', 
+                                font: { size: 10, weight: '700' },
+                                maxTicksLimit: 6,
+                                callback: function(value) {
+                                    if(!conf || !conf.scores) return value;
+                                    const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev);
+                                    const idx = conf.scores.indexOf(closest);
+                                    return conf.labels[idx] || '';
+                                }
+                            } 
+                        }
+                    }
+                }
+            });
+        }
+    },
+
+    toggleDashRow: (id) => {
+        App.haptic();
+        document.querySelectorAll('.table-row.expanded').forEach(r => {
+            if (r.id !== `dash-row-${id}`) {
+                r.classList.remove('expanded');
+                const d = document.getElementById(r.id.replace('row', 'details'));
+                if (d) d.classList.remove('active');
+            }
+        });
+        const row = document.getElementById(`dash-row-${id}`);
+        const details = document.getElementById(`dash-details-${id}`);
+        if (row && details) {
+            row.classList.toggle('expanded');
+            details.classList.toggle('active');
+        }
     },
 
     renderDashboardLogs: () => {
@@ -990,7 +1123,6 @@ const App = {
             const nextIdx = Math.min(curIdx + 1, conf.scores.length - 1);
             const pct = Math.min(100, Math.max(0, ((avgS - conf.scores[curIdx]) / (conf.scores[nextIdx] - conf.scores[curIdx])) * 100)) || 0;
             
-            // Dynamic XP Colors implementation
             let xpColor = 'var(--primary)';
             if (dStr === 'Indoor Bouldering' && conf.colors && conf.colors[curIdx]) {
                 xpColor = conf.colors[curIdx];
@@ -1019,41 +1151,75 @@ const App = {
         }
 
         const lList = document.getElementById('logList');
-        if(lList) {
-            lList.innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
-                const cleanGrade = getBaseGrade(String(l.Grade || ""));
-                const isF = ['flash', 'onsight', 'allfree'].includes(l.Style);
-                const perfClass = isF ? 'fl' : 'rp';
-                let inlineColor = '';
-                if (l.Type === 'Indoor Bouldering') {
-                    const idx = AppConfig.grades.bouldsIn.labels.indexOf(cleanGrade);
-                    if (idx > -1) inlineColor = `color: ${AppConfig.grades.bouldsIn.colors[idx]} !important;`;
-                }
-
-                return `
-                <div class="log-entry ${perfClass}">
-                    <div class="log-summary" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">
-                        <div class="log-date">${formatShortDate(l.cleanDate)}</div>
-                        <div class="log-info"><div class="log-name">${l.Name.split(' @ ')[0]}</div></div>
-                        <div class="log-grade ${perfClass}" style="${inlineColor}">${getStyleBadge(l.Style)}${cleanGrade}</div>
-                    </div>
-                    <div class="log-details">
-                        <div class="log-details-grid">
-                            <div class="log-meta-item">STYLE<div class="log-meta-val">${AppConfig.styles[l.Style] || l.Style}</div></div>
-                            ${l.Partner ? `<div class="log-meta-item" style="grid-column: span 2;">PARTNER<div class="log-meta-val">${l.Partner}</div></div>` : ''}
-                            ${l.Burns ? `<div class="log-meta-item">BURNS<div class="log-meta-val">${l.Burns}</div></div>` : ''}
-                            ${l.Pitches ? `<div class="log-meta-item">PITCHES<div class="log-meta-val">${l.Pitches}</div></div>` : ''}
-                            ${l.GearStyle ? `<div class="log-meta-item">GEAR<div class="log-meta-val">${l.GearStyle}</div></div>` : ''}
-                        </div>
-                        ${l.Notes ? `<div class="log-notes-box">"${l.Notes}"</div>` : ''}
-                        <div class="log-actions">
-                            <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
-                            <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('') + `</div>`;
+        if (!lList) return;
+        if (displayLogs.length === 0) {
+            lList.innerHTML = '<div class="empty-msg">No logs.</div>';
+            return;
         }
+
+        let tableHtml = `
+        <div class="table-responsive">
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Route / Gym</th>
+                        <th>Grade</th>
+                        <th class="col-style">Style</th>
+                        <th class="align-right">Burns</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        tableHtml += displayLogs.map(l => {
+            const cleanGrade = getBaseGrade(String(l.Grade || ""));
+            const type = String(l.Type || "");
+            let dotColor = '#737373';
+            if (type === 'Indoor Rope Climbing') dotColor = '#10b981';
+            else if (type === 'Indoor Bouldering') dotColor = '#3b82f6';
+            else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316';
+            else if (type === 'Outdoor Bouldering') dotColor = '#a855f7';
+            else if (type === 'Outdoor Multipitch') dotColor = '#ef4444';
+
+            const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
+            const cleanName = escapeHTML(l.Name ? l.Name.split('@')[0].trim() : "Unknown");
+            const cleanNotes = escapeHTML(l.Notes);
+
+            return `
+            <tr class="table-row" id="dash-row-${l.ClimbID}" onclick="App.toggleDashRow('${l.ClimbID}')">
+                <td style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate)}</td>
+                <td style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
+                <td style="font-weight:700; color:#fff;">${cleanGrade}</td>
+                <td class="col-style" style="color:#a3a3a3;">${AppConfig.styles[l.Style] || l.Style}</td>
+                <td class="align-right" style="color: #a3a3a3; font-weight: 600;">${l.Burns || 1}</td>
+            </tr>
+            <tr class="details-row" id="dash-details-${l.ClimbID}">
+                <td colspan="5" style="padding:0;">
+                    <div class="details-content">
+                        <div class="details-grid">
+                            <div><div class="d-lbl">Rating</div><div class="d-val" style="color:#eab308;">${'★'.repeat(Number(l.Rating) || 0) || '-'}</div></div>
+                            <div><div class="d-lbl">Angle</div><div class="d-val">${l.Angle || '-'}</div></div>
+                            <div><div class="d-lbl">Holds</div><div class="d-val">${l.Holds || '-'}</div></div>
+                            <div><div class="d-lbl">RPE (Effort)</div><div class="d-val">${l.Effort || '-'}</div></div>
+                            ${l.Partner ? `<div><div class="d-lbl">Partner(s)</div><div class="d-val">${l.Partner}</div></div>` : ''}
+                            ${l.Pitches ? `<div><div class="d-lbl">Pitches</div><div class="d-val">${l.Pitches}</div></div>` : ''}
+                            ${l.GearStyle ? `<div><div class="d-lbl">Gear Style</div><div class="d-val">${l.GearStyle}</div></div>` : ''}
+                            ${l.PackWeight ? `<div><div class="d-lbl">Pack Weight</div><div class="d-val">${l.PackWeight}</div></div>` : ''}
+                            ${l.PitchBreakdown ? `<div class="d-notes" style="grid-column: span 3;">Pitches: ${l.PitchBreakdown}</div>` : ''}
+                        </div>
+                        ${cleanNotes ? `<div class="d-notes">"${cleanNotes}"</div>` : ''}
+                        <div class="log-actions" style="display:flex; gap:12px; margin-top:20px;">
+                            <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
+                            <button class="log-del-btn" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
+                        </div>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+
+        tableHtml += `</tbody></table></div>`;
+        lList.innerHTML = tableHtml;
     },
     
     logClimb: () => {
@@ -1159,7 +1325,7 @@ const App = {
             setTimeout(() => { 
                 App.isSaving = false; 
                 App.validateForm(); 
-                App.renderPartnerPills(); // Re-scan memory
+                App.renderPartnerPills(); 
             }, 2000);
         }, 400); 
     }
