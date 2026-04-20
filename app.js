@@ -887,7 +887,7 @@ const App = {
                 const rawGrade = String(l.Grade || "");
                 const cleanGrade = getBaseGrade(rawGrade);
                 const cleanStyleLower = String(l.Style || "").toLowerCase();
-                const displayStyle = AppConfig.styles[cleanStyleLower] || l.Style; // Solves the "undefined 1" bug
+                const displayStyle = AppConfig.styles[cleanStyleLower] || (l.Style ? l.Style : 'Unknown'); 
                 
                 const isGhost = ['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(cleanStyleLower);
                 const isF = ['flash', 'onsight', 'allfree'].includes(cleanStyleLower);
@@ -1174,8 +1174,6 @@ const App = {
                         <th>Date</th>
                         <th>Route / Gym</th>
                         <th>Grade</th>
-                        <th class="col-style">Style</th>
-                        <th class="align-right">Burns</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -1185,7 +1183,7 @@ const App = {
             const cleanGrade = getBaseGrade(String(l.Grade || ""));
             const type = String(l.Type || "");
             const cleanStyleLower = String(l.Style || "").toLowerCase();
-            const displayStyle = AppConfig.styles[cleanStyleLower] || l.Style; // Fixes the "undefined 1" bug
+            const displayStyle = AppConfig.styles[cleanStyleLower] || (l.Style ? l.Style : 'Unknown'); 
             
             let dotColor = '#737373';
             if (type === 'Indoor Rope Climbing') dotColor = '#10b981';
@@ -1203,22 +1201,22 @@ const App = {
                 <td style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate)}</td>
                 <td style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
                 <td style="font-weight:700; color:#fff;">${cleanGrade}</td>
-                <td class="col-style" style="color:#a3a3a3;">${displayStyle}</td>
-                <td class="align-right" style="color: #a3a3a3; font-weight: 600;">${l.Burns || 1}</td>
             </tr>
             <tr class="details-row" id="dash-details-${l.ClimbID}">
-                <td colspan="5" style="padding:0;">
+                <td colspan="3" style="padding:0;">
                     <div class="details-content">
                         <div class="details-grid">
+                            <div><div class="d-lbl">Style</div><div class="d-val">${displayStyle}</div></div>
+                            <div><div class="d-lbl">Burns</div><div class="d-val">${l.Burns || 1}</div></div>
                             <div><div class="d-lbl">Rating</div><div class="d-val" style="color:#eab308;">${'★'.repeat(Number(l.Rating) || 0) || '-'}</div></div>
                             <div><div class="d-lbl">Angle</div><div class="d-val">${l.Angle || '-'}</div></div>
                             <div><div class="d-lbl">Holds</div><div class="d-val">${l.Holds || '-'}</div></div>
-                            <div><div class="d-lbl">RPE (Effort)</div><div class="d-val">${l.Effort || '-'}</div></div>
+                            <div><div class="d-lbl">Effort</div><div class="d-val">${l.Effort || '-'}</div></div>
                             ${l.Partner ? `<div><div class="d-lbl">Partner(s)</div><div class="d-val">${l.Partner}</div></div>` : ''}
                             ${l.Pitches ? `<div><div class="d-lbl">Pitches</div><div class="d-val">${l.Pitches}</div></div>` : ''}
                             ${l.GearStyle ? `<div><div class="d-lbl">Gear Style</div><div class="d-val">${l.GearStyle}</div></div>` : ''}
                             ${l.PackWeight ? `<div><div class="d-lbl">Pack Weight</div><div class="d-val">${l.PackWeight}</div></div>` : ''}
-                            ${l.PitchBreakdown ? `<div class="d-notes" style="grid-column: span 3;">Pitches: ${l.PitchBreakdown}</div>` : ''}
+                            ${l.PitchBreakdown ? `<div class="d-notes" style="grid-column: 1 / -1;">Pitches: ${l.PitchBreakdown}</div>` : ''}
                         </div>
                         ${cleanNotes ? `<div class="d-notes">"${cleanNotes}"</div>` : ''}
                         <div class="log-actions" style="display:flex; gap:12px; margin-top:20px;">
