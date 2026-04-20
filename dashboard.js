@@ -109,7 +109,6 @@ const Dashboard = {
     showInsight: (type) => {
         Dashboard.haptic();
         const copy = {
-            'cns': { title: 'CNS Peak Output', desc: 'Tracks your maximum physical output (Peak Send) against your systemic tiredness (Average Session Fatigue) over the last 4 weeks. A rising fatigue bar with a dropping peak line is an early warning sign of overtraining.' },
             'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' }
         };
         const modal = document.getElementById('insightModal');
@@ -151,19 +150,7 @@ const Dashboard = {
                 }
             }
         };
-        addIcon('CNS PEAK OUTPUT TRACKER', 'cns');
         addIcon('CLIMBER PROFILE', 'profile');
-    },
-
-    toggleDataset: (idx, el) => {
-        Dashboard.haptic();
-        if (!window.charts || !window.charts.line) return;
-        const chart = window.charts.line;
-        const meta = chart.getDatasetMeta(idx);
-        meta.hidden = meta.hidden === null ? true : null;
-        chart.update();
-        el.style.opacity = meta.hidden ? '0.4' : '1';
-        el.style.textDecoration = meta.hidden ? 'line-through' : 'none';
     },
 
     renderLogbook: () => {
@@ -179,7 +166,7 @@ const Dashboard = {
             return searchString.includes(q);
         });
 
-        if (logCount) logCount.innerText = `${displayData.length} LOGS`;
+        if (logCount) logCount.innerText = `${displayData.length} CLIMBS`;
 
         displayData.sort((a, b) => {
             let valA, valB;
@@ -256,7 +243,7 @@ const Dashboard = {
             tableHtml += `
             <tr class="table-row" onclick="Dashboard.haptic(); Dashboard.logLimit += 10; Dashboard.renderLogbook();">
                 <td colspan="5" style="text-align:center; font-weight:700; color:#fff; padding:18px; letter-spacing:1px; text-transform:uppercase;">
-                    Load More Logs ▾
+                    Load More Climbs ▾
                 </td>
             </tr>`;
         }
@@ -265,7 +252,7 @@ const Dashboard = {
     }
 };
 
-window.charts = { radar: null, line: null, pyr: null };
+window.charts = { radar: null, pyr: null };
 
 document.addEventListener('DOMContentLoaded', () => {
     if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
@@ -506,36 +493,36 @@ document.addEventListener('DOMContentLoaded', () => {
             if (elMarker) elMarker.style.left = `${markerPercent}%`;
         }
 
-        // --- TOP PARTNERS ENGINE ---
-        const partnerCounts = {};
+        // --- PREMIUM TOP 3 BELAYERS ENGINE ---
+        const belayerCounts = {};
         currentFilteredLogs.forEach(l => {
             const partnerStr = getV(l, 'Partner');
             if (partnerStr) {
                 const names = String(partnerStr).split(',').map(n => n.trim()).filter(n => n.length > 0);
-                names.forEach(n => { partnerCounts[n] = (partnerCounts[n] || 0) + 1; });
+                names.forEach(n => { belayerCounts[n] = (belayerCounts[n] || 0) + 1; });
             }
         });
 
-        const sortedPartners = Object.keys(partnerCounts).sort((a, b) => partnerCounts[b] - partnerCounts[a]).slice(0, 3);
-        const partnerContainer = document.getElementById('partner-container');
+        const sortedBelayers = Object.keys(belayerCounts).sort((a, b) => belayerCounts[b] - belayerCounts[a]).slice(0, 3);
+        const belayerContainer = document.getElementById('belayer-container');
 
-        if (partnerContainer) {
-            if (sortedPartners.length > 0) {
-                partnerContainer.innerHTML = sortedPartners.map((name, index) => {
-                    const rankClass = `rank-${index + 1}`;
-                    const rankSymbol = index === 0 ? '1' : (index === 1 ? '2' : '3');
+        if (belayerContainer) {
+            if (sortedBelayers.length > 0) {
+                belayerContainer.innerHTML = sortedBelayers.map((name, index) => {
+                    const rank = index + 1;
+                    const podiumClass = `rank-${rank}`;
                     return `
-                        <div class="partner-row">
-                            <div class="partner-left">
-                                <div class="partner-rank ${rankClass}">${rankSymbol}</div>
-                                <div class="partner-name">${escapeHTML(name)}</div>
+                        <div class="belayer-podium ${podiumClass}">
+                            <div class="belayer-left">
+                                <div class="belayer-rank-icon">${rank}</div>
+                                <div class="belayer-name">${escapeHTML(name)}</div>
                             </div>
-                            <div class="partner-count">${partnerCounts[name]} <span style="font-size:0.7rem; color:#10b981;">logs</span></div>
+                            <div class="belayer-count-badge">${belayerCounts[name]} climbs</div>
                         </div>
                     `;
                 }).join('');
             } else {
-                partnerContainer.innerHTML = '<div class="empty-msg">Not enough partner data yet.</div>';
+                belayerContainer.innerHTML = '<div class="empty-msg">Not enough belayer data yet.</div>';
             }
         }
 
@@ -665,79 +652,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             }
-        }
-
-        const sortedCNS = [...currentFilteredLogs].filter(l => getV(l, 'Score') && getV(l, 'Style') !== 'worked' && getV(l, 'Style') !== 'toprope' && getV(l, 'Style') !== 'autobelay').sort((a,b) => new Date(getV(a, 'Date')) - new Date(getV(b, 'Date')));
-        const cnsData = { labels: ['W4', 'W3', 'W2', 'W1'], peak: [null, null, null, null], grades: ['-','-','-','-'], fatigue: [0,0,0,0] };
-        const weekBins = [[],[],[],[]]; 
-        const sessionBins = [[],[],[],[]];
-
-        sortedCNS.forEach(l => {
-            const diffDays = Math.floor((now - new Date(getV(l, 'Date'))) / (1000 * 60 * 60 * 24));
-            if (diffDays <= 7) weekBins[3].push(l); 
-            else if (diffDays <= 14) weekBins[2].push(l); 
-            else if (diffDays <= 21) weekBins[1].push(l); 
-            else if (diffDays <= 28) weekBins[0].push(l);
-        });
-
-        allSessionsMaster.forEach(s => {
-            const diffDays = Math.floor((now - new Date(getV(s, 'Date'))) / (1000 * 60 * 60 * 24));
-            const f = getV(s, 'Fatigue');
-            if (diffDays <= 28 && f) {
-                let binIdx = -1;
-                if (diffDays <= 7) binIdx = 3; else if (diffDays <= 14) binIdx = 2; else if (diffDays <= 21) binIdx = 1; else if (diffDays <= 28) binIdx = 0;
-                sessionBins[binIdx].push(Number(f));
-            }
-        });
-
-        weekBins.forEach((bin, i) => {
-            if (bin.length > 0) {
-                const maxLog = bin.reduce((max, cur) => Number(getV(cur, 'Score')) > Number(getV(max, 'Score')) ? cur : max);
-                cnsData.peak[i] = Number(getV(maxLog, 'Score')); 
-                cnsData.grades[i] = getBaseGrade(getV(maxLog, 'Grade'));
-            }
-            if (sessionBins[i].length > 0) {
-                cnsData.fatigue[i] = sessionBins[i].reduce((a,b)=>a+b, 0) / sessionBins[i].length;
-            }
-        });
-
-        const canvasElement = document.getElementById('cnsLineChart');
-        if (canvasElement) {
-            const chartWrapper = canvasElement.parentElement;
-            if (!document.getElementById('cnsLegend') && chartWrapper && chartWrapper.parentElement) {
-                const legendDiv = document.createElement('div');
-                legendDiv.id = 'cnsLegend';
-                legendDiv.style.cssText = 'display:flex; justify-content:center; gap:24px; width:100%; margin-bottom:16px; font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:1px;';
-                legendDiv.innerHTML = `
-                    <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(0, this)"><div style="width:12px; height:12px; border-radius:50%; background:#10b981;"></div> Peak Send</div>
-                    <div style="cursor:pointer; display:flex; align-items:center; gap:8px; color:#a3a3a3; transition:0.2s;" onclick="Dashboard.toggleDataset(1, this)"><div style="width:12px; height:12px; border-radius:4px; background:#333;"></div> Avg Fatigue</div>
-                `;
-                chartWrapper.parentElement.insertBefore(legendDiv, chartWrapper);
-            }
-
-            let gL = canvasElement.getContext('2d').createLinearGradient(0,0,0,250); 
-            gL.addColorStop(0, 'rgba(16, 185, 129, 0.4)'); gL.addColorStop(1, 'transparent');
-            
-            window.charts.line = new Chart(canvasElement, {
-                type: 'line', 
-                data: { 
-                    labels: cnsData.labels, 
-                    datasets: [
-                        { type: 'line', label: 'Peak Send', data: cnsData.peak, borderColor: '#10b981', backgroundColor: gL, fill: true, tension: 0.4, spanGaps: true, pointBackgroundColor: '#121212', pointBorderWidth: 2, yAxisID: 'y' },
-                        { type: 'bar', label: 'Avg Fatigue', data: cnsData.fatigue, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: 4, yAxisID: 'y1' }
-                    ] 
-                },
-                options: { 
-                    responsive: true, maintainAspectRatio: false, 
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ctx.datasetIndex === 0 ? ' Peak: ' + cnsData.grades[ctx.dataIndex] : ' Fatigue: ' + (ctx.raw > 0 ? ctx.raw.toFixed(1) + '/10' : '- / 10') } } }, 
-                    scales: { 
-                        y: { display: false, position: 'left' }, 
-                        y1: { display: false, position: 'right', min: 0, max: 10 },
-                        x: { grid: { display: false }, ticks: { color: '#737373', font: { weight: '600' } } } 
-                    } 
-                }
-            });
         }
 
         const currAttr = calcRPG(currentFilteredLogs);
