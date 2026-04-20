@@ -16,8 +16,16 @@ const AppConfig = {
     rpes: ['Breezy', 'Solid', 'Limit'],
     gearStyles: ['Sport', 'Trad', 'Mixed'],
     packWeights: ['Minimal', 'Standard', 'Heavy'],
+    ratingTextMap: {
+        1: "Trash / Garbage",
+        2: "Forgettable / Meh",
+        3: "Decent / Solid",
+        4: "Excellent / Flowy",
+        5: "Masterpiece / Classic"
+    },
     grades: {
-        ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750], colors: [] },
+        ropesIn: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
+        ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
     }
@@ -43,7 +51,8 @@ const formatShortDate = (dStr) => {
 const getScaleConfig = (disc) => {
     if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
     if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
-    return AppConfig.grades.ropes;
+    if (disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Multipitch') return AppConfig.grades.ropesOut;
+    return AppConfig.grades.ropesIn;
 };
 
 // TYPOGRAPHIC BADGES
@@ -97,17 +106,32 @@ const State = new Proxy({
         
         if (prop === 'discipline' && oldVal !== value) {
             const conf = getScaleConfig(value);
+            const isOutdoor = value.includes('Outdoor') || value.includes('Multipitch');
+            
             if (!conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
                 target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
             }
+
             if (value === 'Indoor Rope Climbing' && (target.activeGym === 'Løkka' || target.activeGym === 'Bryn')) {
                 target.activeGym = 'OKS';
             }
+
+            if (!isOutdoor) {
+                target.activeRating = 0;
+                target.activeApproach = null;
+                target.activePackWeight = '';
+                target.activeGearStyle = '';
+                target.activePitches = 2;
+                App.updateDynamicRatingText(0);
+            }
+
             App.renderUI();
         } else if (prop === 'view') {
             ['log', 'journal', 'dash'].forEach(v => {
-                document.getElementById(`view-${v}`).classList.toggle('active', target.view === v);
-                document.getElementById(`nav-${v}`).classList.toggle('active', target.view === v);
+                const elV = document.getElementById(`view-${v}`);
+                const elN = document.getElementById(`nav-${v}`);
+                if(elV) elV.classList.toggle('active', target.view === v);
+                if(elN) elN.classList.toggle('active', target.view === v);
             });
             if(target.view === 'journal') App.renderJournal();
             if(target.view === 'dash') App.renderDashboard();
@@ -121,7 +145,6 @@ const State = new Proxy({
             ];
             if (softPaintTriggers.includes(prop)) {
                 App.updateUISelections(); 
-                if (prop === 'chartMode' && target.view === 'dash') App.renderDashboardCharts();
             }
         }
 
@@ -158,7 +181,18 @@ const SyncManager = {
             }
 
             State.climbs = [...cloudClimbs, ...unsyncedClimbs].reduce((acc, current) => {
-                if (!acc.find(item => String(item.ClimbID) === String(current.ClimbID))) return acc.concat([current]);
+                const existingIdx = acc.findIndex(item => String(item.ClimbID) === String(current.ClimbID));
+                if (existingIdx === -1) return acc.concat([current]);
+
+                const existing = acc[existingIdx];
+                if (!current.Pitches && existing.Pitches) {
+                    current.Pitches = existing.Pitches;
+                    current.GearStyle = existing.GearStyle;
+                    current.PackWeight = existing.PackWeight;
+                    current.PitchBreakdown = existing.PitchBreakdown;
+                }
+                
+                acc[existingIdx] = (current._synced === false) ? current : { ...existing, ...current, _synced: existing._synced };
                 return acc;
             }, []).filter(c => !deletedClimbs.includes(String(c.ClimbID)));
 
@@ -187,7 +221,6 @@ const SyncManager = {
 };
 
 const App = {
-    chart: null,
     isSaving: false,
     isDraggingHP: false,
     isDraggingFatigue: false,
@@ -195,7 +228,8 @@ const App = {
     
     init: () => {
         if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
-        document.getElementById('input-crag').value = localStorage.getItem('lastCrag') || '';
+        const inputCrag = document.getElementById('input-crag');
+        if (inputCrag) inputCrag.value = localStorage.getItem('lastCrag') || '';
         
         App.initScrubber();
         App.renderUI();
@@ -217,12 +251,10 @@ const App = {
         App.haptic();
         const copy = {
             'capacity': { title: 'Working Capacity', desc: 'Your reliable baseline power. This is calculated by averaging the scores of your Top 10 hardest sends over the last 60 days. It filters out one-off lucky flashes to show the grade you can consistently crush.' },
-            'cns': { title: 'CNS Peak Output', desc: 'Tracks your maximum physical output (Peak Send) against your systemic tiredness (Average Session Fatigue) over the last 4 weeks. A rising fatigue bar with a dropping peak line is an early warning sign of overtraining.' },
-            'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' },
-            'rating': { title: 'Route Rating', desc: '1★: Tweaky or Trash.\n2★: Filler or Warm-up.\n3★: Solid Baseline Route.\n4★: Excellent / Flowy.\n5★: Masterpiece / Classic.' }
+            'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' }
         };
         const modal = document.getElementById('insightModal');
-        if(copy[type]) {
+        if(copy[type] && modal) {
             document.getElementById('insightTitle').innerText = copy[type].title;
             document.getElementById('insightDesc').style.whiteSpace = 'pre-wrap';
             document.getElementById('insightDesc').innerText = copy[type].desc;
@@ -252,8 +284,10 @@ const App = {
         
         if (climb.Type.includes('Outdoor')) {
             const parts = (climb.Name || "").split(' @ ');
-            document.getElementById('input-name').value = parts[0] ? parts[0].trim() : '';
-            document.getElementById('input-crag').value = parts[1] ? parts[1].trim() : '';
+            const inName = document.getElementById('input-name');
+            const inCrag = document.getElementById('input-crag');
+            if (inName) inName.value = parts[0] ? parts[0].trim() : '';
+            if (inCrag) inCrag.value = parts[1] ? parts[1].trim() : '';
         } else {
             State.activeGym = climb.Name || 'OKS';
         }
@@ -270,7 +304,9 @@ const App = {
         State.activePitches = climb.Pitches || 2;
         State.activeGearStyle = climb.GearStyle || '';
         State.activePackWeight = climb.PackWeight || '';
-        document.getElementById('input-pitch-breakdown').value = climb.PitchBreakdown || '';
+        
+        const pbInput = document.getElementById('input-pitch-breakdown');
+        if (pbInput) pbInput.value = climb.PitchBreakdown || '';
 
         State.activeRPE = climb.Effort || 'Solid';
         State.activeRating = Number(climb.Rating) || 0;
@@ -278,31 +314,46 @@ const App = {
         State.activeClimbStyles = climb.ClimStyles ? climb.ClimStyles.split(', ') : [];
         State.activeHolds = climb.Holds ? climb.Holds.split(', ') : [];
         
-        document.getElementById('input-notes').value = climb.Notes || '';
+        const notesInput = document.getElementById('input-notes');
+        if (notesInput) notesInput.value = climb.Notes || '';
 
         const advContent = document.getElementById('advanced-content');
-        if (climb.Effort || climb.Rating || climb.Angle || climb.ClimStyles || climb.Holds || climb.Notes) {
+        const advToggle = document.querySelector('.advanced-toggle');
+        if (advContent && (climb.Effort || climb.Rating || climb.Angle || climb.ClimStyles || climb.Holds || climb.Notes)) {
             advContent.classList.remove('hidden');
-            document.querySelector('.advanced-toggle').innerText = '- Hide Details';
+            if (advToggle) advToggle.innerText = '- Hide Details';
         }
 
         const btn = document.getElementById('saveClimbBtn');
-        btn.innerText = 'Update Entry';
-        btn.style.background = '#3b82f6';
-        btn.style.color = '#fff';
+        if(btn) {
+            btn.innerText = 'Update Entry';
+            btn.style.background = '#3b82f6';
+            btn.style.color = '#fff';
+        }
 
         window.scrollTo({ top: 0, behavior: 'smooth' });
     },
     setDate: (type, val = null) => {
         App.haptic();
         document.querySelectorAll('#datePicker .pill').forEach(p => p.classList.remove('active'));
-        if (type === 'today') { State.activeDate = getLocalISO(); document.getElementById('pill-today').classList.add('active'); }
-        else if (type === 'yesterday') { let yest = new Date(); yest.setDate(yest.getDate()-1); State.activeDate = getLocalISO(yest); document.getElementById('pill-yest').classList.add('active'); }
+        if (type === 'today') { 
+            State.activeDate = getLocalISO(); 
+            const pToday = document.getElementById('pill-today');
+            if (pToday) pToday.classList.add('active'); 
+        }
+        else if (type === 'yesterday') { 
+            let yest = new Date(); yest.setDate(yest.getDate()-1); 
+            State.activeDate = getLocalISO(yest); 
+            const pYest = document.getElementById('pill-yest');
+            if (pYest) pYest.classList.add('active'); 
+        }
         else if (type === 'custom' && val) { 
             State.activeDate = val; const [, m, d] = val.split('-');
             const customPill = document.getElementById('pill-custom');
-            customPill.classList.add('active');
-            customPill.innerText = `${AppConfig.months[parseInt(m)-1]} ${parseInt(d)}`;
+            if(customPill) {
+                customPill.classList.add('active');
+                customPill.innerText = `${AppConfig.months[parseInt(m)-1]} ${parseInt(d)}`;
+            }
         }
     },
     centerActivePills: () => {
@@ -314,7 +365,22 @@ const App = {
             }
         });
     },
-    setRating: (num) => { App.haptic(); State.activeRating = State.activeRating === num ? 0 : num; },
+    setRating: (num) => { 
+        App.haptic(); 
+        State.activeRating = State.activeRating === num ? 0 : num; 
+        App.updateDynamicRatingText(State.activeRating);
+    },
+    updateDynamicRatingText: (starCount) => {
+        const textContainer = document.getElementById('dynamic-rating-text');
+        if (!textContainer) return;
+        if (starCount === 0) {
+            textContainer.style.opacity = '0';
+            textContainer.innerText = "";
+        } else {
+            textContainer.innerText = AppConfig.ratingTextMap[starCount] || "";
+            textContainer.style.opacity = '1';
+        }
+    },
     toggleMulti: (category, val) => {
         App.haptic();
         if (category === 'style') State.activeClimbStyles = State.activeClimbStyles.includes(val) ? State.activeClimbStyles.filter(x => x !== val) : [...State.activeClimbStyles, val];
@@ -339,6 +405,7 @@ const App = {
     handleHPSlide: (e) => {
         if (!App.isDraggingHP && e.type !== 'mousedown' && e.type !== 'touchstart') return;
         const track = document.getElementById('hp-track');
+        if (!track) return;
         const rect = track.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         let percent = (clientX - rect.left) / rect.width;
@@ -349,14 +416,19 @@ const App = {
         if (Math.abs(val - State.activeHighPoint) >= 5 || val === 0 || val === 99) {
             if(Math.abs(val - State.activeHighPoint) >= 10) App.haptic(); 
             State.activeHighPoint = val;
-            document.getElementById('hp-output').innerText = `${val}%`;
-            document.getElementById('hp-fill').style.width = `${val}%`;
-            document.getElementById('hp-thumb').style.left = `${val}%`;
+            
+            const out = document.getElementById('hp-output');
+            const fill = document.getElementById('hp-fill');
+            const thumb = document.getElementById('hp-thumb');
+            if (out) out.innerText = `${val}%`;
+            if (fill) fill.style.width = `${val}%`;
+            if (thumb) thumb.style.left = `${val}%`;
         }
     },
     handleFatigueSlide: (e) => {
         if (!App.isDraggingFatigue && e.type !== 'mousedown' && e.type !== 'touchstart') return;
         const track = document.getElementById('fatigue-track');
+        if (!track) return;
         const rect = track.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         let percent = (clientX - rect.left) / rect.width;
@@ -396,6 +468,7 @@ const App = {
             if (!container) return;
             const items = Array.from(container.querySelectorAll('.seg-item'));
             const highlight = container.querySelector('.seg-highlight');
+            if(!highlight) return;
             let found = false;
             
             items.forEach(item => {
@@ -418,7 +491,10 @@ const App = {
         if(!s) return;
         document.getElementById('modalSessionId').value = s.SessionID;
         
-        ['sec-focus', 'sec-fatigue', 'sec-warmup', 'sec-approach'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        ['sec-focus', 'sec-fatigue', 'sec-warmup', 'sec-approach'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.classList.add('hidden');
+        });
         
         const titles = {
             'focus': 'Session Focus',
@@ -429,51 +505,69 @@ const App = {
         };
         
         const titleEl = document.getElementById('modalTitle');
-        titleEl.innerText = titles[mode] || 'Session Editor';
-        titleEl.classList.remove('hidden');
+        if (titleEl) {
+            titleEl.innerText = titles[mode] || 'Session Editor';
+            titleEl.classList.remove('hidden');
+        }
 
         const isNotes = mode === 'notes';
-        document.getElementById('sec-notes-label').classList.toggle('hidden', !isNotes);
-        document.getElementById('modalNotesVal').classList.toggle('hidden', !isNotes);
+        const notesLabel = document.getElementById('sec-notes-label');
+        const notesVal = document.getElementById('modalNotesVal');
+        if(notesLabel) notesLabel.classList.toggle('hidden', !isNotes);
+        if(notesVal) notesVal.classList.toggle('hidden', !isNotes);
 
-        document.getElementById('modalFocusVal').value = s.Focus || "";
-        document.getElementById('modalFatigueVal').value = s.Fatigue || "";
-        document.getElementById('modalWarmUpVal').value = s.WarmUp || "";
-        document.getElementById('modalApproachVal').value = s.Approach || "";
-        document.getElementById('modalNotesVal').value = s.Notes || "";
+        const mFocus = document.getElementById('modalFocusVal');
+        const mFatigue = document.getElementById('modalFatigueVal');
+        const mWarmup = document.getElementById('modalWarmUpVal');
+        const mApproach = document.getElementById('modalApproachVal');
+
+        if (mFocus) mFocus.value = s.Focus || "";
+        if (mFatigue) mFatigue.value = s.Fatigue || "";
+        if (mWarmup) mWarmup.value = s.WarmUp || "";
+        if (mApproach) mApproach.value = s.Approach || "";
+        if (notesVal) notesVal.value = s.Notes || "";
 
         if (mode === 'focus') {
-            document.getElementById('sec-focus').classList.remove('hidden');
+            const sec = document.getElementById('sec-focus');
+            if (sec) sec.classList.remove('hidden');
             App.setModalFocus(s.Focus || "", true);
         } else if (mode === 'fatigue') {
-            document.getElementById('sec-fatigue').classList.remove('hidden');
+            const sec = document.getElementById('sec-fatigue');
+            if (sec) sec.classList.remove('hidden');
             App.setModalFatigue(s.Fatigue || "", true);
         } else if (mode === 'warmup') {
-            document.getElementById('sec-warmup').classList.remove('hidden');
+            const sec = document.getElementById('sec-warmup');
+            if (sec) sec.classList.remove('hidden');
             App.setModalWarmUp(s.WarmUp || "", true);
         } else if (mode === 'approach') {
-            document.getElementById('sec-approach').classList.remove('hidden');
+            const sec = document.getElementById('sec-approach');
+            if (sec) sec.classList.remove('hidden');
             App.setModalApproach(s.Approach || "", true);
         } else if (mode === 'notes') {
-            setTimeout(() => document.getElementById('modalNotesVal').focus(), 300);
+            setTimeout(() => { if(notesVal) notesVal.focus(); }, 300);
         }
         
-        document.getElementById('sessionModal').classList.add('active');
+        const sessionModal = document.getElementById('sessionModal');
+        if (sessionModal) sessionModal.classList.add('active');
     },
     
     setModalFocus: (val, init = false) => {
         if(!init) App.haptic();
-        const current = document.getElementById('modalFocusVal').value;
+        const mFocus = document.getElementById('modalFocusVal');
+        if (!mFocus) return;
+        const current = mFocus.value;
         const newVal = (!init && current === val) ? "" : val;
-        document.getElementById('modalFocusVal').value = newVal;
+        mFocus.value = newVal;
         App.updateSegmentedHighlight('focus-segmented', newVal);
     },
 
     setModalApproach: (val, init = false) => {
         if(!init) App.haptic();
-        const current = document.getElementById('modalApproachVal').value;
+        const mApp = document.getElementById('modalApproachVal');
+        if (!mApp) return;
+        const current = mApp.value;
         const newVal = (!init && current === val) ? "" : val;
-        document.getElementById('modalApproachVal').value = newVal;
+        mApp.value = newVal;
         App.updateSegmentedHighlight('approach-segmented', newVal);
     },
     
@@ -483,11 +577,13 @@ const App = {
         
         if (!init && newVal !== "") App.haptic();
         
-        document.getElementById('modalFatigueVal').value = newVal;
+        const mFV = document.getElementById('modalFatigueVal');
+        if(mFV) mFV.value = newVal;
         
         const out = document.getElementById('fatigue-output');
         const fill = document.getElementById('fatigue-fill');
         const thumb = document.getElementById('fatigue-thumb');
+        if(!out || !fill || !thumb) return;
         
         if (newVal === "" || newVal === "0") {
             out.innerText = "- / 10";
@@ -506,9 +602,11 @@ const App = {
 
     setModalWarmUp: (val, init = false) => {
         if(!init) App.haptic();
-        const current = document.getElementById('modalWarmUpVal').value;
+        const mWarm = document.getElementById('modalWarmUpVal');
+        if (!mWarm) return;
+        const current = mWarm.value;
         const newVal = (!init && current === val) ? "" : val;
-        document.getElementById('modalWarmUpVal').value = newVal;
+        mWarm.value = newVal;
         App.updateSegmentedHighlight('warmup-segmented', newVal);
     },
     
@@ -523,7 +621,9 @@ const App = {
         
         State.sessions = State.sessions.map(s => String(s.SessionID) === String(sessionId) ? {...s, Focus: focus, Fatigue: fatigue, WarmUp: warmup, Approach: approach, Notes: notes, _synced: false} : s);
         SyncManager.pushAll(State.sessions.filter(s => s._synced === false), []);
-        document.getElementById('sessionModal').classList.remove('active');
+        
+        const sm = document.getElementById('sessionModal');
+        if (sm) sm.classList.remove('active');
     },
 
     validateForm: () => {
@@ -531,8 +631,13 @@ const App = {
         const btn = document.getElementById('saveClimbBtn');
         if (!btn) return;
         const isOut = State.discipline.includes('Outdoor');
-        const n = document.getElementById('input-name').value.trim();
-        const c = document.getElementById('input-crag').value.trim();
+        
+        const inName = document.getElementById('input-name');
+        const inCrag = document.getElementById('input-crag');
+        
+        const n = inName ? inName.value.trim() : '';
+        const c = inCrag ? inCrag.value.trim() : '';
+        
         if (isOut && (!n || !c)) {
             btn.disabled = true;
             btn.innerText = App.editingClimbId ? 'Missing Route or Crag' : 'Missing Route or Crag';
@@ -550,23 +655,38 @@ const App = {
 
         const buildPills = (arr, activeVal, clickAction) => arr.map(item => `<div class="pill ${item === activeVal ? 'active' : ''}" data-val="${item}" onclick="${clickAction}='${item}';">${item}</div>`).join('');
 
-        document.getElementById('typeSelector').innerHTML = AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join('');
-        document.getElementById('dashSelector').innerHTML = AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join('');
+        const ts = document.getElementById('typeSelector');
+        if(ts) ts.innerHTML = AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join('');
         
-        document.getElementById('input-outdoor').className = isOut ? '' : 'hidden';
-        document.getElementById('input-indoor').className = isOut ? 'hidden' : '';
-        document.getElementById('input-name').placeholder = isBould ? 'La Marie Rose' : (isMulti ? 'Vestpillaren' : 'Silence');
-        document.getElementById('input-crag').placeholder = isBould ? 'Sector, Crag 🇬🇷' : (isMulti ? 'Presten, Lofoten' : 'Flatanger');
+        const ds = document.getElementById('dashSelector');
+        if(ds) ds.innerHTML = AppConfig.disciplines.map((d, i) => `<div class="pill ${dStr === d ? 'active' : ''}" data-val="${d}" onclick="App.haptic(); State.discipline='${d}'">${AppConfig.discLabels[i]}</div>`).join('');
         
-        document.getElementById('gradeLabel').innerText = isMulti ? 'Crux Grade' : 'Grade';
+        const inO = document.getElementById('input-outdoor'); 
+        if(inO) inO.className = isOut ? '' : 'hidden';
+        
+        const inI = document.getElementById('input-indoor');  
+        if(inI) inI.className = isOut ? 'hidden' : '';
+        
+        const inN = document.getElementById('input-name');
+        if(inN) inN.placeholder = isBould ? 'La Marie Rose' : (isMulti ? 'Vestpillaren' : 'Silence');
+        
+        const inC = document.getElementById('input-crag');
+        if(inC) inC.placeholder = isBould ? 'Sector, Crag 🇬🇷' : (isMulti ? 'Presten, Lofoten' : 'Flatanger');
+        
+        const gL = document.getElementById('gradeLabel');
+        if(gL) gL.innerText = isMulti ? 'Crux Grade' : 'Grade';
 
         const currentGyms = (dStr === 'Indoor Rope Climbing') ? AppConfig.gyms.filter(g => g !== 'Løkka' && g !== 'Bryn') : AppConfig.gyms;
-        document.getElementById('gymPicker').innerHTML = buildPills(currentGyms, State.activeGym, "App.haptic(); State.activeGym");
+        const gP = document.getElementById('gymPicker');
+        if(gP) gP.innerHTML = buildPills(currentGyms, State.activeGym, "App.haptic(); State.activeGym");
         
-        document.getElementById('gradePicker').innerHTML = conf.labels.map((g, i) => {
-            const dot = conf.colors[i] ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
-            return `<div class="pill ${String(g) === String(State.activeGrade.text) ? 'active' : ''}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
-        }).join('');
+        const grP = document.getElementById('gradePicker');
+        if(grP) {
+            grP.innerHTML = conf.labels.map((g, i) => {
+                const dot = (conf.colors && conf.colors[i]) ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
+                return `<div class="pill ${String(g) === String(State.activeGrade.text) ? 'active' : ''}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
+            }).join('');
+        }
 
         let styles = [];
         if (isMulti) {
@@ -579,23 +699,42 @@ const App = {
         }
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = isMulti ? 'topped' : 'quick';
         
-        document.getElementById('styleSelector').innerHTML = styles.map(s => {
-            return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
-                if(['flash', 'onsight', 'toprope', 'autobelay'].includes('${s[0]}')){ State.activeBurns = 1; }
-                else if('${s[0]}' === 'quick' && (State.activeBurns === 1 || State.activeBurns === '-')){ State.activeBurns = 2; }
-                else if(['project', 'worked', 'topped', 'allfree', 'bailed'].includes('${s[0]}')){ State.activeBurns = '-'; }
-            ">${s[1]}</div>`;
-        }).join('');
+        const sS = document.getElementById('styleSelector');
+        if(sS) {
+            sS.innerHTML = styles.map(s => {
+                return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
+                    if(['flash', 'onsight', 'toprope', 'autobelay'].includes('${s[0]}')){ State.activeBurns = 1; }
+                    else if('${s[0]}' === 'quick' && (State.activeBurns === 1 || State.activeBurns === '-')){ State.activeBurns = 2; }
+                    else if(['project', 'worked', 'topped', 'allfree', 'bailed'].includes('${s[0]}')){ State.activeBurns = '-'; }
+                ">${s[1]}</div>`;
+            }).join('');
+        }
 
-        document.getElementById('gearStyleSelector').innerHTML = AppConfig.gearStyles.map(s => `<div class="pill ${State.activeGearStyle === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activeGearStyle='${s}';">${s}</div>`).join('');
-        document.getElementById('packWeightSelector').innerHTML = AppConfig.packWeights.map(s => `<div class="pill ${State.activePackWeight === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activePackWeight='${s}';">${s}</div>`).join('');
-
-        document.getElementById('rpeSelector').innerHTML = buildPills(AppConfig.rpes, State.activeRPE, "App.haptic(); State.activeRPE");
-        document.getElementById('steepnessSelector').innerHTML = AppConfig.steepness.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('steepness', '${s}')">${s}</div>`).join('');
-        document.getElementById('climbStyleSelector').innerHTML = AppConfig.climbStyles.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('style', '${s}')">${s}</div>`).join('');
-        document.getElementById('holdsSelector').innerHTML = AppConfig.holds.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" data-val="${h}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join('');
+        const gSS = document.getElementById('gearStyleSelector');
+        if(gSS) gSS.innerHTML = AppConfig.gearStyles.map(s => `<div class="pill ${State.activeGearStyle === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activeGearStyle='${s}';">${s}</div>`).join('');
         
-        document.getElementById('chartToggle').innerHTML = `<div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" data-val="max" onclick="App.haptic(); State.chartMode='max';">Max Peak</div><div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" data-val="avg" onclick="App.haptic(); State.chartMode='avg';">Avg (Top 10)</div>`;
+        const pWS = document.getElementById('packWeightSelector');
+        if(pWS) pWS.innerHTML = AppConfig.packWeights.map(s => `<div class="pill ${State.activePackWeight === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activePackWeight='${s}';">${s}</div>`).join('');
+
+        const rpS = document.getElementById('rpeSelector'); 
+        if(rpS) rpS.innerHTML = buildPills(AppConfig.rpes, State.activeRPE, "App.haptic(); State.activeRPE");
+        
+        const stS = document.getElementById('steepnessSelector'); 
+        if(stS) stS.innerHTML = AppConfig.steepness.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('steepness', '${s}')">${s}</div>`).join('');
+        
+        const cSS = document.getElementById('climbStyleSelector'); 
+        if(cSS) cSS.innerHTML = AppConfig.climbStyles.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('style', '${s}')">${s}</div>`).join('');
+        
+        const hS = document.getElementById('holdsSelector'); 
+        if(hS) hS.innerHTML = AppConfig.holds.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" data-val="${h}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join('');
+        
+        // Silence old charts to prevent UI errors on main log view
+        const cTog = document.getElementById('chartToggle');
+        if (cTog) cTog.style.display = 'none'; 
+        const pChart = document.getElementById('progressChart');
+        if (pChart) pChart.style.display = 'none';
+        const ndMsg = document.getElementById('noDataMsg');
+        if (ndMsg) ndMsg.style.display = 'none';
 
         App.updateUISelections(); 
         App.validateForm();
@@ -626,38 +765,52 @@ const App = {
         syncMulti('#steepnessSelector', State.activeSteepness);
         syncMulti('#climbStyleSelector', State.activeClimbStyles);
         syncMulti('#holdsSelector', State.activeHolds);
-        syncSingle('#chartToggle', State.chartMode);
 
+        const isOut = State.discipline.includes('Outdoor');
         const isMulti = State.discipline === 'Outdoor Multipitch';
 
+        const ratingSec = document.getElementById('rating-section') || document.getElementById('starRating')?.parentElement;
+        if (ratingSec) ratingSec.style.display = isOut ? 'block' : 'none';
+
+        const mC = document.getElementById('multipitch-container');
+        const bC = document.getElementById('burns-container');
+        const hpC = document.getElementById('highPointContainer');
+        
         if (isMulti) {
-            document.getElementById('multipitch-container').classList.remove('hidden');
-            document.getElementById('burns-container').classList.add('hidden');
-            document.getElementById('highPointContainer').classList.add('hidden');
-            document.getElementById('pitches-val').innerText = State.activePitches;
+            if(mC) mC.classList.remove('hidden');
+            if(bC) bC.classList.add('hidden');
+            if(hpC) hpC.classList.add('hidden');
+            const pV = document.getElementById('pitches-val');
+            if(pV) pV.innerText = State.activePitches;
         } else {
-            document.getElementById('multipitch-container').classList.add('hidden');
+            if(mC) mC.classList.add('hidden');
             if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
-                document.getElementById('highPointContainer').classList.remove('hidden');
+                if(hpC) hpC.classList.remove('hidden');
             } else {
-                document.getElementById('highPointContainer').classList.add('hidden');
+                if(hpC) hpC.classList.add('hidden');
             }
             if (['flash', 'onsight'].includes(State.activeStyle)) {
-                document.getElementById('burns-container').classList.add('hidden');
+                if(bC) bC.classList.add('hidden');
             } else {
-                document.getElementById('burns-container').classList.remove('hidden');
+                if(bC) bC.classList.remove('hidden');
             }
-            document.getElementById('burns-val').innerText = State.activeBurns;
+            const bV = document.getElementById('burns-val');
+            if(bV) bV.innerText = State.activeBurns;
         }
 
-        const stars = document.getElementById('starRating').children;
-        for(let i=0; i<stars.length; i++) stars[i].className = i < State.activeRating ? 'active' : '';
+        const sR = document.getElementById('starRating');
+        if (sR) {
+            const stars = sR.children;
+            for(let i=0; i<stars.length; i++) stars[i].className = i < State.activeRating ? 'active' : '';
+        }
         
+        App.updateDynamicRatingText(State.activeRating);
         App.validateForm();
     },
 
     renderJournal: () => {
         const jList = document.getElementById('journalList');
+        if (!jList) return;
         if (State.sessions.length === 0) { jList.innerHTML = '<div class="empty-msg">No logs found.</div>'; return; }
         const visibleSessions = [...State.sessions].sort((a,b) => new Date(getCleanDate(b.Date)) - new Date(getCleanDate(a.Date))).slice(0, State.journalLimit);
         const climbsBySession = {};
@@ -723,6 +876,8 @@ const App = {
                 </div>`;
             }).join('');
 
+            const isIndoorGym = AppConfig.gyms.includes(session.Location);
+
             return `
             <div class="session-card">
                 <div class="session-header">
@@ -733,7 +888,7 @@ const App = {
                     <div class="s-tag ${session.Focus ? 'focus-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'focus')">${session.Focus ? 'Focus: '+session.Focus : '+ Focus'}</div>
                     <div class="s-tag ${session.Fatigue ? 'fatigue-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'fatigue')">${session.Fatigue ? 'Fatigue: '+session.Fatigue : '+ Fatigue'}</div>
                     <div class="s-tag ${session.WarmUp ? 'warmup-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'warmup')">${session.WarmUp ? 'Warm-up: '+session.WarmUp : '+ Warm-up'}</div>
-                    <div class="s-tag ${session.Approach ? 'approach-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'approach')">${session.Approach ? 'Approach: '+session.Approach : '+ Approach'}</div>
+                    ${isIndoorGym ? '' : `<div class="s-tag ${session.Approach ? 'approach-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'approach')">${session.Approach ? 'Approach: '+session.Approach : '+ Approach'}</div>`}
                     <div class="s-tag ${session.Notes ? 'note-tag' : 'empty-tag'}" onclick="App.openSessionModal('${session.SessionID}', 'notes')">${session.Notes ? '📝 Note Added' : '+ Note'}</div>
                 </div>
                 
@@ -751,86 +906,23 @@ const App = {
         }).join('');
     },
     
-    renderDashboard: () => { App.renderDashboardCharts(); App.renderDashboardLogs(); },
-
-    renderDashboardCharts: () => {
-        const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
-        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(l.Style)).map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
-        const ctxCanvas = document.getElementById('progressChart');
-        if (!window.Chart || viewLogs.length === 0) { ctxCanvas.style.display = 'none'; document.getElementById('noDataMsg').style.display = 'block'; return; }
-        ctxCanvas.style.display = 'block'; document.getElementById('noDataMsg').style.display = 'none';
-
-        if(App.chart) App.chart.destroy();
-        const ctx = ctxCanvas.getContext('2d');
-        const allM = [...new Set(viewLogs.map(l => l.cleanDate.substring(0,7)))].sort();
-        const cD = { rp: [], fl: [], rpG: [], flG: [], avg: [], avgG: [], lbl: [] };
-        
-        const getScoreIndex = (s, isF) => { 
-            let b = s - (isF ? (dStr.includes('Rope') || dStr.includes('Multipitch') ? 10 : 17) : 0); 
-            return conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-b) < Math.abs(p-b) ? c : p)); 
-        };
-        
-        allM.forEach(m => {
-            const [y, mo] = m.split('-').map(Number);
-            const mL = viewLogs.filter(l => l.cleanDate.substring(0,7) === m);
-            if (State.chartMode === 'max') {
-                const rpL = mL.filter(l => l.Style !== 'flash' && l.Style !== 'onsight' && l.Style !== 'allfree');
-                const flL = mL.filter(l => l.Style === 'flash' || l.Style === 'onsight' || l.Style === 'allfree');
-                const maxRp = rpL.length ? rpL.reduce((p, c) => Number(c.Score) > Number(p.Score) ? c : p) : null;
-                const maxFl = flL.length ? flL.reduce((p, c) => Number(c.Score) > Number(p.Score) ? c : p) : null;
-                cD.rp.push(maxRp ? getScoreIndex(Number(maxRp.Score), false) : null);
-                cD.fl.push(maxFl ? getScoreIndex(Number(maxFl.Score), true) : null);
-                cD.rpG.push(maxRp ? getBaseGrade(maxRp.Grade) : ""); cD.flG.push(maxFl ? getBaseGrade(maxFl.Grade) : "");
-            } else {
-                const top10 = mL.sort((a,b) => Number(b.Score) - Number(a.Score)).slice(0, 10);
-                const avS = Math.round(top10.reduce((s, l) => s + Number(l.Score), 0) / top10.length);
-                const avI = conf.scores.indexOf(conf.scores.reduce((p, c) => Math.abs(c-avS) < Math.abs(p-avS) ? c : p));
-                cD.avg.push(avI); cD.avgG.push(conf.labels[avI]);
-            }
-            cD.lbl.push(`${AppConfig.months[mo-1]} '${y.toString().slice(-2)}`);
-        });
-
-        let dSet = [], toolC;
-        if (State.chartMode === 'max') {
-            let g = ctx.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, 'rgba(16, 185, 129, 0.25)'); g.addColorStop(1, 'transparent');
-            dSet = [
-                { label: 'Max Redpoint', data: cD.rp, borderColor: '#10b981', backgroundColor: g, tension: 0.4, fill: true, pointRadius: 5, pointBackgroundColor: '#121212', pointBorderWidth: 2, spanGaps: true }, 
-                { label: 'Flash/Onsight', data: cD.fl, borderColor: '#db2777', borderDash: [5,5], tension: 0.4, fill: false, pointRadius: 5, pointBackgroundColor: '#121212', pointBorderWidth: 2, spanGaps: true }
-            ];
-            toolC = chartCtx => chartCtx.datasetIndex === 0 ? ` Redpoint: ${cD.rpG[chartCtx.dataIndex]}` : ` Flash: ${cD.flG[chartCtx.dataIndex]}`;
-        } else {
-            let gA = ctx.createLinearGradient(0, 0, 0, 300); gA.addColorStop(0, 'rgba(59, 130, 246, 0.35)'); gA.addColorStop(1, 'transparent');
-            dSet = [{ label: 'Top 10 Average', data: cD.avg, borderColor: '#3b82f6', backgroundColor: gA, tension: 0.4, fill: true, pointRadius: 6, pointBackgroundColor: '#121212', pointBorderWidth: 2, spanGaps: true }];
-            toolC = chartCtx => ` Power Avg: ${cD.avgG[chartCtx.dataIndex]}`;
-        }
-        
-        App.chart = new Chart(ctx, { 
-            type: 'line', 
-            data: { labels: cD.lbl, datasets: dSet },
-            options: { 
-                responsive: true, maintainAspectRatio: false, 
-                interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { display: false }, tooltip: { callbacks: { label: toolC } } }, 
-                scales: { 
-                    y: { ticks: { callback: v => conf.labels[v] || "", font: { weight: '600' } }, grid: { display: false, drawBorder: false } }, 
-                    x: { grid: { display: false }, ticks: { font: { weight: '600' } } } 
-                } 
-            }
-        });
+    renderDashboard: () => { 
+        // Forward logging view below the Nerd Dashboard button
+        App.renderDashboardLogs(); 
     },
 
     renderDashboardLogs: () => {
         const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
         const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(l.Style)).map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
         
-        document.getElementById('listToggleTop').className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
-        document.getElementById('listToggleRecent').className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
+        const lTT = document.getElementById('listToggleTop'); if(lTT) lTT.className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
+        const lTR = document.getElementById('listToggleRecent'); if(lTR) lTR.className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
         
         let displayLogs = [];
         const titleEl = document.getElementById('logListTitle');
         
         if (State.listMode === 'top10') {
-            titleEl.innerText = 'Last 60 Days';
+            if(titleEl) titleEl.innerText = 'Last 60 Days';
             const sixtyDaysAgo = new Date();
             sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
             sixtyDaysAgo.setHours(0,0,0,0);
@@ -840,23 +932,27 @@ const App = {
                 return logDate >= sixtyDaysAgo;
             }).sort((a,b) => Number(b.Score) - Number(a.Score)).slice(0, 10);
         } else {
-            titleEl.innerText = 'Recent Logs';
+            if(titleEl) titleEl.innerText = 'Recent Logs';
             displayLogs = viewLogs.sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID)).slice(0, 10);
         }
         
-        document.getElementById('xpContainer').classList.toggle('hidden', State.listMode !== 'top10' || displayLogs.length === 0);
+        const xpCont = document.getElementById('xpContainer');
+        if(xpCont) xpCont.classList.toggle('hidden', State.listMode !== 'top10' || displayLogs.length === 0);
+        
         if (State.listMode === 'top10' && displayLogs.length > 0) {
             const avgS = Math.round(displayLogs.reduce((s, l) => s + Number(l.Score), 0) / displayLogs.length);
             const curIdx = conf.scores.indexOf(conf.scores.slice().reverse().find(s => s <= avgS) || conf.scores[0]);
             const nextIdx = Math.min(curIdx + 1, conf.scores.length - 1);
             const pct = Math.min(100, Math.max(0, ((avgS - conf.scores[curIdx]) / (conf.scores[nextIdx] - conf.scores[curIdx])) * 100)) || 0;
-            document.getElementById('xpBaseGrade').innerText = conf.labels[curIdx];
-            document.getElementById('xpNextGrade').innerText = conf.labels[nextIdx];
-            document.getElementById('xpPercent').innerText = `${Math.round(pct)}%`;
-            document.getElementById('xpBarFill').style.width = `${pct}%`;
+            const xBG = document.getElementById('xpBaseGrade'); if(xBG) xBG.innerText = conf.labels[curIdx];
+            const xNG = document.getElementById('xpNextGrade'); if(xNG) xNG.innerText = conf.labels[nextIdx];
+            const xP = document.getElementById('xpPercent'); if(xP) xP.innerText = `${Math.round(pct)}%`;
+            const xBF = document.getElementById('xpBarFill'); if(xBF) xBF.style.width = `${pct}%`;
         }
 
-        document.getElementById('logList').innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
+        const lList = document.getElementById('logList');
+        if(!lList) return;
+        lList.innerHTML = displayLogs.length === 0 ? '<div class="empty-msg">No logs.</div>' : `<div class="log-list">` + displayLogs.map(l => {
             const cleanGrade = getBaseGrade(String(l.Grade || ""));
             const isF = ['flash', 'onsight', 'allfree'].includes(l.Style);
             const perfClass = isF ? 'fl' : 'rp';
@@ -892,7 +988,13 @@ const App = {
     
     logClimb: () => {
         App.haptic(); 
-        const isOut = State.discipline.includes('Outdoor'), outN = document.getElementById('input-name').value.trim(), outC = document.getElementById('input-crag').value.trim();
+        const isOut = State.discipline.includes('Outdoor');
+        
+        const inName = document.getElementById('input-name');
+        const inCrag = document.getElementById('input-crag');
+        
+        const outN = inName ? inName.value.trim() : '';
+        const outC = inCrag ? inCrag.value.trim() : '';
         if (isOut && (!outN || !outC)) return;
         
         App.isSaving = true; 
@@ -910,7 +1012,7 @@ const App = {
         
         const sessionID = isOut ? `${climbDateStr}_Outdoor` : `${climbDateStr}_${State.activeGym.replace(/[^a-zA-Z0-9\s]/g, '').trim()}`;
         
-        let existingSession = State.sessions.find(s => s.SessionID === sessionID);
+        let existingSession = State.sessions.find(ses => ses.SessionID === sessionID);
         if (!existingSession) {
             const newS = { SessionID: sessionID, Date: climbDateStr, Location: isOut ? outC : State.activeGym, Focus: "", Fatigue: "", WarmUp: "", Approach: "", Notes: "", _synced: false };
             State.sessions = [newS, ...State.sessions];
@@ -924,28 +1026,35 @@ const App = {
         }
 
         const btn = document.getElementById('saveClimbBtn');
-        btn.disabled = true; btn.innerText = 'Saving...';
+        if (btn) {
+            btn.disabled = true; 
+            btn.innerText = 'Saving...';
+        }
         
         const climb = { 
             ClimbID: App.editingClimbId ? App.editingClimbId : String(Date.now()), 
             SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Grade: g, Score: s, Style: State.activeStyle, 
             Burns: State.activeBurns === '-' ? '' : State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE,
             Rating: State.activeRating || "", Holds: State.activeHolds.join(', '), ClimStyles: State.activeClimbStyles.join(', '),
-            Notes: document.getElementById('input-notes').value.trim(), _synced: false 
+            Notes: document.getElementById('input-notes') ? document.getElementById('input-notes').value.trim() : '', _synced: false 
         };
 
         if (isMulti) {
             climb.Pitches = State.activePitches;
             climb.GearStyle = State.activeGearStyle;
             climb.PackWeight = State.activePackWeight;
-            climb.PitchBreakdown = document.getElementById('input-pitch-breakdown').value.trim();
+            const pbInput = document.getElementById('input-pitch-breakdown');
+            climb.PitchBreakdown = pbInput ? pbInput.value.trim() : '';
         } else if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
             climb.HighPoint = State.activeHighPoint;
         }
         
-        document.getElementById('input-notes').value = '';
-        if (isOut) document.getElementById('input-name').value = '';
-        document.getElementById('input-pitch-breakdown').value = '';
+        const inNotes = document.getElementById('input-notes');
+        if (inNotes) inNotes.value = '';
+        if (isOut && inName) inName.value = '';
+        
+        const pbInput = document.getElementById('input-pitch-breakdown');
+        if (pbInput) pbInput.value = '';
         
         if (App.editingClimbId) {
             State.climbs = State.climbs.map(c => String(c.ClimbID) === String(App.editingClimbId) ? climb : c);
@@ -953,7 +1062,7 @@ const App = {
             State.climbs = [climb, ...State.climbs]; 
         }
 
-        SyncManager.pushAll(State.sessions.filter(s => !s._synced), [climb]); 
+        SyncManager.pushAll(State.sessions.filter(ses => !ses._synced), [climb]); 
         
         State.activeRating = 0; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
         State.activeBurns = ['flash', 'onsight', 'toprope', 'autobelay', 'allfree'].includes(State.activeStyle) ? 1 : (['quick', 'topped'].includes(State.activeStyle) ? 2 : '-');
@@ -963,15 +1072,16 @@ const App = {
         State.activePackWeight = '';
         
         setTimeout(() => {
-            btn.innerHTML = App.editingClimbId ? '✓ Updated!' : '✓ Saved!';
+            if (btn) {
+                btn.innerHTML = App.editingClimbId ? '✓ Updated!' : '✓ Saved!';
+                if (App.editingClimbId) {
+                    App.editingClimbId = null;
+                    btn.style.background = 'var(--primary)';
+                    btn.style.color = '#000';
+                }
+            }
             if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
             
-            if (App.editingClimbId) {
-                App.editingClimbId = null;
-                btn.style.background = 'var(--primary)';
-                btn.style.color = '#000';
-            }
-
             setTimeout(() => { 
                 App.isSaving = false; 
                 App.validateForm(); 
