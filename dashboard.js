@@ -50,6 +50,24 @@ const formatShortDate = (dStr) => {
     return `${parseInt(d, 10)} ${AppConfig.months[parseInt(m, 10)-1]}`;
 };
 
+const getScaleConfig = (disc) => {
+    if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
+    if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
+    if (disc === 'Outdoor Ice Climbing') return AppConfig.grades.ice;
+    if (disc === 'Outdoor Multipitch' || disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut || AppConfig.grades.ropes;
+    return AppConfig.grades.ropes;
+};
+
+// DECPOUPLES VOLUME CHART XP FROM CUMULATIVE MULTIPITCH XP
+const getChartScore = (l) => {
+    if (getV(l, 'Type') === 'Outdoor Multipitch') {
+        const sConf = AppConfig.grades.ropesOut || AppConfig.grades.ropes;
+        const idx = sConf.labels.indexOf(getBaseGrade(getV(l, 'Grade')));
+        if (idx > -1) return sConf.scores[idx];
+    }
+    return Number(getV(l, 'Score')) || 0;
+};
+
 const ArchetypeDefs = {
     'The Caveman': "You are a dynamic powerhouse. You treat every route like a board climb, favoring explosive movement, big deadpoints, and campus beta. While others waste time analyzing micro-beta, you prefer to just drag yourself up the wall like a caveman. Subtlety is a suggestion; raw pulling power is your weapon of choice.",
     'The Juggernaut': "You win through sheer attrition. You don't need to campus the crux when you have the stamina to hang on terrible holds for five minutes to map out the sequence. You are a slow-moving, unstoppable force built for long, sustained walls.",
@@ -553,24 +571,91 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- STANDARD MODE LOGIC ---
         if (!isMultiMode) {
-            // HYBRID ACWR READINESS ENGINE 
+            
+            // HYBRID TRIMP ACWR READINESS ENGINE 
             const today = new Date();
             today.setHours(0,0,0,0);
             let rawAcute = 0; 
             let rawChronic = 0; 
 
+            const dailyLoads = {};
             currentFilteredLogs.forEach(l => {
-                const cDate = new Date(getCleanDate(getV(l, 'Date')));
+                const cDate = getCleanDate(getV(l, 'Date'));
+                if (!dailyLoads[cDate]) dailyLoads[cDate] = { climbs: [], session: null };
+                dailyLoads[cDate].climbs.push(l);
+            });
+
+            Object.keys(dailyLoads).forEach(dateStr => {
+                const dayData = dailyLoads[dateStr];
+                let dayRawVolume = 0;
+                let hasHeavyPack = false;
+                let fatigueVal = 5; 
+                let approachStr = '';
+
+                dayData.climbs.forEach(c => {
+                    const typeStr = String(getV(c, 'Type') || "");
+                    const gradeStr = String(getV(c, 'Grade') || "");
+                    let sConf = getScaleConfig(typeStr);
+                    let cleanG = getBaseGrade(gradeStr);
+                    let gIdx = sConf.labels.indexOf(cleanG);
+                    let baseScore = gIdx > -1 ? sConf.scores[gIdx] : 400;
+
+                    if (typeStr === 'Outdoor Multipitch') baseScore = Number(getV(c, 'Score')) || baseScore;
+
+                    const styleStr = String(getV(c, 'Style') || "").toLowerCase();
+                    let burns = Number(getV(c, 'Burns')) || 1;
+                    if (['flash', 'onsight', 'toprope', 'autobelay', 'allfree'].includes(styleStr)) burns = 1;
+
+                    let hp = 1.0;
+                    if (['worked', 'toprope', 'project', 'bailed'].includes(styleStr) && getV(c, 'HighPoint')) {
+                        hp = Number(getV(c, 'HighPoint')) / 100;
+                    }
+
+                    let volume = baseScore * burns * hp;
+
+                    let discMult = 1.0;
+                    if (typeStr === 'Indoor Bouldering') discMult = 1.2;
+                    else if (typeStr === 'Outdoor Rope Climbing' || typeStr.includes('Trad') || typeStr.includes('Ice') || typeStr.includes('Multipitch')) discMult = 1.1;
+                    else if (typeStr === 'Indoor Rope Climbing') discMult = 0.9;
+
+                    let steepMult = 1.0;
+                    const angleStr = String(getV(c, 'Angle') || "");
+                    if (angleStr.includes('Overhang') || angleStr.includes('Roof')) steepMult = 1.2;
+
+                    dayRawVolume += (volume * discMult * steepMult);
+
+                    if (String(getV(c, 'PackWeight')) === 'Heavy') hasHeavyPack = true;
+
+                    const session = allSessionsMaster.find(s => String(getV(s, 'SessionID')) === String(getV(c, 'SessionID')));
+                    if (session) {
+                        if (getV(session, 'Fatigue')) fatigueVal = Number(getV(session, 'Fatigue'));
+                        if (getV(session, 'Approach')) approachStr = String(getV(session, 'Approach')).toLowerCase();
+                    }
+                });
+
+                let fatMult = 1.0;
+                if (fatigueVal <= 2) fatMult = 0.5;
+                else if (fatigueVal <= 4) fatMult = 0.8;
+                else if (fatigueVal <= 6) fatMult = 1.0;
+                else if (fatigueVal <= 8) fatMult = 1.3;
+                else if (fatigueVal >= 9) fatMult = 1.8;
+
+                let legTax = 1.0;
+                if (approachStr.includes('alpine') || hasHeavyPack) legTax = 1.2;
+
+                let finalDailyLoad = dayRawVolume * fatMult * legTax;
+                finalDailyLoad = Math.min(finalDailyLoad, 7500); 
+
+                const cDate = new Date(dateStr);
                 cDate.setHours(0,0,0,0);
                 const diffTime = Math.abs(today - cDate);
-                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)); 
-                const score = Number(getV(l, 'Score')) || 0;
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
                 if (diffDays < 7) {
                     const weight = (7 - diffDays) / 7; 
-                    rawAcute += (score * weight);
+                    rawAcute += (finalDailyLoad * weight);
                 }
-                if (diffDays < 28) rawChronic += score;
+                if (diffDays < 28) rawChronic += finalDailyLoad;
             });
 
             rawAcute = rawAcute * 1.75;
