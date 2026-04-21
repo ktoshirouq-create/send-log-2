@@ -7,12 +7,14 @@ const AppConfig = {
     gyms: ["OKS", "Torshov", "Løkka", "Bryn", "Gneiss", "Other"],
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering', 'Outdoor Multipitch'],
-    discLabels: ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder', 'Multipitch'],
+    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering', 'Outdoor Multipitch', 'Outdoor Trad Climbing', 'Outdoor Ice Climbing'],
+    discLabels: ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder', 'Multipitch', 'Trad', 'Ice'],
     styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
+    iceFeatures: ['Pillar', 'Curtain', 'Shield', 'Cauliflower', 'Mixed', 'Alpine'],
     climbStyles: ['Endurance', 'Cruxy', 'Technical', 'Athletic', 'Crack'],
     holds: ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs', 'Cracks'],
+    iceConditions: ['Plastic', 'Hero Ice', 'Brittle', 'Wet/Slushy', 'Chandeliers'],
     rpes: ['Breezy', 'Solid', 'Limit'],
     gearStyles: ['Sport', 'Trad', 'Mixed'],
     packWeights: ['Minimal', 'Standard', 'Heavy'],
@@ -27,7 +29,8 @@ const AppConfig = {
         ropesIn: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
-        bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
+        bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] },
+        ice: { labels: ["WI2","WI3","WI4","WI4+","WI5","WI5+","WI6","WI6+","WI7","M4","M5","M6","M7","M8"], scores: [300,450,600,650,700,750,800,850,900,600,650,700,750,800], colors: [] }
     }
 };
 
@@ -67,7 +70,8 @@ const formatShortDate = (dStr) => {
 const getScaleConfig = (disc) => {
     if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
     if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
-    if (disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Multipitch') return AppConfig.grades.ropesOut;
+    if (disc === 'Outdoor Ice Climbing') return AppConfig.grades.ice;
+    if (disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Multipitch' || disc === 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut;
     return AppConfig.grades.ropesIn;
 };
 
@@ -766,6 +770,8 @@ const App = {
         const dStr = String(State.discipline || "");
         const isOut = dStr.includes('Outdoor'), isRope = dStr.includes('Rope'), isBould = dStr.includes('Boulder');
         const isMulti = dStr === 'Outdoor Multipitch';
+        const isIce = dStr === 'Outdoor Ice Climbing';
+        const isTrad = dStr === 'Outdoor Trad Climbing';
         const conf = getScaleConfig(dStr);
 
         const buildPills = (arr, activeVal, clickAction) => arr.map(item => `<div class="pill ${item === activeVal ? 'active' : ''}" data-val="${item}" onclick="${clickAction}='${item}';">${item}</div>`).join('');
@@ -777,10 +783,10 @@ const App = {
         safeClass('input-indoor', isOut ? 'hidden' : '');
         
         const inN = document.getElementById('input-name');
-        if(inN) inN.placeholder = isBould ? 'La Marie Rose' : (isMulti ? 'Vestpillaren' : 'Silence');
+        if(inN) inN.placeholder = isBould ? 'La Marie Rose' : (isMulti ? 'Vestpillaren' : (isIce ? 'Rjukanfossen' : 'Silence'));
         
         const inC = document.getElementById('input-crag');
-        if(inC) inC.placeholder = isBould ? 'Sector, Crag 🇬🇷' : (isMulti ? 'Presten, Lofoten' : 'Flatanger');
+        if(inC) inC.placeholder = isBould ? 'Sector, Crag 🇬🇷' : (isMulti ? 'Presten, Lofoten' : (isIce ? 'Rjukan' : 'Flatanger'));
         
         safeText('gradeLabel', isMulti ? 'Crux Grade' : 'Grade');
 
@@ -797,7 +803,7 @@ const App = {
         let styles = [];
         if (isMulti) {
             styles = [['topped', 'Topped Out'], ['allfree', 'All Free'], ['bailed', 'Bailed']];
-        } else if (isRope) {
+        } else if (isRope || isTrad || isIce) {
             if (isOut) styles = [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['onsight', 'Onsight'], ['toprope', 'Top Rope'], ['worked', 'Worked']];
             else styles = [['project', 'Project'], ['quick', 'Send'], ['flash', 'Flash'], ['toprope', 'Top Rope'], ['autobelay', 'Auto Belay'], ['worked', 'Worked']];
         } else {
@@ -816,9 +822,19 @@ const App = {
         safeHTML('gearStyleSelector', AppConfig.gearStyles.map(s => `<div class="pill ${State.activeGearStyle === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activeGearStyle='${s}';">${s}</div>`).join(''));
         safeHTML('packWeightSelector', AppConfig.packWeights.map(s => `<div class="pill ${State.activePackWeight === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activePackWeight='${s}';">${s}</div>`).join(''));
         safeHTML('rpeSelector', buildPills(AppConfig.rpes, State.activeRPE, "App.haptic(); State.activeRPE"));
-        safeHTML('steepnessSelector', AppConfig.steepness.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('steepness', '${s}')">${s}</div>`).join(''));
+
+        const steepLabel = document.querySelector('#steepnessSelector')?.previousElementSibling;
+        if (steepLabel && steepLabel.tagName === 'LABEL') steepLabel.innerText = isIce ? 'Ice Features' : 'Steepness / Angle';
+        
+        const holdsLabel = document.querySelector('#holdsSelector')?.previousElementSibling;
+        if (holdsLabel && holdsLabel.tagName === 'LABEL') holdsLabel.innerText = isIce ? 'Ice Conditions' : 'Holds / Grip';
+
+        const steepArr = isIce ? AppConfig.iceFeatures : AppConfig.steepness;
+        const holdArr = isIce ? AppConfig.iceConditions : AppConfig.holds;
+
+        safeHTML('steepnessSelector', steepArr.map(s => `<div class="pill ${State.activeSteepness.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('steepness', '${s}')">${s}</div>`).join(''));
         safeHTML('climbStyleSelector', AppConfig.climbStyles.map(s => `<div class="pill ${State.activeClimbStyles.includes(s) ? 'active' : ''}" data-val="${s}" onclick="App.toggleMulti('style', '${s}')">${s}</div>`).join(''));
-        safeHTML('holdsSelector', AppConfig.holds.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" data-val="${h}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join(''));
+        safeHTML('holdsSelector', holdArr.map(h => `<div class="pill ${State.activeHolds.includes(h) ? 'active' : ''}" data-val="${h}" onclick="App.toggleMulti('hold', '${h}')">${h}</div>`).join(''));
 
         App.renderPartnerPills();
         App.updateUISelections(); 
@@ -853,6 +869,8 @@ const App = {
 
         const isOut = State.discipline.includes('Outdoor');
         const isMulti = State.discipline === 'Outdoor Multipitch';
+        const isTrad = State.discipline === 'Outdoor Trad Climbing';
+        const isIce = State.discipline === 'Outdoor Ice Climbing';
         const isBould = State.discipline.includes('Boulder');
 
         const partnerCont = document.getElementById('partner-container');
@@ -902,6 +920,18 @@ const App = {
             }
             const bV = document.getElementById('burns-val');
             if(bV) bV.innerText = State.activeBurns;
+        }
+
+        const showGearPack = (isMulti || isTrad || isIce);
+        const gearSel = document.getElementById('gearStyleSelector');
+        if (gearSel) {
+            gearSel.style.display = showGearPack ? 'flex' : 'none';
+            if(gearSel.previousElementSibling && gearSel.previousElementSibling.tagName === 'LABEL') gearSel.previousElementSibling.style.display = showGearPack ? 'block' : 'none';
+        }
+        const packSel = document.getElementById('packWeightSelector');
+        if (packSel) {
+            packSel.style.display = showGearPack ? 'flex' : 'none';
+            if(packSel.previousElementSibling && packSel.previousElementSibling.tagName === 'LABEL') packSel.previousElementSibling.style.display = showGearPack ? 'block' : 'none';
         }
 
         const sR = document.getElementById('starRating');
@@ -956,7 +986,11 @@ const App = {
                 if (maxSend.Type.includes('Bouldering') && sConf && sConf.colors) {
                     const mIdx = sConf.labels.indexOf(maxSentStr);
                     maxColor = sConf.colors[mIdx] || '#fff';
-                } else if (maxSend.Type.includes('Rope') || maxSend.Type.includes('Multipitch')) maxColor = 'var(--primary)';
+                } else if (maxSend.Type.includes('Rope') || maxSend.Type.includes('Multipitch') || maxSend.Type.includes('Trad')) {
+                    maxColor = 'var(--primary)';
+                } else if (maxSend.Type.includes('Ice')) {
+                    maxColor = '#0ea5e9';
+                }
             }
 
             let childrenHtml = `
@@ -985,6 +1019,8 @@ const App = {
                 else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316';
                 else if (type === 'Outdoor Bouldering') dotColor = '#a855f7';
                 else if (type === 'Outdoor Multipitch') dotColor = '#ef4444';
+                else if (type === 'Outdoor Trad Climbing') dotColor = '#d97706';
+                else if (type === 'Outdoor Ice Climbing') dotColor = '#0ea5e9';
 
                 const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
                 const cleanName = escapeHTML(l.Name ? l.Name.split('@')[0].trim() : "Unknown");
@@ -1003,8 +1039,8 @@ const App = {
                                 <div><div class="d-lbl">Style</div><div class="d-val">${displayStyle}</div></div>
                                 ${type !== 'Outdoor Multipitch' ? `<div><div class="d-lbl">Burns</div><div class="d-val">${l.Burns || 1}</div></div>` : ''}
                                 <div><div class="d-lbl">Rating</div><div class="d-val" style="color:#eab308;">${'★'.repeat(Number(l.Rating) || 0) || '-'}</div></div>
-                                <div><div class="d-lbl">Angle</div><div class="d-val">${l.Angle || '-'}</div></div>
-                                <div><div class="d-lbl">Holds</div><div class="d-val">${l.Holds || '-'}</div></div>
+                                <div><div class="d-lbl">${type.includes('Ice') ? 'Ice Feature' : 'Angle'}</div><div class="d-val">${l.Angle || '-'}</div></div>
+                                <div><div class="d-lbl">${type.includes('Ice') ? 'Ice Cond.' : 'Holds'}</div><div class="d-val">${l.Holds || '-'}</div></div>
                                 <div><div class="d-lbl">Effort</div><div class="d-val">${l.Effort || '-'}</div></div>
                                 ${l.Partner ? `<div><div class="d-lbl">Partner(s)</div><div class="d-val">${l.Partner}</div></div>` : ''}
                                 ${l.Pitches ? `<div><div class="d-lbl">Pitches</div><div class="d-val">${l.Pitches}</div></div>` : ''}
@@ -1276,6 +1312,8 @@ const App = {
             else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316';
             else if (type === 'Outdoor Bouldering') dotColor = '#a855f7';
             else if (type === 'Outdoor Multipitch') dotColor = '#ef4444';
+            else if (type === 'Outdoor Trad Climbing') dotColor = '#d97706';
+            else if (type === 'Outdoor Ice Climbing') dotColor = '#0ea5e9';
 
             const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
             const cleanName = escapeHTML(l.Name ? l.Name.split('@')[0].trim() : "Unknown");
@@ -1294,8 +1332,8 @@ const App = {
                             <div><div class="d-lbl">Style</div><div class="d-val">${displayStyle}</div></div>
                             ${type !== 'Outdoor Multipitch' ? `<div><div class="d-lbl">Burns</div><div class="d-val">${l.Burns || 1}</div></div>` : ''}
                             <div><div class="d-lbl">Rating</div><div class="d-val" style="color:#eab308;">${'★'.repeat(Number(l.Rating) || 0) || '-'}</div></div>
-                            <div><div class="d-lbl">Angle</div><div class="d-val">${l.Angle || '-'}</div></div>
-                            <div><div class="d-lbl">Holds</div><div class="d-val">${l.Holds || '-'}</div></div>
+                            <div><div class="d-lbl">${type.includes('Ice') ? 'Ice Feature' : 'Angle'}</div><div class="d-val">${l.Angle || '-'}</div></div>
+                            <div><div class="d-lbl">${type.includes('Ice') ? 'Ice Cond.' : 'Holds'}</div><div class="d-val">${l.Holds || '-'}</div></div>
                             <div><div class="d-lbl">Effort</div><div class="d-val">${l.Effort || '-'}</div></div>
                             ${l.Partner ? `<div><div class="d-lbl">Partner(s)</div><div class="d-val">${l.Partner}</div></div>` : ''}
                             ${l.Pitches ? `<div><div class="d-lbl">Pitches</div><div class="d-val">${l.Pitches}</div></div>` : ''}
@@ -1338,7 +1376,7 @@ const App = {
         const g = State.activeGrade.text; 
         const isMulti = State.discipline === 'Outdoor Multipitch';
         
-        if(['flash', 'allfree'].includes(State.activeStyle)) { s += State.discipline.includes('Rope') || isMulti ? 10 : 17; } 
+        if(['flash', 'allfree'].includes(State.activeStyle)) { s += State.discipline.includes('Rope') || isMulti || State.discipline.includes('Trad') || State.discipline.includes('Ice') ? 10 : 17; } 
         else if (State.activeStyle === 'onsight') { s += 10; }
         else if (['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(State.activeStyle)) { s = 0; }
         
@@ -1387,8 +1425,14 @@ const App = {
             
             climb.GearStyle = State.activeGearStyle;
             climb.PackWeight = State.activePackWeight;
-        } else if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
-            climb.HighPoint = State.activeHighPoint;
+        } else {
+            if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
+                climb.HighPoint = State.activeHighPoint;
+            }
+            if (State.discipline.includes('Trad') || State.discipline.includes('Ice')) {
+                climb.GearStyle = State.activeGearStyle;
+                climb.PackWeight = State.activePackWeight;
+            }
         }
         
         const inNotes = document.getElementById('input-notes');
