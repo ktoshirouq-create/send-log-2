@@ -11,9 +11,9 @@ const AppConfig = {
     discLabels: ['In Rope', 'In Boulder', 'Out Rope', 'Out Boulder', 'Multipitch', 'Trad', 'Ice'],
     styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
-    iceFeatures: ['Pillar', 'Curtain', 'Shield', 'Cauliflower', 'Mixed', 'Alpine'],
     climbStyles: ['Endurance', 'Cruxy', 'Technical', 'Athletic', 'Crack'],
     holds: ['Crimps', 'Slopers', 'Pockets', 'Pinches', 'Tufas', 'Jugs', 'Cracks'],
+    iceFeatures: ['Pillar', 'Curtain', 'Shield', 'Cauliflower', 'Mixed', 'Alpine'],
     iceConditions: ['Plastic', 'Hero Ice', 'Brittle', 'Wet/Slushy', 'Chandeliers'],
     rpes: ['Breezy', 'Solid', 'Limit'],
     gearStyles: ['Sport', 'Trad', 'Mixed'],
@@ -37,7 +37,6 @@ const AppConfig = {
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 
-// TIMEZONE NEUTRALIZER
 const getCleanDate = (dStr) => {
     if (!dStr) return getLocalISO();
     if (typeof dStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dStr.trim())) return dStr.trim();
@@ -75,7 +74,16 @@ const getScaleConfig = (disc) => {
     return AppConfig.grades.ropesIn;
 };
 
-// TYPOGRAPHIC BADGES
+// CHART & CAPACITY DECOUPLER: Extracts strictly the crux grade score, ignoring cumulative pitch scores
+const getChartScore = (l) => {
+    if (l.Type === 'Outdoor Multipitch') {
+        const sConf = AppConfig.grades.ropesOut;
+        const idx = sConf.labels.indexOf(getBaseGrade(l.Grade));
+        if (idx > -1) return sConf.scores[idx];
+    }
+    return Number(l.Score) || 0;
+};
+
 const getStyleBadge = (style) => {
     const lowerStyle = String(style || "").toLowerCase();
     const map = {
@@ -1132,7 +1140,7 @@ const App = {
             const monthKey = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
 
             if (!grouped[monthKey]) grouped[monthKey] = [];
-            grouped[monthKey].push(Number(l.Score) || 0);
+            grouped[monthKey].push(getChartScore(l));
         });
 
         const sortedMonths = Object.keys(grouped).sort((a,b) => Number(a) - Number(b)).slice(-12);
@@ -1185,7 +1193,7 @@ const App = {
                                     if(!conf || !conf.scores) return ` ${context.raw} XP`;
                                     const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - context.raw) < Math.abs(prev - context.raw) ? curr : prev);
                                     const idx = conf.scores.indexOf(closest);
-                                    return ` ${conf.labels[idx]} (${context.raw} XP)`;
+                                    return ` ${conf.labels[idx]}`;
                                 }
                             }
                         }
@@ -1235,7 +1243,7 @@ const App = {
                 const logDate = new Date(l.cleanDate);
                 logDate.setHours(0,0,0,0);
                 return logDate >= sixtyDaysAgo;
-            }).sort((a,b) => Number(b.Score) - Number(a.Score)).slice(0, 10);
+            }).sort((a,b) => getChartScore(b) - getChartScore(a)).slice(0, 10);
         } else {
             if(titleEl) titleEl.innerText = 'Recent Logs';
             displayLogs = viewLogs.sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID)).slice(0, 10);
@@ -1245,7 +1253,7 @@ const App = {
         if(xpCont) xpCont.classList.toggle('hidden', State.listMode !== 'top10' || displayLogs.length === 0);
         
         if (State.listMode === 'top10' && displayLogs.length > 0 && conf) {
-            const avgS = Math.round(displayLogs.reduce((s, l) => s + Number(l.Score), 0) / displayLogs.length);
+            const avgS = Math.round(displayLogs.reduce((s, l) => s + getChartScore(l), 0) / displayLogs.length);
             const curIdx = conf.scores.indexOf(conf.scores.slice().reverse().find(s => s <= avgS) || conf.scores[0]);
             const nextIdx = Math.min(curIdx + 1, conf.scores.length - 1);
             const pct = Math.min(100, Math.max(0, ((avgS - conf.scores[curIdx]) / (conf.scores[nextIdx] - conf.scores[curIdx])) * 100)) || 0;
