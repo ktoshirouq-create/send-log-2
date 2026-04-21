@@ -74,7 +74,6 @@ const getScaleConfig = (disc) => {
     return AppConfig.grades.ropesIn;
 };
 
-// CHART & CAPACITY DECOUPLER: Extracts strictly the crux grade score, ignoring cumulative pitch scores
 const getChartScore = (l) => {
     if (l.Type === 'Outdoor Multipitch') {
         const sConf = AppConfig.grades.ropesOut;
@@ -1101,6 +1100,139 @@ const App = {
     renderDashboard: () => { 
         App.renderDashboardCharts(); 
         App.renderDashboardLogs(); 
+        
+        // HYBRID TRIMP ACWR READINESS ENGINE
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        let rawAcute = 0; 
+        let rawChronic = 0; 
+
+        const dailyLoads = {};
+        State.climbs.forEach(l => {
+            const cDate = getCleanDate(l.Date);
+            if (!dailyLoads[cDate]) dailyLoads[cDate] = { climbs: [], session: null };
+            dailyLoads[cDate].climbs.push(l);
+        });
+
+        Object.keys(dailyLoads).forEach(dateStr => {
+            const dayData = dailyLoads[dateStr];
+            let dayRawVolume = 0;
+            let hasHeavyPack = false;
+            let fatigueVal = 5; 
+            let approachStr = '';
+
+            dayData.climbs.forEach(c => {
+                let sConf = getScaleConfig(c.Type);
+                let cleanG = getBaseGrade(c.Grade);
+                let gIdx = sConf.labels.indexOf(cleanG);
+                let baseScore = gIdx > -1 ? sConf.scores[gIdx] : 400;
+
+                if (c.Type === 'Outdoor Multipitch') baseScore = Number(c.Score) || baseScore;
+
+                let burns = Number(c.Burns) || 1;
+                if (['flash', 'onsight', 'toprope', 'autobelay', 'allfree'].includes(String(c.Style).toLowerCase())) burns = 1;
+
+                let hp = 1.0;
+                if (['worked', 'toprope', 'project', 'bailed'].includes(String(c.Style).toLowerCase()) && c.HighPoint) {
+                    hp = Number(c.HighPoint) / 100;
+                }
+
+                let volume = baseScore * burns * hp;
+
+                let discMult = 1.0;
+                if (c.Type === 'Indoor Bouldering') discMult = 1.2;
+                else if (c.Type === 'Outdoor Rope Climbing' || c.Type.includes('Trad') || c.Type.includes('Ice') || c.Type.includes('Multipitch')) discMult = 1.1;
+                else if (c.Type === 'Indoor Rope Climbing') discMult = 0.9;
+
+                let steepMult = 1.0;
+                if (c.Angle && (c.Angle.includes('Overhang') || c.Angle.includes('Roof'))) steepMult = 1.2;
+
+                dayRawVolume += (volume * discMult * steepMult);
+                if (c.PackWeight === 'Heavy') hasHeavyPack = true;
+
+                const session = State.sessions.find(s => s.SessionID === c.SessionID);
+                if (session) {
+                    if (session.Fatigue) fatigueVal = Number(session.Fatigue);
+                    if (session.Approach) approachStr = String(session.Approach).toLowerCase();
+                }
+            });
+
+            let fatMult = 1.0;
+            if (fatigueVal <= 2) fatMult = 0.5;
+            else if (fatigueVal <= 4) fatMult = 0.8;
+            else if (fatigueVal <= 6) fatMult = 1.0;
+            else if (fatigueVal <= 8) fatMult = 1.3;
+            else if (fatigueVal >= 9) fatMult = 1.8;
+
+            let legTax = 1.0;
+            if (approachStr.includes('alpine') || hasHeavyPack) legTax = 1.2;
+
+            let finalDailyLoad = dayRawVolume * fatMult * legTax;
+            finalDailyLoad = Math.min(finalDailyLoad, 7500); 
+
+            const cDate = new Date(dateStr);
+            cDate.setHours(0,0,0,0);
+            const diffTime = Math.abs(today - cDate);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 7) {
+                const weight = (7 - diffDays) / 7; 
+                rawAcute += (finalDailyLoad * weight);
+            }
+            if (diffDays < 28) rawChronic += finalDailyLoad;
+        });
+
+        rawAcute = rawAcute * 1.75;
+        const acuteLoad = rawAcute / 100;
+        const chronicLoad = (rawChronic / 100) / 4; 
+        const acwr = chronicLoad > 0 ? (acuteLoad / chronicLoad) : 0;
+
+        const elRatio = document.getElementById('ui-acwr-ratio');
+        const elReadiness = document.getElementById('ui-readiness-pct');
+        const elCallout = document.getElementById('ui-acwr-callout');
+        const elMarker = document.getElementById('ui-acwr-marker');
+        const elDate = document.getElementById('ui-current-date');
+
+        if(elRatio && elCallout && elReadiness) {
+            document.getElementById('ui-acute-load').innerText = `${acuteLoad.toFixed(1)} Load`;
+            document.getElementById('ui-chronic-load').innerText = `${chronicLoad.toFixed(1)} Load/wk`;
+            elRatio.innerText = acwr.toFixed(2) + 'x';
+            
+            if (elDate) {
+                const dateOpts = { weekday: 'short', month: 'short', day: 'numeric' };
+                elDate.innerText = today.toLocaleDateString('en-US', dateOpts).toUpperCase();
+            }
+
+            let color = '#a3a3a3';
+            let message = 'Log more climbs to establish baseline.';
+            let markerPercent = 0;
+            let readinessPct = 100;
+
+            if (chronicLoad > 0) {
+                markerPercent = Math.min((acwr / 2.0) * 100, 100);
+                
+                if (acwr <= 0.8) readinessPct = 100;
+                else if (acwr > 0.8 && acwr <= 1.5) readinessPct = Math.round(100 - ((acwr - 0.8) / 0.7) * 60);
+                else readinessPct = 35;
+
+                elReadiness.innerText = readinessPct + '%';
+
+                if (acwr < 0.8) { color = '#3b82f6'; message = 'Undertraining detected. Increase training stimulus to build baseline capacity.'; }
+                else if (acwr < 1.3) { color = '#10b981'; message = 'Optimal training load. You are primed to perform and recovering well.'; }
+                else if (acwr < 1.5) { color = '#eab308'; message = 'High fatigue. You are overreaching. Proceed with caution and prioritize sleep.'; }
+                else { color = '#ef4444'; message = 'Danger zone. Significant injury risk. Mandatory rest recommended.'; }
+            } else {
+                elReadiness.innerText = '0%';
+            }
+
+            elRatio.style.color = color;
+            elReadiness.style.color = color;
+            elCallout.innerText = message;
+            elCallout.style.background = `${color}15`; 
+            elCallout.style.borderLeft = `4px solid ${color}`;
+            elCallout.style.color = color;
+            if (elMarker) elMarker.style.left = `${markerPercent}%`;
+        }
     },
 
     renderDashboardCharts: () => {
