@@ -34,12 +34,15 @@ const AppConfig = {
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
 const getLocalISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().substring(0, 10);
 
-// Upgraded Date Engine to fix the UTC Timezone trap from Google Sheets
+// TIMEZONE NEUTRALIZER
 const getCleanDate = (dStr) => {
     if (!dStr) return getLocalISO();
-    if (typeof dStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dStr)) return dStr;
+    if (typeof dStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dStr.trim())) return dStr.trim();
     const d = new Date(dStr);
-    if (!isNaN(d.getTime())) return getLocalISO(d);
+    if (!isNaN(d.getTime())) {
+        d.setHours(d.getHours() + 12); 
+        return d.toISOString().substring(0, 10);
+    }
     return String(dStr).substring(0, 10);
 };
 
@@ -301,7 +304,7 @@ const App = {
         App.editingClimbId = id;
         
         State.discipline = climb.Type || 'Indoor Rope Climbing';
-        App.setDate('custom', climb.Date);
+        App.setDate('custom', getCleanDate(climb.Date));
         
         if (climb.Type.includes('Outdoor')) {
             const parts = (climb.Name || "").split(' @ ');
