@@ -3,14 +3,15 @@ const AppConfig = {
     gyms: ["OKS", "Torshov", "Løkka", "Bryn", "Gneiss", "Other"],
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering', 'Outdoor Multipitch'],
+    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering', 'Outdoor Multipitch', 'Outdoor Trad Climbing', 'Outdoor Ice Climbing'],
     styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
-    steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
+    steepness: ['Slab', 'Vertical', 'Overhang', 'Roof', 'Pillar', 'Curtain', 'Shield', 'Cauliflower', 'Mixed', 'Alpine'],
     grades: {
         ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
-        bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] }
+        bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] },
+        ice: { labels: ["WI2","WI3","WI4","WI4+","WI5","WI5+","WI6","WI6+","WI7","M4","M5","M6","M7","M8"], scores: [300,450,600,650,700,750,800,850,900,600,650,700,750,800], colors: [] }
     }
 };
 
@@ -31,13 +32,23 @@ const escapeHTML = (str) => {
 };
 
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
-const formatShortDate = (dStr) => {
-    const clean = dStr ? String(dStr).substring(0, 10) : "";
-    if(!clean) return "";
-    const [y, m, d] = clean.split('-');
-    return `${d} ${AppConfig.months[parseInt(m)-1]}`;
+
+const getCleanDate = (dStr) => {
+    if (!dStr) return new Date().toISOString().substring(0, 10);
+    if (typeof dStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dStr.trim())) return dStr.trim();
+    const d = new Date(dStr);
+    if (!isNaN(d.getTime())) {
+        d.setHours(d.getHours() + 12); 
+        return d.toISOString().substring(0, 10);
+    }
+    return String(dStr).substring(0, 10);
 };
-const getCleanDate = (dStr) => dStr ? String(dStr).substring(0, 10) : new Date().toISOString().substring(0, 10);
+
+const formatShortDate = (dStr) => {
+    const clean = getCleanDate(dStr);
+    const [y, m, d] = clean.split('-');
+    return `${parseInt(d, 10)} ${AppConfig.months[parseInt(m, 10)-1]}`;
+};
 
 const ArchetypeDefs = {
     'The Caveman': "You are a dynamic powerhouse. You treat every route like a board climb, favoring explosive movement, big deadpoints, and campus beta. While others waste time analyzing micro-beta, you prefer to just drag yourself up the wall like a caveman. Subtlety is a suggestion; raw pulling power is your weapon of choice.",
@@ -138,9 +149,9 @@ const Dashboard = {
             if (isCrux) lineColor = '#ef4444'; 
             else {
                  const num = parseInt(cleanG);
-                 if(num >= 7) lineColor = '#c084fc';
-                 else if (num === 6) lineColor = '#eab308';
-                 else if (num <= 5) lineColor = '#3b82f6';
+                 if(num >= 7 || cleanG.includes('WI6') || cleanG.includes('WI7')) lineColor = '#c084fc';
+                 else if (num === 6 || cleanG.includes('WI5')) lineColor = '#eab308';
+                 else if (num <= 5 || cleanG.includes('WI4') || cleanG.includes('WI3')) lineColor = '#3b82f6';
             }
 
             svg += `<path d="M ${currentX} ${currentY} Q ${currentX} ${currentY - pitchHeight/2} ${nextX} ${nextY}" fill="none" stroke="${lineColor}" stroke-width="5" stroke-linecap="round" />`;
@@ -247,7 +258,7 @@ const Dashboard = {
 
         displayData.sort((a, b) => {
             let valA, valB;
-            if (Dashboard.sortCol === 'Date') { valA = new Date(getV(a, 'Date')).getTime() || 0; valB = new Date(getV(b, 'Date')).getTime() || 0; }
+            if (Dashboard.sortCol === 'Date') { valA = new Date(getCleanDate(getV(a, 'Date'))).getTime() || 0; valB = new Date(getCleanDate(getV(b, 'Date'))).getTime() || 0; }
             else if (Dashboard.sortCol === 'Name') { valA = String(getV(a, 'Name')||"").toLowerCase(); valB = String(getV(b, 'Name')||"").toLowerCase(); }
             else if (Dashboard.sortCol === 'Grade') { valA = Number(getV(a, 'Score')) || 0; valB = Number(getV(b, 'Score')) || 0; }
             else if (Dashboard.sortCol === 'Style') { valA = String(getV(a, 'Style')||"").toLowerCase(); valB = String(getV(b, 'Style')||"").toLowerCase(); }
@@ -280,6 +291,8 @@ const Dashboard = {
             else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316';
             else if (type === 'Outdoor Bouldering') dotColor = '#a855f7';
             else if (type === 'Outdoor Multipitch') dotColor = '#ef4444';
+            else if (type === 'Outdoor Trad Climbing') dotColor = '#d97706';
+            else if (type === 'Outdoor Ice Climbing') dotColor = '#0ea5e9';
             
             const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
             
@@ -301,8 +314,8 @@ const Dashboard = {
                     <div class="details-content">
                         <div class="details-grid">
                             <div><div class="d-lbl">Rating</div><div class="d-val" style="color:#eab308;">${'★'.repeat(Number(getV(l, 'Rating')) || 0) || '-'}</div></div>
-                            <div><div class="d-lbl">Angle</div><div class="d-val">${getV(l, 'Angle') || '-'}</div></div>
-                            <div><div class="d-lbl">Holds</div><div class="d-val">${getV(l, 'Holds') || '-'}</div></div>
+                            <div><div class="d-lbl">${type.includes('Ice') ? 'Ice Feature' : 'Angle'}</div><div class="d-val">${getV(l, 'Angle') || '-'}</div></div>
+                            <div><div class="d-lbl">${type.includes('Ice') ? 'Ice Cond.' : 'Holds'}</div><div class="d-val">${getV(l, 'Holds') || '-'}</div></div>
                             <div><div class="d-lbl">RPE (Effort)</div><div class="d-val">${getV(l, 'Effort') || '-'}</div></div>
                             <div><div class="d-lbl">Session Fatigue</div><div class="d-val" style="color:#fb923c;">${fatigue}</div></div>
                             <div><div class="d-lbl">Session Focus</div><div class="d-val" style="color:#60a5fa;">${focus}</div></div>
@@ -352,7 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const getScaleConfig = (disc) => {
         if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
         if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
-        if (disc === 'Outdoor Multipitch' || disc === 'Outdoor Rope Climbing') return AppConfig.grades.ropesOut || AppConfig.grades.ropes;
+        if (disc === 'Outdoor Ice Climbing') return AppConfig.grades.ice;
+        if (disc === 'Outdoor Multipitch' || disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut || AppConfig.grades.ropes;
         return AppConfig.grades.ropes;
     };
 
@@ -424,19 +438,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const isOutdoor = type.toLowerCase().includes('outdoor');
             const score = Number(getV(l, 'Score')) || 0;
 
-            if (angle.includes('Overhang') || angle.includes('Roof')) attr.Power += 2;
+            if (angle.includes('Overhang') || angle.includes('Roof') || angle.includes('Pillar') || angle.includes('Shield')) attr.Power += 2;
             if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
             if (type.includes('Bouldering')) attr.Power += 1;
 
-            if (type.includes('Rope') || type.includes('Multipitch')) attr.Endurance += 1;
+            if (type.includes('Rope') || type.includes('Multipitch') || type.includes('Trad') || type.includes('Ice')) attr.Endurance += 1;
             if (styleTag.includes('endurance') || styleTag.includes('volume')) attr.Endurance += 3;
             if ((styleResult === 'toprope' || styleResult === 'autobelay') && (styleTag.includes('endurance') || styleTag.includes('volume'))) attr.Endurance += 3;
 
-            if (angle.includes('Slab') || angle.includes('Vertical')) attr.Technique += 2;
-            if (holds.includes('Slopers') || holds.includes('Pinches') || holds.includes('Volumes')) attr.Technique += 2;
+            if (angle.includes('Slab') || angle.includes('Vertical') || angle.includes('Mixed')) attr.Technique += 2;
+            if (holds.includes('Slopers') || holds.includes('Pinches') || holds.includes('Volumes') || holds.includes('Brittle') || holds.includes('Chandeliers')) attr.Technique += 2;
             if (styleResult === 'onsight') attr.Technique += 2;
 
-            if (holds.includes('Crimps') || holds.includes('Pockets')) {
+            if (holds.includes('Crimps') || holds.includes('Pockets') || holds.includes('Cracks')) {
                 attr.Fingers += 2;
                 if (angle.includes('Overhang') || angle.includes('Roof')) attr.Fingers += 2; 
                 if (isOutdoor) attr.Fingers += 1; 
@@ -445,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (styleResult === 'flash' || styleResult === 'onsight' || styleResult === 'allfree') attr.Headspace += 3;
             if (effort.includes('Limit')) attr.Headspace += 2;
-            if (isOutdoor && (type.includes('Rope') || type.includes('Multipitch'))) attr.Headspace += 2; 
+            if (type.includes('Multipitch') || type.includes('Trad') || type.includes('Ice')) attr.Headspace += 3; 
 
             if (styleResult === 'project' || styleResult === 'worked') attr.Tenacity += 3;
             if (burns >= 3) attr.Tenacity += 1;
@@ -473,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentFilteredLogs = allTimeLogsFiltered.filter(l => {
             if (activeTime === 'All') return true;
-            const logDate = new Date(getV(l, 'Date'));
+            const logDate = new Date(getCleanDate(getV(l, 'Date')));
             const diffDays = (now - logDate) / (1000 * 60 * 60 * 24);
             return diffDays <= parseInt(activeTime);
         });
@@ -505,7 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const score = Number(getV(l, 'Score')) || 0;
                 if (score > peakScore) { peakScore = score; peakCrux = getBaseGrade(getV(l, 'Grade')); }
 
-                const dateStr = getV(l, 'Date');
+                const dateStr = getCleanDate(getV(l, 'Date'));
                 if (dateStr) wallDays.add(dateStr);
             });
 
@@ -515,7 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('stat-multi-days').innerText = wallDays.size;
 
             const multiSelector = document.getElementById('multi-route-selector');
-            const recentMultis = [...currentFilteredLogs].sort((a,b) => new Date(getV(b, 'Date')) - new Date(getV(a, 'Date')));
+            const recentMultis = [...currentFilteredLogs].sort((a,b) => new Date(getCleanDate(getV(b, 'Date'))) - new Date(getCleanDate(getV(a, 'Date'))));
             
             if (recentMultis.length > 0) {
                 if (!Dashboard.activeMultiClimbId || !recentMultis.find(c => getV(c, 'ClimbID') === Dashboard.activeMultiClimbId)) {
@@ -537,7 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // --- STANDARD MODE LOGIC (Skip charts if in Multi Mode) ---
+        // --- STANDARD MODE LOGIC ---
         if (!isMultiMode) {
             // HYBRID ACWR READINESS ENGINE 
             const today = new Date();
@@ -615,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const elStatSends = document.getElementById('stat-sends');
             if (elStatSends) elStatSends.innerText = currentFilteredLogs.length;
             
-            const outDays = new Set(currentFilteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getV(l, 'Date'))).size;
+            const outDays = new Set(currentFilteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getCleanDate(getV(l, 'Date')))).size;
             const elStatOutdoor = document.getElementById('stat-outdoor');
             if (elStatOutdoor) elStatOutdoor.innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
             
@@ -628,8 +642,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (isSend && s > maxScore) { maxScore = s; peakG = String(getV(l, 'Grade') || ""); } 
                 
-                const dateStr = getV(l, 'Date');
-                if (dateStr) { const d = new Date(dateStr).getDay(); dayC[AppConfig.days[d]] = (dayC[AppConfig.days[d]] || 0) + 1; }
+                const dateStr = getCleanDate(getV(l, 'Date'));
+                if (dateStr) { const d = new Date(dateStr); if(!isNaN(d)) { dayC[AppConfig.days[d.getDay()]] = (dayC[AppConfig.days[d.getDay()]] || 0) + 1; } }
                 if (String(getV(l, 'Type') || "").toLowerCase().includes('indoor')) indoorCount++;
             });
 
@@ -749,7 +763,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        const steepnessPeaks = { 'Slab': null, 'Vertical': null, 'Overhang': null, 'Roof': null };
+        const steepnessPeaks = { 'Slab': null, 'Vertical': null, 'Overhang': null, 'Roof': null, 'Pillar': null, 'Curtain': null, 'Shield': null, 'Cauliflower': null };
         const locSessions = {};
         const locs = {};
 
@@ -766,6 +780,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!steepnessPeaks[st] || s > Number(getV(steepnessPeaks[st], 'Score'))) steepnessPeaks[st] = l;
                 }
             });
+            if (AppConfig.iceFeatures) {
+                AppConfig.iceFeatures.forEach(st => {
+                    if (angleStr.includes(st) && isSend) {
+                        if (!steepnessPeaks[st] || s > Number(getV(steepnessPeaks[st], 'Score'))) steepnessPeaks[st] = l;
+                    }
+                });
+            }
 
             if(nameStr) {
                 if(nameStr.includes('@')) nameStr = nameStr.split('@')[1].trim(); 
@@ -795,7 +816,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join(''));
 
         let steepHTML = '';
-        AppConfig.steepness.forEach(st => {
+        const featuresToRender = (activeDisc === 'Outdoor Ice Climbing') ? AppConfig.iceFeatures : AppConfig.steepness;
+        featuresToRender.forEach(st => {
             const peakLog = steepnessPeaks[st];
             if(peakLog) steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="background: rgba(59,130,246,0.15); color:#3b82f6;">${getBaseGrade(getV(peakLog, 'Grade'))}</div></div>`;
             else steepHTML += `<div class="list-item"><div class="list-main" style="color:#555;">${st}</div><div class="list-badge" style="background:transparent; color:#555;">-</div></div>`;
