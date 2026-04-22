@@ -5,7 +5,8 @@ const AppConfig = {
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering', 'Outdoor Multipitch', 'Outdoor Trad Climbing', 'Outdoor Ice Climbing'],
     styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
-    steepness: ['Slab', 'Vertical', 'Overhang', 'Roof', 'Pillar', 'Curtain', 'Shield', 'Cauliflower', 'Mixed', 'Alpine'],
+    steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
+    iceFeatures: ['Pillar', 'Curtain', 'Shield', 'Cauliflower', 'Mixed', 'Alpine'],
     grades: {
         ropes: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         ropesOut: { labels: ["3","4-","4","4+","5-","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [100,200,250,300,400,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
@@ -67,6 +68,54 @@ const getChartScore = (l) => {
     return Number(getV(l, 'Score')) || 0;
 };
 
+const calcRPG = (logs) => {
+    let attr = { Power: 0, Endurance: 0, Technique: 0, Fingers: 0, Headspace: 0, Tenacity: 0 };
+    if (logs.length === 0) return { Power: 40, Endurance: 40, Technique: 40, Fingers: 40, Headspace: 40, Tenacity: 40 };
+
+    logs.forEach(l => {
+        const angle = String(getV(l, 'Angle') || "");
+        const styleTag = String(getV(l, 'ClimStyles') || "").toLowerCase();
+        const holds = String(getV(l, 'Holds') || "");
+        const effort = String(getV(l, 'Effort') || "");
+        const styleResult = String(getV(l, 'Style') || "").toLowerCase();
+        const burns = Number(getV(l, 'Burns')) || 1;
+        const type = String(getV(l, 'Type') || "");
+        const isOutdoor = type.toLowerCase().includes('outdoor');
+        const score = Number(getV(l, 'Score')) || 0;
+
+        if (angle.includes('Overhang') || angle.includes('Roof') || angle.includes('Pillar') || angle.includes('Shield')) attr.Power += 2;
+        if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
+        if (type.includes('Bouldering')) attr.Power += 1;
+
+        if (type.includes('Rope') || type.includes('Multipitch') || type.includes('Trad') || type.includes('Ice')) attr.Endurance += 1;
+        if (styleTag.includes('endurance') || styleTag.includes('volume')) attr.Endurance += 3;
+        if ((styleResult === 'toprope' || styleResult === 'autobelay') && (styleTag.includes('endurance') || styleTag.includes('volume'))) attr.Endurance += 3;
+
+        if (angle.includes('Slab') || angle.includes('Vertical') || angle.includes('Mixed')) attr.Technique += 2;
+        if (holds.includes('Slopers') || holds.includes('Pinches') || holds.includes('Volumes') || holds.includes('Brittle') || holds.includes('Chandeliers')) attr.Technique += 2;
+        if (styleResult === 'onsight') attr.Technique += 2;
+
+        if (holds.includes('Crimps') || holds.includes('Pockets') || holds.includes('Cracks')) {
+            attr.Fingers += 2;
+            if (angle.includes('Overhang') || angle.includes('Roof')) attr.Fingers += 2; 
+            if (isOutdoor) attr.Fingers += 1; 
+            if (score > 600) attr.Fingers += 1; 
+        }
+
+        if (styleResult === 'flash' || styleResult === 'onsight' || styleResult === 'allfree') attr.Headspace += 3;
+        if (effort.includes('Limit')) attr.Headspace += 2;
+        if (type.includes('Multipitch') || type.includes('Trad') || type.includes('Ice')) attr.Headspace += 3; 
+
+        if (styleResult === 'project' || styleResult === 'worked') attr.Tenacity += 3;
+        if (burns >= 3) attr.Tenacity += 1;
+        if (burns >= 5) attr.Tenacity += 2;
+    });
+    
+    const maxVal = Math.max(...Object.values(attr), 1);
+    Object.keys(attr).forEach(k => attr[k] = 40 + Math.round((attr[k] / maxVal) * 60));
+    return attr;
+};
+
 const ArchetypeDefs = {
     'The Caveman': "You are a dynamic powerhouse. You treat every route like a board climb, favoring explosive movement, big deadpoints, and campus beta. While others waste time analyzing micro-beta, you prefer to just drag yourself up the wall like a caveman. Subtlety is a suggestion; raw pulling power is your weapon of choice.",
     'The Juggernaut': "You win through sheer attrition. You don't need to campus the crux when you have the stamina to hang on terrible holds for five minutes to map out the sequence. You are a slow-moving, unstoppable force built for long, sustained walls.",
@@ -77,312 +126,14 @@ const ArchetypeDefs = {
     'The All-Rounder': "A rare breed. Your stat polygon is perfectly balanced. You can pull on a roof, balance on a slab, and hold on through a deep pump. The ultimate climbing chameleon."
 };
 
-// --- WRAP UP STORY ENGINE ---
-const StoryManager = {
-    activeMonth: null,
-    slides: [],
-    currentIdx: 0,
-    viewed: JSON.parse(localStorage.getItem('crag_viewed_wrapups') || '[]'),
-    allMonthGroups: {},
-    
-    initUI: () => {
-        if (document.getElementById('story-overlay')) return;
-        
-        // Inject Custom CSS
-        const style = document.createElement('style');
-        style.innerHTML = `
-            .story-overlay { position: fixed; inset: 0; background: #0a0a0a; z-index: 9999; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
-            .story-overlay.active { opacity: 1; pointer-events: auto; }
-            .story-progress-container { display: flex; gap: 6px; padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); z-index: 10; }
-            .story-bar { flex: 1; height: 3px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; }
-            .story-bar-fill { width: 0%; height: 100%; background: #fff; transition: width 0.2s linear; }
-            .story-bar.completed .story-bar-fill { width: 100%; }
-            .story-bar.active .story-bar-fill { width: 100%; }
-            .story-content { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 30px; }
-            .story-slide { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; opacity: 0; transform: scale(0.95); transition: opacity 0.4s ease, transform 0.4s ease; padding: 30px; pointer-events: none; }
-            .story-slide.active { opacity: 1; transform: scale(1); pointer-events: auto; z-index: 5; }
-            .story-close { position: absolute; top: max(16px, env(safe-area-inset-top)); right: 16px; background: rgba(255,255,255,0.1); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: bold; z-index: 20; cursor: pointer; backdrop-filter: blur(5px); }
-            .tap-zone { position: absolute; top: 0; bottom: 0; z-index: 10; }
-            .tap-left { left: 0; width: 35%; }
-            .tap-right { right: 0; width: 65%; }
-            .glow-text { text-shadow: 0 0 25px currentColor; font-weight: 900; letter-spacing: -1px; }
-            .vault-scroller { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: none; }
-            .vault-scroller::-webkit-scrollbar { display: none; }
-            .vault-card { flex-shrink: 0; width: 120px; background: #121212; border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; text-align: center; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-            .vault-card:active { transform: scale(0.95); }
-            .vault-month { font-size: 1rem; font-weight: 800; color: #fff; letter-spacing: 1px; }
-            .vault-year { font-size: 0.75rem; color: #737373; font-weight: 600; margin-top: 4px; }
-            #teaser-banner { background: linear-gradient(135deg, #121212, #022c22); border: 1px solid #10b981; border-radius: 12px; padding: 16px; text-align: center; cursor: pointer; box-shadow: 0 0 20px rgba(16,185,129,0.15); margin-bottom: 24px; animation: pulseGlow 3s infinite; }
-            @keyframes pulseGlow { 0% { box-shadow: 0 0 15px rgba(16,185,129,0.1); } 50% { box-shadow: 0 0 25px rgba(16,185,129,0.3); } 100% { box-shadow: 0 0 15px rgba(16,185,129,0.1); } }
-        `;
-        document.head.appendChild(style);
-
-        // Inject Full-Screen Overlay
-        const overlay = document.createElement('div');
-        overlay.id = 'story-overlay';
-        overlay.className = 'story-overlay';
-        overlay.innerHTML = `
-            <div class="story-progress-container" id="story-progress"></div>
-            <button class="story-close" onclick="StoryManager.close()">×</button>
-            <div class="story-content" id="story-content"></div>
-            <div class="tap-zone tap-left" onclick="StoryManager.prev()"></div>
-            <div class="tap-zone tap-right" onclick="StoryManager.next()"></div>
-        `;
-        document.body.appendChild(overlay);
-
-        // Inject Teaser Banner & Vault into Dashboard structure
-        const dashContainer = document.querySelector('.dashboard-container');
-        if (dashContainer) {
-            // Teaser Banner (after time filters)
-            const timeFilter = document.getElementById('time-filter');
-            if (timeFilter) {
-                const teaser = document.createElement('div');
-                teaser.id = 'teaser-banner';
-                teaser.style.display = 'none';
-                teaser.onclick = () => StoryManager.open(StoryManager.latestMonth);
-                teaser.innerHTML = `
-                    <h3 style="color: #10b981; margin: 0; font-size: 1.1rem; font-weight: 800; letter-spacing: -0.5px;">🔥 <span id="teaser-title">Your Wrap-Up is Here</span></h3>
-                    <p style="color: #a3a3a3; margin: 4px 0 0 0; font-size: 0.85rem; font-weight: 500;">Tap to view your monthly milestones.</p>
-                `;
-                timeFilter.parentNode.insertBefore(teaser, timeFilter.nextSibling);
-            }
-
-            // Vault (before Master Logbook)
-            const logSearch = document.getElementById('logSearch');
-            if (logSearch) {
-                const logCard = logSearch.closest('.standard-card');
-                if (logCard) {
-                    const vaultCont = document.createElement('div');
-                    vaultCont.id = 'vault-container';
-                    vaultCont.style.marginBottom = '24px';
-                    vaultCont.style.display = 'none';
-                    vaultCont.innerHTML = `
-                        <h3 style="color: #e5e5e5; font-size: 0.85rem; margin-bottom: 12px; letter-spacing: 2px; font-weight: 800; opacity: 0.7;">THE VAULT</h3>
-                        <div class="vault-scroller" id="vault-scroller"></div>
-                    `;
-                    logCard.parentNode.insertBefore(vaultCont, logCard);
-                }
-            }
-        }
-    },
-
-    processLogs: (logs) => {
-        StoryManager.allMonthGroups = {};
-        logs.forEach(l => {
-            const d = getCleanDate(getV(l, 'Date'));
-            if (!d) return;
-            const key = d.substring(0, 7); // YYYY-MM
-            if (!StoryManager.allMonthGroups[key]) StoryManager.allMonthGroups[key] = [];
-            StoryManager.allMonthGroups[key].push(l);
-        });
-
-        const sortedKeys = Object.keys(StoryManager.allMonthGroups).sort((a, b) => b.localeCompare(a));
-        if (sortedKeys.length === 0) return;
-
-        StoryManager.latestMonth = sortedKeys[0];
-        
-        // Teaser Logic
-        const teaser = document.getElementById('teaser-banner');
-        const teaserTitle = document.getElementById('teaser-title');
-        if (teaser && teaserTitle) {
-            if (!StoryManager.viewed.includes(StoryManager.latestMonth)) {
-                const [y, m] = StoryManager.latestMonth.split('-');
-                teaserTitle.innerText = `Your ${AppConfig.months[parseInt(m)-1]} Wrap-Up is Here`;
-                teaser.style.display = 'block';
-            } else {
-                teaser.style.display = 'none';
-            }
-        }
-
-        // Vault Logic
-        const vaultCont = document.getElementById('vault-container');
-        const vaultScroll = document.getElementById('vault-scroller');
-        if (vaultCont && vaultScroll) {
-            vaultCont.style.display = 'block';
-            vaultScroll.innerHTML = sortedKeys.map(k => {
-                const [y, m] = k.split('-');
-                return `
-                <div class="vault-card" onclick="StoryManager.open('${k}')">
-                    <div class="vault-month">${AppConfig.months[parseInt(m)-1].toUpperCase()}</div>
-                    <div class="vault-year">${y}</div>
-                </div>`;
-            }).join('');
-        }
-    },
-
-    getNeonColor: (type) => {
-        if (!type) return '#10b981';
-        if (type.includes('Ice')) return '#0ea5e9'; // Cyan
-        if (type.includes('Bouldering') && type.includes('Indoor')) return '#3b82f6'; // Blue
-        if (type.includes('Bouldering') && type.includes('Outdoor')) return '#a855f7'; // Purple
-        if (type.includes('Rope') && type.includes('Outdoor')) return '#f97316'; // Orange
-        return '#10b981'; // Green
-    },
-
-    open: (monthKey) => {
-        Dashboard.haptic();
-        StoryManager.activeMonth = monthKey;
-        const monthLogs = StoryManager.allMonthGroups[monthKey] || [];
-        
-        if (!StoryManager.viewed.includes(monthKey)) {
-            StoryManager.viewed.push(monthKey);
-            localStorage.setItem('crag_viewed_wrapups', JSON.stringify(StoryManager.viewed));
-            const teaser = document.getElementById('teaser-banner');
-            if (teaser) teaser.style.display = 'none';
-        }
-
-        // --- CALC DATA ---
-        let totalClimbs = monthLogs.length;
-        let peakScore = 0, peakGrade = '-', peakType = 'Indoor Rope Climbing';
-        let indoor = 0, outdoor = 0;
-        let crags = {}, partners = {}, days = {};
-
-        monthLogs.forEach(l => {
-            const s = Number(getV(l, 'Score')) || 0;
-            const style = String(getV(l, 'Style') || "").toLowerCase();
-            const type = String(getV(l, 'Type') || "");
-            const name = String(getV(l, 'Name') || "");
-            
-            if (s > peakScore && !['worked', 'toprope', 'autobelay', 'bailed'].includes(style)) {
-                peakScore = s; peakGrade = getBaseGrade(getV(l, 'Grade')); peakType = type;
-            }
-
-            if (type.includes('Indoor')) indoor++; else outdoor++;
-
-            const loc = name.includes('@') ? name.split('@')[1].trim() : "The Gym";
-            crags[loc] = (crags[loc] || 0) + 1;
-
-            const pStr = getV(l, 'Partner');
-            if (pStr) {
-                pStr.split(',').forEach(p => { const tn = p.trim(); if(tn) partners[tn] = (partners[tn] || 0) + 1; });
-            }
-
-            const dStr = getCleanDate(getV(l, 'Date'));
-            if (dStr) { const d = new Date(dStr); if(!isNaN(d)) days[d.getDay()] = (days[d.getDay()] || 0) + 1; }
-        });
-
-        const neon = StoryManager.getNeonColor(peakType);
-        const topCrag = Object.keys(crags).length ? Object.keys(crags).reduce((a,b) => crags[a] > crags[b] ? a : b) : 'Unknown';
-        const topPartner = Object.keys(partners).length ? Object.keys(partners).reduce((a,b) => partners[a] > partners[b] ? a : b) : 'The Auto-Belay';
-        const partnerCount = partners[topPartner] || 0;
-        const favDayInt = Object.keys(days).length ? Object.keys(days).reduce((a,b) => days[a] > days[b] ? a : b) : null;
-        const favDayStr = favDayInt !== null ? AppConfig.days[favDayInt] : 'Any Day';
-        const inPct = Math.round((indoor/totalClimbs)*100) || 0;
-        const outPct = Math.round((outdoor/totalClimbs)*100) || 0;
-
-        const attr = calcRPG(monthLogs);
-        const archMap = { 'Power': 'The Caveman', 'Endurance': 'The Juggernaut', 'Technique': 'The Technician', 'Fingers': 'The Scalpel', 'Headspace': 'The Assassin', 'Tenacity': 'The Pitbull' };
-        const topAttrs = Object.keys(attr).filter(k => attr[k] === 100);
-        const archetype = topAttrs.length > 1 ? 'The All-Rounder' : archMap[topAttrs[0]];
-
-        const [y, m] = monthKey.split('-');
-        const titleStr = `${AppConfig.months[parseInt(m)-1]} ${y}`;
-
-        // --- BUILD SLIDES ---
-        StoryManager.slides = [
-            `
-                <h4 style="color: #737373; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 20px; text-transform: uppercase;">${titleStr}</h4>
-                <div style="font-size: 1.2rem; color: #e5e5e5; font-weight: 600; margin-bottom: 10px;">You logged</div>
-                <div class="glow-text" style="font-size: 6rem; color: ${neon}; line-height: 1;">${totalClimbs}</div>
-                <div style="font-size: 1.5rem; color: #e5e5e5; font-weight: 800; margin-top: 10px;">Routes & Boulders</div>
-            `,
-            `
-                <h4 style="color: #737373; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 20px;">PEAK PERFORMANCE</h4>
-                <div style="font-size: 1.1rem; color: #e5e5e5; font-weight: 500; margin-bottom: 20px;">You pushed the limit.</div>
-                <div class="glow-text" style="font-size: 5.5rem; color: ${neon}; line-height: 1; margin-bottom: 10px;">${peakGrade}</div>
-                <div style="font-size: 1rem; color: #a3a3a3; font-weight: 600; background: rgba(255,255,255,0.05); padding: 8px 16px; border-radius: 20px;">${peakType}</div>
-            `,
-            `
-                <h4 style="color: #737373; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 20px;">THE HABITAT</h4>
-                <div style="display: flex; width: 100%; max-width: 250px; height: 12px; border-radius: 6px; overflow: hidden; margin-bottom: 30px; background: #262626;">
-                    <div style="width: ${inPct}%; background: #10b981;"></div>
-                    <div style="width: ${outPct}%; background: #f97316;"></div>
-                </div>
-                <div style="display: flex; justify-content: space-between; width: 100%; max-width: 250px; margin-bottom: 40px; font-weight: 800;">
-                    <span style="color: #10b981;">${inPct}% Indoor</span>
-                    <span style="color: #f97316;">${outPct}% Outdoor</span>
-                </div>
-                <div style="font-size: 1rem; color: #737373; margin-bottom: 5px;">Top Basecamp</div>
-                <div style="font-size: 1.8rem; color: ${neon}; font-weight: 900;">${topCrag}</div>
-            `,
-            `
-                <h4 style="color: #737373; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 20px;">THE TRUST FALL</h4>
-                <div style="font-size: 1.2rem; color: #e5e5e5; font-weight: 500; margin-bottom: 20px;">You trusted your life to</div>
-                <div class="glow-text" style="font-size: 3rem; color: ${neon}; line-height: 1.1; margin-bottom: 20px;">${topPartner}</div>
-                <div style="font-size: 1.2rem; color: #a3a3a3; font-weight: 700;">${partnerCount} Times</div>
-            `,
-            `
-                <h4 style="color: #737373; letter-spacing: 2px; font-size: 0.8rem; margin-bottom: 20px;">YOUR SIGNATURE</h4>
-                <div style="font-size: 1.2rem; color: #e5e5e5; font-weight: 500; margin-bottom: 10px;">This month, you climbed like</div>
-                <div class="glow-text" style="font-size: 2.5rem; color: ${neon}; line-height: 1.1; margin-bottom: 40px; text-transform: uppercase;">${archetype}</div>
-                <div style="font-size: 0.9rem; color: #737373; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px;">Favorite Day</div>
-                <div style="font-size: 1.5rem; color: #e5e5e5; font-weight: 800;">${favDayStr}s</div>
-            `
-        ];
-
-        // --- RENDER ---
-        const progContainer = document.getElementById('story-progress');
-        const contentContainer = document.getElementById('story-content');
-        
-        progContainer.innerHTML = StoryManager.slides.map((_, i) => `<div class="story-bar" id="prog-${i}"><div class="story-bar-fill"></div></div>`).join('');
-        contentContainer.innerHTML = StoryManager.slides.map((s, i) => `<div class="story-slide" id="slide-${i}">${s}</div>`).join('');
-
-        StoryManager.currentIdx = 0;
-        document.getElementById('story-overlay').classList.add('active');
-        StoryManager.updateView();
-    },
-
-    updateView: () => {
-        StoryManager.slides.forEach((_, i) => {
-            const slide = document.getElementById(`slide-${i}`);
-            const prog = document.getElementById(`prog-${i}`);
-            if (slide && prog) {
-                if (i < StoryManager.currentIdx) {
-                    slide.classList.remove('active');
-                    prog.classList.add('completed');
-                    prog.classList.remove('active');
-                } else if (i === StoryManager.currentIdx) {
-                    slide.classList.add('active');
-                    prog.classList.remove('completed');
-                    prog.classList.add('active');
-                } else {
-                    slide.classList.remove('active');
-                    prog.classList.remove('completed');
-                    prog.classList.remove('active');
-                }
-            }
-        });
-    },
-
-    next: () => {
-        Dashboard.haptic();
-        if (StoryManager.currentIdx < StoryManager.slides.length - 1) {
-            StoryManager.currentIdx++;
-            StoryManager.updateView();
-        } else {
-            StoryManager.close();
-        }
-    },
-
-    prev: () => {
-        Dashboard.haptic();
-        if (StoryManager.currentIdx > 0) {
-            StoryManager.currentIdx--;
-            StoryManager.updateView();
-        }
-    },
-
-    close: () => {
-        Dashboard.haptic();
-        document.getElementById('story-overlay').classList.remove('active');
-    }
-};
-
 const Dashboard = {
     sortCol: 'Date',
     sortAsc: false,
     logLimit: 10, 
     activeMultiClimbId: null,
+    wrapUpData: [],
+    activeWrapUpIdx: 0,
+    activeCardIdx: 0,
     
     haptic: () => { if (navigator.vibrate) navigator.vibrate(40); },
     
@@ -396,7 +147,6 @@ const Dashboard = {
 
     toggleRow: (id) => {
         Dashboard.haptic();
-        
         document.querySelectorAll('.table-row.expanded').forEach(r => {
             if (r.id !== `row-${id}`) {
                 r.classList.remove('expanded');
@@ -446,7 +196,7 @@ const Dashboard = {
         const padding = 50;
         const totalHeight = (pitches.length * pitchHeight) + padding * 2;
         
-        // CSS FIX APPLIED HERE:
+        // CSS SVG SCALE FIX
         let svg = `<svg width="100%" height="auto" viewBox="0 0 ${width} ${totalHeight}" style="max-height: 500px; display: block; overflow: visible;" xmlns="http://www.w3.org/2000/svg">`;
         
         let currentX = width / 2;
@@ -560,6 +310,278 @@ const Dashboard = {
         addIcon('CLIMBER PROFILE', 'profile');
     },
 
+    // --- SPOTIFY WRAPPED UX ENGINE ---
+    initWrapUp: function(allLogsMaster) {
+        const groups = {};
+        allLogsMaster.forEach(l => {
+            const dStr = getCleanDate(getV(l, 'Date'));
+            if (!dStr) return;
+            const d = new Date(dStr);
+            if (isNaN(d)) return;
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(l);
+        });
+
+        const wrapUps = [];
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        
+        Object.keys(groups).sort((a,b) => b.localeCompare(a)).forEach(key => {
+            const logs = groups[key];
+            const [year, mStr] = key.split('-');
+            const monthName = monthNames[parseInt(mStr, 10) - 1];
+            
+            const volume = logs.length;
+            let peakScore = 0;
+            let peakGrade = '-';
+            let indoorCount = 0;
+            let outdoorCount = 0;
+            const partners = {};
+            const days = {};
+            const locs = {};
+
+            logs.forEach(l => {
+                const s = Number(getV(l, 'Score')) || 0;
+                const style = String(getV(l, 'Style') || "").toLowerCase();
+                if (s > peakScore && !['worked', 'toprope', 'autobelay'].includes(style)) {
+                    peakScore = s;
+                    peakGrade = getBaseGrade(getV(l, 'Grade'));
+                }
+                
+                const type = String(getV(l, 'Type') || "");
+                if (type.includes('Indoor')) indoorCount++;
+                if (type.includes('Outdoor')) outdoorCount++;
+                
+                const p = String(getV(l, 'Partner') || "").trim();
+                if (p) {
+                    p.split(',').forEach(n => {
+                        const cleanN = n.trim();
+                        if (cleanN) partners[cleanN] = (partners[cleanN] || 0) + 1;
+                    });
+                }
+                
+                const dDate = new Date(getCleanDate(getV(l, 'Date')));
+                if (!isNaN(dDate)) {
+                    const dName = AppConfig.days[dDate.getDay()];
+                    days[dName] = (days[dName] || 0) + 1;
+                }
+                
+                let loc = String(getV(l, 'Name') || "");
+                if (loc.includes('@')) loc = loc.split('@')[1].trim();
+                else loc = type.includes('Indoor') ? "The Gym" : loc;
+                if (loc) locs[loc] = (locs[loc] || 0) + 1;
+            });
+            
+            const totalInOut = indoorCount + outdoorCount || 1;
+            const indoorPct = Math.round((indoorCount / totalInOut) * 100);
+            const outdoorPct = 100 - indoorPct;
+            
+            const topLoc = Object.keys(locs).sort((a,b) => locs[b] - locs[a])[0] || '-';
+            const topPartner = Object.keys(partners).sort((a,b) => partners[b] - partners[a])[0] || 'Solo / Auto-belay';
+            
+            const attr = calcRPG(logs);
+            const archMap = { 'Power': 'The Caveman', 'Endurance': 'The Juggernaut', 'Technique': 'The Technician', 'Fingers': 'The Scalpel', 'Headspace': 'The Assassin', 'Tenacity': 'The Pitbull' };
+            const topAttrs = Object.keys(attr).filter(k => attr[k] === 100);
+            const archetype = topAttrs.length > 1 ? 'The All-Rounder' : (archMap[topAttrs[0]] || 'The All-Rounder');
+            
+            const favDay = Object.keys(days).sort((a,b) => days[b] - days[a])[0] || '-';
+
+            wrapUps.push({ key, monthName, year, volume, peakGrade, indoorPct, outdoorPct, topLoc, topPartner, archetype, favDay });
+        });
+        
+        Dashboard.wrapUpData = wrapUps;
+
+        if(!document.getElementById('wrapup-styles')) {
+            const style = document.createElement('style');
+            style.id = 'wrapup-styles';
+            style.innerHTML = `
+                .wu-teaser { background: linear-gradient(135deg, #10b981 0%, #047857 100%); color: #000; border-radius: 12px; padding: 16px; margin-top: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: 800; box-shadow: 0 10px 25px rgba(16,185,129,0.2); }
+                .wu-teaser-title { font-size: 1.1rem; }
+                .wu-teaser-btn { background: #000; color: #10b981; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+                
+                .wu-vault-wrapper { margin-top: 40px; margin-bottom: 30px; }
+                .wu-vault-header { font-size: 0.9rem; font-weight: 800; color: #737373; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+                .wu-vault-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: none; }
+                .wu-vault-row::-webkit-scrollbar { display: none; }
+                .wu-vault-card { flex: 0 0 auto; width: 120px; background: #1a1a1a; border: 1px solid #262626; border-radius: 12px; padding: 16px; cursor: pointer; text-align: center; transition: 0.2s; }
+                .wu-vault-card.latest { border-color: #10b981; background: rgba(16,185,129,0.05); }
+                .wu-vault-card:active { transform: scale(0.95); }
+                .wu-vault-month { font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 4px; }
+                .wu-vault-year { font-size: 0.8rem; font-weight: 600; color: #a3a3a3; }
+                
+                .wu-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #0a0a0a; z-index: 9999; display: none; flex-direction: column; }
+                .wu-overlay.active { display: flex; }
+                .wu-progress-row { display: flex; gap: 4px; padding: 16px; padding-top: 48px; }
+                .wu-progress-bar { flex: 1; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; }
+                .wu-progress-fill { height: 100%; width: 0%; background: #fff; transition: width 0.3s; }
+                .wu-progress-bar.done .wu-progress-fill { width: 100%; }
+                .wu-progress-bar.active .wu-progress-fill { width: 100%; transition: width 4.5s linear; }
+                
+                .wu-content { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 32px; text-align: center; position: relative; }
+                .wu-close { position: absolute; top: 24px; right: 24px; color: #fff; font-size: 24px; font-weight: bold; background: none; border: none; z-index: 10; opacity: 0.5; cursor: pointer; }
+                .wu-close:active { opacity: 1; }
+                
+                .wu-tap-left, .wu-tap-right { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 5; }
+                .wu-tap-left { left: 0; }
+                .wu-tap-right { right: 0; }
+                
+                .wu-super-text { font-size: 5rem; font-weight: 900; background: linear-gradient(135deg, #10b981, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 16px; line-height: 1; }
+                .wu-main-text { font-size: 1.5rem; font-weight: 700; color: #fff; margin-bottom: 12px; }
+                .wu-sub-text { font-size: 1.1rem; font-weight: 500; color: #a3a3a3; line-height: 1.5; }
+            `;
+            document.head.appendChild(style);
+        }
+
+        if(!document.getElementById('wu-overlay')) {
+            const overlay = document.createElement('div');
+            overlay.id = 'wu-overlay';
+            overlay.className = 'wu-overlay';
+            overlay.innerHTML = `
+                <div class="wu-progress-row" id="wu-progress-row"></div>
+                <button class="wu-close" onclick="Dashboard.closeWrapUp()">×</button>
+                <div class="wu-tap-left" onclick="Dashboard.prevWrapUpCard()"></div>
+                <div class="wu-tap-right" onclick="Dashboard.nextWrapUpCard()"></div>
+                <div class="wu-content" id="wu-content"></div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        const statsGrid = document.getElementById('standard-stats-grid');
+        let teaserContainer = document.getElementById('wu-teaser-container');
+        if(!teaserContainer && statsGrid) {
+            teaserContainer = document.createElement('div');
+            teaserContainer.id = 'wu-teaser-container';
+            statsGrid.parentElement.insertBefore(teaserContainer, statsGrid);
+        }
+
+        const logSearchEl = document.getElementById('logSearch');
+        let vaultContainer = document.getElementById('wu-vault-container');
+        if(!vaultContainer && logSearchEl) {
+            vaultContainer = document.createElement('div');
+            vaultContainer.id = 'wu-vault-container';
+            logSearchEl.parentElement.parentElement.insertBefore(vaultContainer, logSearchEl.parentElement);
+        }
+
+        if(Dashboard.wrapUpData.length > 0) {
+            const latest = Dashboard.wrapUpData[0];
+            const dismissedKey = `crag_wrapup_dismissed_${latest.key}`;
+            
+            if(teaserContainer) {
+                if(!localStorage.getItem(dismissedKey)) {
+                    teaserContainer.innerHTML = `
+                        <div class="wu-teaser" onclick="Dashboard.openWrapUp(0, true)">
+                            <div class="wu-teaser-title">${latest.monthName} '${latest.year.slice(-2)} Wrap-Up is here.</div>
+                            <div class="wu-teaser-btn">View</div>
+                        </div>
+                    `;
+                } else {
+                    teaserContainer.innerHTML = '';
+                }
+            }
+            
+            if(vaultContainer) {
+                vaultContainer.innerHTML = `
+                    <div class="wu-vault-wrapper">
+                        <div class="wu-vault-header">
+                            <span style="display:inline-block; width:12px; height:12px; background:#10b981; border-radius:3px;"></span> 
+                            Monthly Recaps
+                        </div>
+                        <div class="wu-vault-row">
+                            ${Dashboard.wrapUpData.map((w, i) => `
+                                <div class="wu-vault-card ${i === 0 ? 'latest' : ''}" onclick="Dashboard.openWrapUp(${i}, false)">
+                                    <div class="wu-vault-month">${w.monthName.substring(0,3)}</div>
+                                    <div class="wu-vault-year">${w.year}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    },
+
+    openWrapUp: function(dataIdx, isFromTeaser) {
+        Dashboard.haptic();
+        Dashboard.activeWrapUpIdx = dataIdx;
+        Dashboard.activeCardIdx = 0;
+        
+        const data = Dashboard.wrapUpData[dataIdx];
+        if(isFromTeaser) {
+            localStorage.setItem(`crag_wrapup_dismissed_${data.key}`, 'true');
+            const teaser = document.getElementById('wu-teaser-container');
+            if(teaser) teaser.innerHTML = '';
+        }
+        
+        document.getElementById('wu-overlay').classList.add('active');
+        Dashboard.renderWrapUpCard();
+    },
+
+    closeWrapUp: function() {
+        Dashboard.haptic();
+        document.getElementById('wu-overlay').classList.remove('active');
+        clearTimeout(Dashboard.wrapUpTimer);
+    },
+
+    nextWrapUpCard: function() {
+        Dashboard.haptic();
+        if(Dashboard.activeCardIdx < 4) {
+            Dashboard.activeCardIdx++;
+            Dashboard.renderWrapUpCard();
+        } else {
+            Dashboard.closeWrapUp();
+        }
+    },
+
+    prevWrapUpCard: function() {
+        Dashboard.haptic();
+        if(Dashboard.activeCardIdx > 0) {
+            Dashboard.activeCardIdx--;
+            Dashboard.renderWrapUpCard();
+        }
+    },
+
+    renderWrapUpCard: function() {
+        clearTimeout(Dashboard.wrapUpTimer);
+        const data = Dashboard.wrapUpData[Dashboard.activeWrapUpIdx];
+        const pRow = document.getElementById('wu-progress-row');
+        const content = document.getElementById('wu-content');
+        
+        pRow.innerHTML = Array(5).fill(0).map((_, i) => `
+            <div class="wu-progress-bar ${i < Dashboard.activeCardIdx ? 'done' : (i === Dashboard.activeCardIdx ? 'active' : '')}">
+                <div class="wu-progress-fill"></div>
+            </div>
+        `).join('');
+
+        let html = '';
+        if(Dashboard.activeCardIdx === 0) {
+            html = `<div class="wu-super-text">${data.volume}</div>
+                    <div class="wu-main-text">Climbs Logged</div>
+                    <div class="wu-sub-text">You tied in and threw yourself at the wall ${data.volume} times in ${data.monthName}.</div>`;
+        } else if(Dashboard.activeCardIdx === 1) {
+            html = `<div class="wu-super-text" style="background: linear-gradient(135deg, #ef4444, #fb923c); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${data.peakGrade}</div>
+                    <div class="wu-main-text">Peak Grade</div>
+                    <div class="wu-sub-text">The absolute hardest crux you pulled this month.</div>`;
+        } else if(Dashboard.activeCardIdx === 2) {
+            html = `<div class="wu-super-text" style="background: linear-gradient(135deg, #a855f7, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${data.indoorPct}%</div>
+                    <div class="wu-main-text">Indoor Rat</div>
+                    <div class="wu-sub-text">You spent ${data.indoorPct}% of your time inside and ${data.outdoorPct}% touching real rock.<br><br>Top spot: <b style="color:#fff;">${data.topLoc}</b></div>`;
+        } else if(Dashboard.activeCardIdx === 3) {
+            html = `<div class="wu-super-text" style="font-size:3.5rem; background: linear-gradient(135deg, #eab308, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${data.topPartner}</div>
+                    <div class="wu-main-text">MVP Belayer</div>
+                    <div class="wu-sub-text">The person who caught your falls and fed you slack the most this month.</div>`;
+        } else if(Dashboard.activeCardIdx === 4) {
+            html = `<div class="wu-super-text" style="font-size:3.5rem; background: linear-gradient(135deg, #10b981, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${data.archetype}</div>
+                    <div class="wu-main-text">Your Identity</div>
+                    <div class="wu-sub-text">Your primary climbing style in ${data.monthName}.<br><br>Favorite day: <b style="color:#fff;">${data.favDay}</b></div>`;
+        }
+
+        content.innerHTML = html;
+        
+        Dashboard.wrapUpTimer = setTimeout(() => {
+            Dashboard.nextWrapUpCard();
+        }, 5000);
+    },
+
     renderLogbook: () => {
         const tbody = document.getElementById('masterLogbookBody');
         const logCount = document.getElementById('logCount');
@@ -666,8 +688,6 @@ window.charts = { radar: null, pyr: null };
 document.addEventListener('DOMContentLoaded', () => {
     if (window.Chart) { Chart.defaults.color = '#a3a3a3'; Chart.defaults.borderColor = 'rgba(255,255,255,0.05)'; Chart.defaults.font.family = "'Inter', sans-serif"; }
 
-    StoryManager.initUI(); // Inject Wrap-Up UX Elements dynamically
-
     let allLogs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
     if (allLogs.length === 0) {
         allLogs = JSON.parse(localStorage.getItem('climbingLogs') || localStorage.getItem('climbLogs') || '[]');
@@ -682,7 +702,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let activeDisc = 'All';
     let activeTime = '90'; 
-    
+
     const logSearchInput = document.getElementById('logSearch');
     if (logSearchInput) {
         logSearchInput.addEventListener('input', () => {
@@ -736,57 +756,9 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFilters('disc-filter', 'disc', 'filter-pill');
     attachFilters('time-filter', 'time', 'time-tab');
 
-    const calcRPG = (logs) => {
-        let attr = { Power: 0, Endurance: 0, Technique: 0, Fingers: 0, Headspace: 0, Tenacity: 0 };
-        if (logs.length === 0) return { Power: 40, Endurance: 40, Technique: 40, Fingers: 40, Headspace: 40, Tenacity: 40 };
-
-        logs.forEach(l => {
-            const angle = String(getV(l, 'Angle') || "");
-            const styleTag = String(getV(l, 'ClimStyles') || "").toLowerCase();
-            const holds = String(getV(l, 'Holds') || "");
-            const effort = String(getV(l, 'Effort') || "");
-            const styleResult = String(getV(l, 'Style') || "").toLowerCase();
-            const burns = Number(getV(l, 'Burns')) || 1;
-            const type = String(getV(l, 'Type') || "");
-            const isOutdoor = type.toLowerCase().includes('outdoor');
-            const score = Number(getV(l, 'Score')) || 0;
-
-            if (angle.includes('Overhang') || angle.includes('Roof') || angle.includes('Pillar') || angle.includes('Shield')) attr.Power += 2;
-            if (styleTag.includes('cruxy') || styleTag.includes('athletic')) attr.Power += 2;
-            if (type.includes('Bouldering')) attr.Power += 1;
-
-            if (type.includes('Rope') || type.includes('Multipitch') || type.includes('Trad') || type.includes('Ice')) attr.Endurance += 1;
-            if (styleTag.includes('endurance') || styleTag.includes('volume')) attr.Endurance += 3;
-            if ((styleResult === 'toprope' || styleResult === 'autobelay') && (styleTag.includes('endurance') || styleTag.includes('volume'))) attr.Endurance += 3;
-
-            if (angle.includes('Slab') || angle.includes('Vertical') || angle.includes('Mixed')) attr.Technique += 2;
-            if (holds.includes('Slopers') || holds.includes('Pinches') || holds.includes('Volumes') || holds.includes('Brittle') || holds.includes('Chandeliers')) attr.Technique += 2;
-            if (styleResult === 'onsight') attr.Technique += 2;
-
-            if (holds.includes('Crimps') || holds.includes('Pockets') || holds.includes('Cracks')) {
-                attr.Fingers += 2;
-                if (angle.includes('Overhang') || angle.includes('Roof')) attr.Fingers += 2; 
-                if (isOutdoor) attr.Fingers += 1; 
-                if (score > 600) attr.Fingers += 1; 
-            }
-
-            if (styleResult === 'flash' || styleResult === 'onsight' || styleResult === 'allfree') attr.Headspace += 3;
-            if (effort.includes('Limit')) attr.Headspace += 2;
-            if (type.includes('Multipitch') || type.includes('Trad') || type.includes('Ice')) attr.Headspace += 3; 
-
-            if (styleResult === 'project' || styleResult === 'worked') attr.Tenacity += 3;
-            if (burns >= 3) attr.Tenacity += 1;
-            if (burns >= 5) attr.Tenacity += 2;
-        });
-        
-        const maxVal = Math.max(...Object.values(attr), 1);
-        Object.keys(attr).forEach(k => attr[k] = 40 + Math.round((attr[k] / maxVal) * 60));
-        return attr;
-    };
-
     function renderDashboard() {
         Dashboard.setupInsights();
-        StoryManager.processLogs(allLogs); // Crunch wrap-up data
+        Dashboard.initWrapUp(allLogs);
         
         const now = new Date();
         const isMultiMode = activeDisc === 'Outdoor Multipitch';
@@ -807,14 +779,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return diffDays <= parseInt(activeTime);
         });
 
-        // TOGGLE BIG WALL MODE DOM ELEMENTS
         document.querySelectorAll('.standard-card').forEach(el => el.style.display = isMultiMode ? 'none' : 'block');
         document.getElementById('standard-stats-grid').style.display = isMultiMode ? 'none' : 'grid';
         document.getElementById('multi-stats-wrapper').style.display = isMultiMode ? 'block' : 'none';
         document.getElementById('multipitch-topo-card').style.display = isMultiMode ? 'block' : 'none';
         document.getElementById('limit-log-card').style.display = isMultiMode ? 'none' : 'block';
 
-        // --- MULTIPITCH BIG WALL STATS & TOPO ---
         if (isMultiMode) {
             document.getElementById('stat-multi-routes').innerText = currentFilteredLogs.length;
             
@@ -866,10 +836,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // --- STANDARD MODE LOGIC ---
         if (!isMultiMode) {
             
-            // HYBRID TRIMP ACWR READINESS ENGINE 
             const today = new Date();
             today.setHours(0,0,0,0);
             let rawAcute = 0; 
@@ -1007,7 +975,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (elMarker) elMarker.style.left = `${markerPercent}%`;
             }
 
-            // STANDARD STATS
             const elStatSends = document.getElementById('stat-sends');
             if (elStatSends) elStatSends.innerText = currentFilteredLogs.length;
             
@@ -1066,7 +1033,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const elIdArch = document.getElementById('id-arch');
             if (elIdArch) elIdArch.innerText = archetype;
 
-            // RENDER CHARTS
             Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
             
             const gradesForPyramid = {};
@@ -1110,9 +1076,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } }, tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } } }, scales: { r: { min: 0, max: 100, ticks: { display: false, stepSize: 20 }, grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } } } } 
                 });
             }
-        } // End !isMultiMode
+        } 
 
-        // --- UNIVERSAL METRICS (Apply to both modes) ---
         const partnerCounts = {};
         currentFilteredLogs.forEach(l => {
             const partnerStr = getV(l, 'Partner');
@@ -1145,7 +1110,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        const steepnessPeaks = { 'Slab': null, 'Vertical': null, 'Overhang': null, 'Roof': null, 'Pillar': null, 'Curtain': null, 'Shield': null, 'Cauliflower': null };
+        const steepnessPeaks = {};
+        const featuresToRender = (activeDisc === 'Outdoor Ice Climbing') ? AppConfig.iceFeatures : AppConfig.steepness;
+        featuresToRender.forEach(st => steepnessPeaks[st] = null);
+        
         const locSessions = {};
         const locs = {};
 
@@ -1157,18 +1125,11 @@ document.addEventListener('DOMContentLoaded', () => {
             let nameStr = String(getV(l, 'Name') || "");
             const sessionID = String(getV(l, 'SessionID') || "");
 
-            AppConfig.steepness.forEach(st => {
+            featuresToRender.forEach(st => {
                 if (angleStr.includes(st) && isSend) {
                     if (!steepnessPeaks[st] || s > Number(getV(steepnessPeaks[st], 'Score'))) steepnessPeaks[st] = l;
                 }
             });
-            if (AppConfig.iceFeatures) {
-                AppConfig.iceFeatures.forEach(st => {
-                    if (angleStr.includes(st) && isSend) {
-                        if (!steepnessPeaks[st] || s > Number(getV(steepnessPeaks[st], 'Score'))) steepnessPeaks[st] = l;
-                    }
-                });
-            }
 
             if(nameStr) {
                 if(nameStr.includes('@')) nameStr = nameStr.split('@')[1].trim(); 
@@ -1198,7 +1159,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join(''));
 
         let steepHTML = '';
-        const featuresToRender = (activeDisc === 'Outdoor Ice Climbing') ? AppConfig.iceFeatures : AppConfig.steepness;
         featuresToRender.forEach(st => {
             const peakLog = steepnessPeaks[st];
             if(peakLog) steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="background: rgba(59,130,246,0.15); color:#3b82f6;">${getBaseGrade(getV(peakLog, 'Grade'))}</div></div>`;
