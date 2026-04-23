@@ -802,8 +802,17 @@ const App = {
         
         if (conf && conf.labels) {
             safeHTML('gradePicker', conf.labels.map((g, i) => {
-                const dot = (conf.colors && conf.colors[i]) ? `<span class="boulder-dot" style="background:${conf.colors[i]};"></span>` : '';
-                return `<div class="pill ${String(g) === String(State.activeGrade.text) ? 'active' : ''}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
+                const isActive = String(g) === String(State.activeGrade.text);
+                const color = (conf.colors && conf.colors[i]) ? conf.colors[i] : null;
+                
+                // If it is the active pill and it is a custom colored Boulder grade, we paint it inline
+                let activeStyle = '';
+                if (isActive && color && dStr === 'Indoor Bouldering') {
+                    activeStyle = `background: ${color}20; color: ${color}; border-color: ${color}; box-shadow: 0 0 12px ${color}40;`;
+                }
+
+                const dot = (color && !isActive) ? `<span class="boulder-dot" style="background:${color};"></span>` : '';
+                return `<div class="pill ${isActive ? 'active custom-color-active' : ''}" style="${activeStyle}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${dot}${g}</div>`;
             }).join(''));
         }
 
@@ -865,7 +874,29 @@ const App = {
         syncSingle('#typeSelector', State.discipline);
         syncSingle('#dashSelector', State.discipline);
         syncSingle('#gymPicker', State.activeGym);
-        syncSingle('#gradePicker', State.activeGrade.text);
+        
+        const gConf = getScaleConfig(State.discipline);
+        document.querySelectorAll('#gradePicker .pill').forEach(p => {
+            const val = p.getAttribute('data-val');
+            const isActive = val === String(State.activeGrade.text);
+            p.classList.toggle('active', isActive);
+            
+            const gIdx = gConf.labels ? gConf.labels.indexOf(val) : -1;
+            const c = (gIdx > -1 && gConf.colors && gConf.colors[gIdx]) ? gConf.colors[gIdx] : null;
+            
+            if (isActive && c && State.discipline === 'Indoor Bouldering') {
+                p.style.backgroundColor = `${c}20`; 
+                p.style.borderColor = c;
+                p.style.color = c;
+                p.style.boxShadow = `0 0 12px ${c}40`;
+            } else {
+                p.style.backgroundColor = '';
+                p.style.borderColor = '';
+                p.style.color = '';
+                p.style.boxShadow = '';
+            }
+        });
+
         syncSingle('#styleSelector', State.activeStyle);
         syncSingle('#gearStyleSelector', State.activeGearStyle);
         syncSingle('#packWeightSelector', State.activePackWeight);
@@ -1029,6 +1060,16 @@ const App = {
                 else if (type === 'Outdoor Trad Climbing') dotColor = '#d97706';
                 else if (type === 'Outdoor Ice Climbing') dotColor = '#0ea5e9';
 
+                let textGradeColor = dotColor;
+                if (type === 'Indoor Bouldering') {
+                    const bConf = AppConfig.grades.bouldsIn;
+                    const bIdx = bConf.labels.indexOf(cleanGrade);
+                    if (bIdx > -1 && bConf.colors[bIdx]) {
+                        textGradeColor = bConf.colors[bIdx];
+                    }
+                }
+                const gradeStyle = `font-weight:900; color:${textGradeColor}; text-shadow: 0 0 8px ${textGradeColor}40;`;
+
                 const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
                 const cleanName = escapeHTML(l.Name ? l.Name.split('@')[0].trim() : "Unknown");
                 const cleanNotes = escapeHTML(l.Notes);
@@ -1037,7 +1078,7 @@ const App = {
                 <tr class="table-row" id="journal-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'journal')">
                     <td class="col-date" style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate || l.Date)}</td>
                     <td class="col-route" style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
-                    <td class="col-grade" style="font-weight:800; color:${dotColor};">${cleanGrade}</td>
+                    <td class="col-grade" style="${gradeStyle}">${cleanGrade}</td>
                 </tr>
                 <tr class="details-row" id="journal-details-${l.ClimbID}">
                     <td colspan="3" style="padding:0;">
@@ -1455,6 +1496,16 @@ const App = {
             else if (type === 'Outdoor Trad Climbing') dotColor = '#d97706';
             else if (type === 'Outdoor Ice Climbing') dotColor = '#0ea5e9';
 
+            let textGradeColor = dotColor;
+            if (type === 'Indoor Bouldering') {
+                const bConf = AppConfig.grades.bouldsIn;
+                const bIdx = bConf.labels.indexOf(cleanGrade);
+                if (bIdx > -1 && bConf.colors[bIdx]) {
+                    textGradeColor = bConf.colors[bIdx];
+                }
+            }
+            const gradeStyle = `font-weight:900; color:${textGradeColor}; text-shadow: 0 0 8px ${textGradeColor}40;`;
+
             const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
             const cleanName = escapeHTML(l.Name ? l.Name.split('@')[0].trim() : "Unknown");
             const cleanNotes = escapeHTML(l.Notes);
@@ -1463,7 +1514,7 @@ const App = {
             <tr class="table-row" id="dash-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'dash')">
                 <td class="col-date" style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate)}</td>
                 <td class="col-route" style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
-                <td class="col-grade" style="font-weight:800; color:${dotColor};">${cleanGrade}</td>
+                <td class="col-grade" style="${gradeStyle}">${cleanGrade}</td>
             </tr>
             <tr class="details-row" id="dash-details-${l.ClimbID}">
                 <td colspan="3" style="padding:0;">
