@@ -70,7 +70,7 @@ const getScaleConfig = (disc) => {
     if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
     if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
     if (disc === 'Outdoor Ice Climbing') return AppConfig.grades.ice;
-    if (disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Multipitch' || disc === 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut;
+    if (disc === 'Outdoor Rope Climbing' || 'Outdoor Multipitch' || 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut;
     return AppConfig.grades.ropesIn;
 };
 
@@ -889,14 +889,14 @@ const App = {
                     p.style.borderColor = c;
                     p.style.color = '#ffffff'; 
                     p.style.boxShadow = `0 0 12px ${c}40`;
-                    p.style.transform = 'scale(1.05)';
+                    p.style.transform = ''; 
                     p.style.fontWeight = '800';
                 } else {
                     p.style.backgroundColor = ''; 
-                    p.style.borderColor = 'transparent';
+                    p.style.borderColor = ''; 
                     p.style.color = '#a3a3a3'; 
                     p.style.boxShadow = 'none';
-                    p.style.transform = 'scale(1)';
+                    p.style.transform = '';
                     p.style.fontWeight = '';
                 }
             } else {
