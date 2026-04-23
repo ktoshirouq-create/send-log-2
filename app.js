@@ -803,18 +803,7 @@ const App = {
         if (conf && conf.labels) {
             safeHTML('gradePicker', conf.labels.map((g, i) => {
                 const isActive = String(g) === String(State.activeGrade.text);
-                const color = (conf.colors && conf.colors[i]) ? conf.colors[i] : null;
-                
-                let activeStyle = '';
-                if (color && dStr === 'Indoor Bouldering') {
-                    if (isActive) {
-                        activeStyle = `background: ${color}20; color: ${color}; border-color: ${color}; box-shadow: 0 0 12px ${color}40;`;
-                    } else {
-                        activeStyle = `color: ${color}; border-color: ${color}60; background: ${color}05;`;
-                    }
-                }
-
-                return `<div class="pill ${isActive ? 'active' : ''}" style="${activeStyle}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};">${g}</div>`;
+                return `<div class="pill ${isActive ? 'active' : ''}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${conf.scores[i]}};" style="transition: all 0.2s ease;">${g}</div>`;
             }).join(''));
         }
 
@@ -887,22 +876,34 @@ const App = {
             const c = (gIdx > -1 && gConf.colors && gConf.colors[gIdx]) ? gConf.colors[gIdx] : null;
             
             if (c && State.discipline === 'Indoor Bouldering') {
+                const isLight = ['#ffffff', '#eab308', '#22c55e'].includes(c.toLowerCase());
+                const textColor = isLight ? '#121212' : '#ffffff';
+
+                p.style.backgroundColor = c;
+                p.style.color = textColor;
+                p.style.fontWeight = '800';
+                p.style.textShadow = 'none';
+
                 if (isActive) {
-                    p.style.backgroundColor = `${c}20`; 
-                    p.style.borderColor = c;
-                    p.style.color = c;
-                    p.style.boxShadow = `0 0 12px ${c}40`;
+                    p.style.borderColor = '#ffffff';
+                    p.style.boxShadow = `0 0 16px ${c}80, 0 0 0 2px #ffffff`;
+                    p.style.opacity = '1';
+                    p.style.transform = 'scale(1.05)';
                 } else {
-                    p.style.backgroundColor = `${c}05`; 
-                    p.style.borderColor = `${c}60`;
-                    p.style.color = c;
+                    p.style.borderColor = 'transparent';
                     p.style.boxShadow = 'none';
+                    p.style.opacity = '0.6';
+                    p.style.transform = 'scale(1)';
                 }
             } else {
                 p.style.backgroundColor = '';
                 p.style.borderColor = '';
                 p.style.color = '';
                 p.style.boxShadow = '';
+                p.style.opacity = '1';
+                p.style.transform = 'scale(1)';
+                p.style.fontWeight = '';
+                p.style.textShadow = '';
             }
         });
 
