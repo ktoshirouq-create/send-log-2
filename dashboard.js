@@ -60,12 +60,15 @@ const getScaleConfig = (disc) => {
 };
 
 const getChartScore = (l) => {
-    if (getV(l, 'Type') === 'Outdoor Multipitch') {
-        const sConf = AppConfig.grades.ropesOut || AppConfig.grades.ropes;
-        const idx = sConf.labels.indexOf(getBaseGrade(getV(l, 'Grade')));
+    const typeStr = String(getV(l, 'Type') || "");
+    const gradeStr = getBaseGrade(getV(l, 'Grade') || "");
+    const sConf = getScaleConfig(typeStr);
+    
+    if (sConf && sConf.labels) {
+        const idx = sConf.labels.indexOf(gradeStr);
         if (idx > -1) return sConf.scores[idx];
     }
-    return Number(getV(l, 'Score')) || 0;
+    return Number(getV(l, 'Score')) || 0; 
 };
 
 const calcRPG = (logs) => {
@@ -196,7 +199,6 @@ const Dashboard = {
         const padding = 50;
         const totalHeight = (pitches.length * pitchHeight) + padding * 2;
         
-        // CSS SVG SCALE FIX
         let svg = `<svg width="100%" height="auto" viewBox="0 0 ${width} ${totalHeight}" style="max-height: 500px; display: block; overflow: visible;" xmlns="http://www.w3.org/2000/svg">`;
         
         let currentX = width / 2;
@@ -341,9 +343,11 @@ const Dashboard = {
             const locs = {};
 
             logs.forEach(l => {
-                const s = Number(getV(l, 'Score')) || 0;
+                const s = getChartScore(l); 
                 const style = String(getV(l, 'Style') || "").toLowerCase();
-                if (s > peakScore && !['worked', 'toprope', 'autobelay'].includes(style)) {
+                const invalidStyles = ['worked', 'toprope', 'autobelay', 'project', 'bailed'];
+                
+                if (s > peakScore && !invalidStyles.includes(style)) {
                     peakScore = s;
                     peakGrade = getBaseGrade(getV(l, 'Grade'));
                 }
@@ -623,9 +627,18 @@ const Dashboard = {
             const cleanName = escapeHTML(name ? name.split('@')[0].trim() : "Unknown");
             const cleanNotes = escapeHTML(getV(l, 'Notes'));
             
+            const type = String(getV(l, 'Type') || "");
             const grade = String(getV(l, 'Grade') || "");
             
-            const type = String(getV(l, 'Type') || "");
+            let gradeDisplay = grade;
+            if (type === 'Indoor Bouldering') {
+                const conf = AppConfig.grades.bouldsIn;
+                const idx = conf.labels.indexOf(getBaseGrade(grade));
+                if (idx > -1 && conf.colors[idx]) {
+                    gradeDisplay = `<span style="color: ${conf.colors[idx]}; text-shadow: 0 0 8px ${conf.colors[idx]}40;">${grade}</span>`;
+                }
+            }
+            
             let dotColor = '#737373';
             if (type === 'Indoor Rope Climbing') dotColor = '#10b981';
             else if (type === 'Indoor Bouldering') dotColor = '#3b82f6';
@@ -646,7 +659,7 @@ const Dashboard = {
             <tr class="table-row" id="row-${id}" onclick="Dashboard.toggleRow('${id}')">
                 <td style="color:#a3a3a3; font-weight: 500;">${formatShortDate(getV(l, 'Date'))}</td>
                 <td style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
-                <td style="font-weight:700; color:#fff;">${grade}</td>
+                <td style="font-weight:700; color:#fff;">${gradeDisplay}</td>
                 <td class="col-style" style="color:#a3a3a3;">${AppConfig.styles[getV(l, 'Style')] || getV(l, 'Style')}</td>
                 <td class="align-right" style="color: #a3a3a3; font-weight: 600;">${getV(l, 'Burns') || 1}</td>
             </tr>
