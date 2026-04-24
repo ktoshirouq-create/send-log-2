@@ -1170,20 +1170,20 @@ const App = {
         App.renderDashboardCharts(); 
         App.renderDashboardLogs(); 
         
-        // Dashboard Header Injection
+        // Header Gamification Icon Inject
         const mainTitles = document.querySelectorAll('h1, h2, .header-title, .page-title');
         mainTitles.forEach(t => {
             if (t.innerText.trim().includes('Dashboard') && !t.querySelector('.dash-icon')) {
                 const originalText = t.innerText.trim();
-                t.innerHTML = `${originalText} <svg class="dash-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #10b981)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: top; margin-left: 6px;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`;
+                t.innerHTML = `${originalText} <svg class="dash-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #10b981)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom; margin-left: 8px;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`;
             }
         });
 
-        // Hide obsolete Readiness Engine UI elements
+        // Aggressive Readiness UI Purge - Kills DOM elements to repair grid
         ['ui-acwr-ratio', 'ui-readiness-pct', 'ui-acwr-callout', 'ui-acute-load', 'ui-chronic-load'].forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                const card = el.closest('.stat-card') || el.closest('.readiness-card') || el.parentElement;
+                const card = el.closest('.stat-card') || el.closest('.readiness-card') || el.parentElement.parentElement;
                 if(card) card.style.display = 'none';
             }
         });
