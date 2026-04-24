@@ -312,7 +312,6 @@ const Dashboard = {
         addIcon('CLIMBER PROFILE', 'profile');
     },
 
-    // --- SPOTIFY WRAPPED UX ENGINE ---
     initWrapUp: function(allLogsMaster) {
         const groups = {};
         allLogsMaster.forEach(l => {
@@ -772,6 +771,24 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderDashboard() {
         Dashboard.setupInsights();
         Dashboard.initWrapUp(allLogs);
+
+        // Header Gamification Icon Inject
+        const mainTitles = document.querySelectorAll('h1, h2, .header-title, .page-title');
+        mainTitles.forEach(t => {
+            if (t.innerText.trim().includes('Dashboard') && !t.querySelector('.dash-icon')) {
+                const originalText = t.innerText.trim();
+                t.innerHTML = `${originalText} <svg class="dash-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #10b981)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom; margin-left: 8px;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`;
+            }
+        });
+
+        // Readiness Purge: Force hide any remaining elements in DOM
+        ['ui-acwr-ratio', 'ui-readiness-pct', 'ui-acwr-callout', 'ui-acute-load', 'ui-chronic-load'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                const card = el.closest('.stat-card') || el.closest('.readiness-card') || el.parentElement;
+                if(card) card.style.display = 'none';
+            }
+        });
         
         const now = new Date();
         const isMultiMode = activeDisc === 'Outdoor Multipitch';
@@ -908,6 +925,24 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const elIdArch = document.getElementById('id-arch');
             if (elIdArch) elIdArch.innerText = archetype;
+
+            // --- GAMIFICATION DASHBOARD RIBBON ---
+            const levelUpSessionId = localStorage.getItem('crag_levelup_session');
+            let isLevelUpToday = false;
+            if (levelUpSessionId) {
+                const todayStr = getCleanDate(new Date());
+                if (levelUpSessionId.includes(todayStr)) isLevelUpToday = true;
+            }
+
+            const topStatsGrid = document.getElementById('standard-stats-grid');
+            if (topStatsGrid && isLevelUpToday && !document.getElementById('dash-gold-ribbon')) {
+                topStatsGrid.style.position = 'relative';
+                topStatsGrid.insertAdjacentHTML('beforeend', `
+                    <div id="dash-gold-ribbon" style="position: absolute; top: -15px; right: -15px; width: 80px; height: 80px; overflow: hidden; border-radius: 0 12px 0 0; z-index: 100; pointer-events: none;">
+                        <div style="position: absolute; top: 18px; right: -28px; width: 120px; background: linear-gradient(135deg, #f59e0b, #fbbf24, #fcd34d); color: #451a03; font-size: 10px; font-weight: 900; text-align: center; padding: 5px 0; transform: rotate(45deg); box-shadow: 0 2px 15px rgba(245,158,11,0.5); text-transform: uppercase; letter-spacing: 1px;">Level Up</div>
+                    </div>
+                `);
+            }
 
             Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
             
@@ -1047,4 +1082,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         Dashboard.renderLogbook();
     }
-};
+    
+    renderDashboard(); 
+});
