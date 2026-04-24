@@ -70,7 +70,7 @@ const getScaleConfig = (disc) => {
     if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
     if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
     if (disc === 'Outdoor Ice Climbing') return AppConfig.grades.ice;
-    if (disc === 'Outdoor Rope Climbing' || 'Outdoor Multipitch' || 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut;
+    if (disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Multipitch' || disc === 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut;
     return AppConfig.grades.ropesIn;
 };
 
@@ -122,7 +122,7 @@ const State = new Proxy({
     activeRPE: 'Solid', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
     activePitches: [{type: 'Lead', grade: initConf.labels[gIdx]}, {type: 'Lead', grade: initConf.labels[gIdx]}], 
     activeGearStyle: '', activePackWeight: '',
-    climbs: safeClimbs, sessions: safeSessions, journalLimit: 15
+    climbs: safeClimbs, sessions: safeSessions, journalLimit: 10
 }, {
     set(target, prop, value) {
         let oldVal = target[prop];
@@ -893,7 +893,7 @@ const App = {
                     p.style.fontWeight = '800';
                 } else {
                     p.style.backgroundColor = ''; 
-                    p.style.borderColor = ''; 
+                    p.style.borderColor = 'transparent';
                     p.style.color = '#a3a3a3'; 
                     p.style.boxShadow = 'none';
                     p.style.transform = '';
@@ -1019,6 +1019,13 @@ const App = {
         const climbsBySession = {};
         State.climbs.forEach(c => { if (!climbsBySession[c.SessionID]) climbsBySession[c.SessionID] = []; climbsBySession[c.SessionID].push(c); });
 
+        const levelUpSessionId = localStorage.getItem('crag_levelup_session');
+
+        let loadMoreBtn = '';
+        if (State.sessions.length > State.journalLimit) {
+            loadMoreBtn = `<button class="load-more-btn" onclick="App.haptic(); State.journalLimit += 10; App.renderJournal();" style="width: 100%; padding: 16px; margin-top: 16px; background: #1a1a1a; color: #fff; border: 1px solid #262626; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s;">Load More Sessions ▾</button>`;
+        }
+
         jList.innerHTML = visibleSessions.map(session => {
             const children = climbsBySession[session.SessionID] || [];
             children.sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID));
@@ -1121,9 +1128,18 @@ const App = {
             childrenHtml += `</tbody></table></div>`;
 
             const isIndoorGym = AppConfig.gyms.includes(session.Location);
+            
+            let ribbonHtml = '';
+            if (session.SessionID === levelUpSessionId) {
+                ribbonHtml = `
+                <div style="position: absolute; top: -5px; right: -5px; width: 60px; height: 60px; overflow: hidden; border-radius: 0 12px 0 0; z-index: 10;">
+                    <div style="position: absolute; top: 13px; right: -25px; width: 90px; background: linear-gradient(135deg, #f59e0b, #fbbf24, #fcd34d); color: #451a03; font-size: 8px; font-weight: 900; text-align: center; padding: 4px 0; transform: rotate(45deg); box-shadow: 0 2px 10px rgba(245,158,11,0.4); text-transform: uppercase; letter-spacing: 0.5px;">Level Up</div>
+                </div>`;
+            }
 
             return `
-            <div class="session-card">
+            <div class="session-card" style="position: relative;">
+                ${ribbonHtml}
                 <div class="session-header">
                     <div class="s-date-block"><div class="s-date-main">${dateInfo.main}</div><div class="s-date-sub">${dateInfo.sub}</div></div>
                     <div class="s-loc">@ ${session.Location}</div>
@@ -1147,145 +1163,30 @@ const App = {
                 <button class="session-accordion-btn" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">View ${children.length} Climbs ▾</button>
                 <div class="session-children">${childrenHtml}</div>
             </div>`;
-        }).join('');
+        }).join('') + loadMoreBtn;
     },
     
     renderDashboard: () => { 
         App.renderDashboardCharts(); 
         App.renderDashboardLogs(); 
         
-        // HYBRID TRIMP ACWR READINESS ENGINE
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        let rawAcute = 0; 
-        let rawChronic = 0; 
-
-        const dailyLoads = {};
-        State.climbs.forEach(l => {
-            const cDate = getCleanDate(l.Date);
-            if (!dailyLoads[cDate]) dailyLoads[cDate] = { climbs: [], session: null };
-            dailyLoads[cDate].climbs.push(l);
+        // Dashboard Header Injection
+        const mainTitles = document.querySelectorAll('h1, h2, .header-title, .page-title');
+        mainTitles.forEach(t => {
+            if (t.innerText.trim().includes('Dashboard') && !t.querySelector('.dash-icon')) {
+                const originalText = t.innerText.trim();
+                t.innerHTML = `${originalText} <svg class="dash-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #10b981)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: top; margin-left: 6px;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`;
+            }
         });
 
-        Object.keys(dailyLoads).forEach(dateStr => {
-            const dayData = dailyLoads[dateStr];
-            let dayRawVolume = 0;
-            let hasHeavyPack = false;
-            let fatigueVal = 5; 
-            let approachStr = '';
-
-            dayData.climbs.forEach(c => {
-                let sConf = getScaleConfig(c.Type);
-                let cleanG = getBaseGrade(c.Grade);
-                let gIdx = sConf.labels.indexOf(cleanG);
-                let baseScore = gIdx > -1 ? sConf.scores[gIdx] : 400;
-
-                if (c.Type === 'Outdoor Multipitch') baseScore = Number(c.Score) || baseScore;
-
-                let burns = Number(c.Burns) || 1;
-                if (['flash', 'onsight', 'toprope', 'autobelay', 'allfree'].includes(String(c.Style).toLowerCase())) burns = 1;
-
-                let hp = 1.0;
-                if (['worked', 'toprope', 'project', 'bailed'].includes(String(c.Style).toLowerCase()) && c.HighPoint) {
-                    hp = Number(c.HighPoint) / 100;
-                }
-
-                let volume = baseScore * burns * hp;
-
-                let discMult = 1.0;
-                if (c.Type === 'Indoor Bouldering') discMult = 1.2;
-                else if (c.Type === 'Outdoor Rope Climbing' || c.Type.includes('Trad') || c.Type.includes('Ice') || c.Type.includes('Multipitch')) discMult = 1.1;
-                else if (c.Type === 'Indoor Rope Climbing') discMult = 0.9;
-
-                let steepMult = 1.0;
-                if (c.Angle && (c.Angle.includes('Overhang') || c.Angle.includes('Roof'))) steepMult = 1.2;
-
-                dayRawVolume += (volume * discMult * steepMult);
-                if (c.PackWeight === 'Heavy') hasHeavyPack = true;
-
-                const session = State.sessions.find(s => s.SessionID === c.SessionID);
-                if (session) {
-                    if (session.Fatigue) fatigueVal = Number(session.Fatigue);
-                    if (session.Approach) approachStr = String(session.Approach).toLowerCase();
-                }
-            });
-
-            let fatMult = 1.0;
-            if (fatigueVal <= 2) fatMult = 0.5;
-            else if (fatigueVal <= 4) fatMult = 0.8;
-            else if (fatigueVal <= 6) fatMult = 1.0;
-            else if (fatigueVal <= 8) fatMult = 1.3;
-            else if (fatigueVal >= 9) fatMult = 1.8;
-
-            let legTax = 1.0;
-            if (approachStr.includes('alpine') || hasHeavyPack) legTax = 1.2;
-
-            let finalDailyLoad = dayRawVolume * fatMult * legTax;
-            finalDailyLoad = Math.min(finalDailyLoad, 7500); 
-
-            const cDate = new Date(dateStr);
-            cDate.setHours(0,0,0,0);
-            const diffTime = Math.abs(today - cDate);
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-            if (diffDays < 7) {
-                const weight = (7 - diffDays) / 7; 
-                rawAcute += (finalDailyLoad * weight);
+        // Hide obsolete Readiness Engine UI elements
+        ['ui-acwr-ratio', 'ui-readiness-pct', 'ui-acwr-callout', 'ui-acute-load', 'ui-chronic-load'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                const card = el.closest('.stat-card') || el.closest('.readiness-card') || el.parentElement;
+                if(card) card.style.display = 'none';
             }
-            if (diffDays < 28) rawChronic += finalDailyLoad;
         });
-
-        rawAcute = rawAcute * 1.75;
-        const acuteLoad = rawAcute / 100;
-        const chronicLoad = (rawChronic / 100) / 4; 
-        const acwr = chronicLoad > 0 ? (acuteLoad / chronicLoad) : 0;
-
-        const elRatio = document.getElementById('ui-acwr-ratio');
-        const elReadiness = document.getElementById('ui-readiness-pct');
-        const elCallout = document.getElementById('ui-acwr-callout');
-        const elMarker = document.getElementById('ui-acwr-marker');
-        const elDate = document.getElementById('ui-current-date');
-
-        if(elRatio && elCallout && elReadiness) {
-            document.getElementById('ui-acute-load').innerText = `${acuteLoad.toFixed(1)} Load`;
-            document.getElementById('ui-chronic-load').innerText = `${chronicLoad.toFixed(1)} Load/wk`;
-            elRatio.innerText = acwr.toFixed(2) + 'x';
-            
-            if (elDate) {
-                const dateOpts = { weekday: 'short', month: 'short', day: 'numeric' };
-                elDate.innerText = today.toLocaleDateString('en-US', dateOpts).toUpperCase();
-            }
-
-            let color = '#a3a3a3';
-            let message = 'Log more climbs to establish baseline.';
-            let markerPercent = 0;
-            let readinessPct = 100;
-
-            if (chronicLoad > 0) {
-                markerPercent = Math.min((acwr / 2.0) * 100, 100);
-                
-                if (acwr <= 0.8) readinessPct = 100;
-                else if (acwr > 0.8 && acwr <= 1.5) readinessPct = Math.round(100 - ((acwr - 0.8) / 0.7) * 60);
-                else readinessPct = 35;
-
-                elReadiness.innerText = readinessPct + '%';
-
-                if (acwr < 0.8) { color = '#3b82f6'; message = 'Undertraining detected. Increase training stimulus to build baseline capacity.'; }
-                else if (acwr < 1.3) { color = '#10b981'; message = 'Optimal training load. You are primed to perform and recovering well.'; }
-                else if (acwr < 1.5) { color = '#eab308'; message = 'High fatigue. You are overreaching. Proceed with caution and prioritize sleep.'; }
-                else { color = '#ef4444'; message = 'Danger zone. Significant injury risk. Mandatory rest recommended.'; }
-            } else {
-                elReadiness.innerText = '0%';
-            }
-
-            elRatio.style.color = color;
-            elReadiness.style.color = color;
-            elCallout.innerText = message;
-            elCallout.style.background = `${color}15`; 
-            elCallout.style.borderLeft = `4px solid ${color}`;
-            elCallout.style.color = color;
-            if (elMarker) elMarker.style.left = `${markerPercent}%`;
-        }
     },
 
     renderDashboardCharts: () => {
@@ -1442,6 +1343,33 @@ const App = {
             const curIdx = conf.scores.indexOf(conf.scores.slice().reverse().find(s => s <= avgS) || conf.scores[0]);
             const nextIdx = Math.min(curIdx + 1, conf.scores.length - 1);
             const pct = Math.min(100, Math.max(0, ((avgS - conf.scores[curIdx]) / (conf.scores[nextIdx] - conf.scores[curIdx])) * 100)) || 0;
+
+            // --- GAMIFICATION: LEVEL UP ENGINE ---
+            const storedMaxIdx = parseInt(localStorage.getItem(`crag_max_idx_${dStr}`) || '-1');
+            if (curIdx > storedMaxIdx) {
+                localStorage.setItem(`crag_max_idx_${dStr}`, curIdx);
+                const latestLog = displayLogs.sort((a,b) => new Date(b.cleanDate) - new Date(a.cleanDate))[0];
+                if (latestLog) {
+                    localStorage.setItem('crag_levelup_session', latestLog.SessionID);
+                }
+            }
+
+            const levelUpSessionId = localStorage.getItem('crag_levelup_session');
+            let isLevelUpToday = false;
+            if (levelUpSessionId) {
+                const todayStr = getLocalISO();
+                if (levelUpSessionId.includes(todayStr)) isLevelUpToday = true;
+            }
+
+            const topStatsGrid = document.getElementById('standard-stats-grid') || document.querySelector('.dashboard-grid');
+            if (topStatsGrid && isLevelUpToday && !document.getElementById('dash-gold-ribbon')) {
+                topStatsGrid.style.position = 'relative';
+                topStatsGrid.insertAdjacentHTML('beforeend', `
+                    <div id="dash-gold-ribbon" style="position: absolute; top: -15px; right: -15px; width: 80px; height: 80px; overflow: hidden; border-radius: 0 12px 0 0; z-index: 100; pointer-events: none;">
+                        <div style="position: absolute; top: 18px; right: -28px; width: 120px; background: linear-gradient(135deg, #f59e0b, #fbbf24, #fcd34d); color: #451a03; font-size: 10px; font-weight: 900; text-align: center; padding: 5px 0; transform: rotate(45deg); box-shadow: 0 2px 15px rgba(245,158,11,0.5); text-transform: uppercase; letter-spacing: 1px;">Level Up</div>
+                    </div>
+                `);
+            }
             
             let colorBase = 'var(--primary)';
             let colorNext = 'var(--primary)';
