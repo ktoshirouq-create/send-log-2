@@ -307,7 +307,7 @@ const Dashboard = {
                 }
             }
         };
-        addIcon('CLIMBER PROFILE', 'profile');
+        addIcon('Climber Profile', 'profile');
     },
 
     initWrapUp: function(allLogsMaster) {
