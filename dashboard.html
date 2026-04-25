@@ -10,7 +10,7 @@
         /* Premium Typography & Deep Backgrounds */
         body { background-color: #050505; color: #e5e5e5; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 20px; -webkit-font-smoothing: antialiased; }
         
-        .header-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a1a1a; padding-bottom: 15px; margin-bottom: 15px; }
+        .header-bar { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #1a1a1a; padding-bottom: 15px; margin-bottom: 15px; }
         .back-btn { background: #1a1a1a; color: #fff; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
         .back-btn:hover { background: #262626; }
         
@@ -145,11 +145,14 @@
 </head>
 <body>
     <div class="header-bar">
-        <h2 style="display:flex; align-items:center; gap:10px; font-size: 1.3rem; margin: 0; font-weight: 800; letter-spacing: -0.5px;">
-            Nerd Dashboard 
-            <span id="syncStatus" style="font-size:10px; color:#10b981; font-weight:600; letter-spacing:0.5px; text-transform: uppercase;"></span>
-        </h2>
-        <button class="back-btn" onclick="Dashboard.haptic(); window.location.href='./'">← Back</button>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+            <h2 style="display:flex; align-items:center; gap:8px; font-size: 1.3rem; margin: 0; font-weight: 800; letter-spacing: -0.5px;">
+                Nerd Dashboard 
+                <svg class="dash-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #10b981)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            </h2>
+            <span id="syncStatus" style="font-size:10px; color:#10b981; font-weight:700; letter-spacing:1px; text-transform: uppercase;"></span>
+        </div>
+        <button class="back-btn" style="margin-top: 2px;" onclick="Dashboard.haptic(); window.location.href='./'">← Back</button>
     </div>
 
     <div class="sticky-zone">
@@ -216,13 +219,13 @@
     </div>
 
     <div class="grid-2">
-        <div class="dash-card"><div class="section-header">The Hall of Fame</div><div id="list-fame"></div></div>
         <div class="dash-card">
             <div class="section-header">Top 3 Belayers</div>
             <div id="belayer-container" class="belayer-list"></div>
         </div>
         <div class="dash-card" id="limit-log-card"><div class="section-header">The "Limit" Log</div><div id="list-limit"></div></div>
         <div class="dash-card standard-card"><div class="section-header">Peak by Steepness</div><div id="list-steepness"></div></div>
+        <div class="dash-card"><div class="section-header">The Hall of Fame</div><div id="list-fame"></div></div>
         <div class="dash-card"><div class="section-header">Top Locations</div><div id="list-locations"></div></div>
     </div>
 
@@ -258,6 +261,6 @@
         </div>
     </div>
 
-    <script src="dashboard.js?v=79"></script> 
+    <script src="dashboard.js?v=80"></script> 
 </body>
 </html>
