@@ -187,8 +187,6 @@ const SyncManager = {
             const cloudClimbs = data.climbs || [];
             const cloudSessions = data.sessions || [];
             
-            // THE FIX: Only grab climbs/sessions that have explicitly NEVER been synced.
-            // If it HAS been synced (_synced: true) but is missing from cloudClimbs, the cloud deleted it. Let it die.
             const unsyncedClimbs = State.climbs.filter(c => c._synced === false);
             const unsyncedSessions = State.sessions.filter(s => s._synced === false);
 
@@ -1152,170 +1150,180 @@ const App = {
     renderDashboard: () => { 
         App.renderDashboardCharts(); 
         App.renderDashboardLogs(); 
+    },
+
+    renderDashboardCharts: () => {
+        const dStr = String(State.discipline || "");
+        const conf = getScaleConfig(dStr);
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(String(l.Style).toLowerCase()));
         
-        // Header Gamification Icon Inject
-        const mainTitles = document.querySelectorAll('h1, h2, .header-title, .page-title');
-        mainTitles.forEach(t => {
-            if (t.innerText.trim().includes('Dashboard') && !t.querySelector('.dash-icon')) {
-                const originalText = t.innerText.trim();
-                t.innerHTML = `${originalText} <svg class="dash-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #10b981)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom; margin-left: 8px;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`;
-            }
-        });
-
-        // Aggressive Readiness UI Purge - Kills DOM elements to repair grid
-        ['ui-acwr-ratio', 'ui-readiness-pct', 'ui-acwr-callout', 'ui-acute-load', 'ui-chronic-load'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                const card = el.closest('.stat-card') || el.closest('.readiness-card') || el.parentElement.parentElement;
-                if(card) card.style.display = 'none';
-            }
-        });
-        
-        const now = new Date();
-        const isMultiMode = activeDisc === 'Outdoor Multipitch';
-        
-        const allTimeLogsFiltered = State.climbs.filter(l => {
-            const type = String(getV(l, 'Type') || "");
-            let normalizedType = type;
-            if (type === 'indoor_ropes') normalizedType = 'Indoor Rope Climbing';
-            else if (type === 'indoor_boulders') normalizedType = 'Indoor Bouldering';
-            if (activeDisc !== 'All' && normalizedType !== activeDisc) return false;
-            return true;
-        });
-
-        currentFilteredLogs = allTimeLogsFiltered.filter(l => {
-            if (activeTime === 'All') return true;
-            const logDate = new Date(getCleanDate(getV(l, 'Date')));
-            const diffDays = (now - logDate) / (1000 * 60 * 60 * 24);
-            return diffDays <= parseInt(activeTime);
-        });
-
-        document.querySelectorAll('.standard-card').forEach(el => el.style.display = isMultiMode ? 'none' : 'block');
-        document.getElementById('standard-stats-grid').style.display = isMultiMode ? 'none' : 'grid';
-        document.getElementById('multi-stats-wrapper').style.display = isMultiMode ? 'block' : 'none';
-        document.getElementById('multipitch-topo-card').style.display = isMultiMode ? 'block' : 'none';
-        document.getElementById('limit-log-card').style.display = isMultiMode ? 'none' : 'block';
-
-        if (isMultiMode) {
-            document.getElementById('stat-multi-routes').innerText = currentFilteredLogs.length;
-            
-            let maxEpic = 0;
-            let peakCrux = '-';
-            let peakScore = 0;
-            let wallDays = new Set();
-
-            currentFilteredLogs.forEach(l => {
-                let pCount = 0;
-                const breakdown = String(getV(l, 'PitchBreakdown') || "");
-                if (breakdown) pCount = breakdown.split(',').length;
-                else pCount = Number(getV(l, 'Pitches')) || 2;
-
-                if (pCount > maxEpic) maxEpic = pCount;
-
-                const score = Number(getV(l, 'Score')) || 0;
-                if (score > peakScore) { peakScore = score; peakCrux = getBaseGrade(getV(l, 'Grade')); }
-
-                const dateStr = getCleanDate(getV(l, 'Date'));
-                if (dateStr) wallDays.add(dateStr);
-            });
-
-            document.getElementById('stat-multi-epic').innerText = maxEpic;
-            document.getElementById('stat-multi-peak').innerText = peakCrux;
-            document.getElementById('stat-multi-peak').style.color = '#ef4444';
-            document.getElementById('stat-multi-days').innerText = wallDays.size;
-
-            const multiSelector = document.getElementById('multi-route-selector');
-            const recentMultis = [...currentFilteredLogs].sort((a,b) => new Date(getCleanDate(getV(b, 'Date'))) - new Date(getCleanDate(getV(a, 'Date'))));
-            
-            if (recentMultis.length > 0) {
-                if (!Dashboard.activeMultiClimbId || !recentMultis.find(c => getV(c, 'ClimbID') === Dashboard.activeMultiClimbId)) {
-                    Dashboard.activeMultiClimbId = getV(recentMultis[0], 'ClimbID');
-                }
-
-                multiSelector.innerHTML = recentMultis.map(l => {
-                    const id = getV(l, 'ClimbID');
-                    const rawName = String(getV(l, 'Name') || "Unknown");
-                    const name = escapeHTML(rawName.split('@')[0].trim());
-                    return `<div class="filter-pill ${String(id) === String(Dashboard.activeMultiClimbId) ? 'active' : ''}" onclick="Dashboard.setActiveMulti('${id}')">${name}</div>`;
-                }).join('');
-
-                const selectedClimb = recentMultis.find(c => getV(c, 'ClimbID') === Dashboard.activeMultiClimbId);
-                Dashboard.renderTopo(selectedClimb);
-            } else {
-                multiSelector.innerHTML = '';
-                document.getElementById('topo-canvas').innerHTML = '<div class="empty-msg" style="margin-top:40px;">No multipitch routes logged in this time frame.</div>';
-            }
+        const chartTog = document.getElementById('chartToggle');
+        if (chartTog) {
+            chartTog.style.display = 'flex';
+            chartTog.innerHTML = `
+                <div class="chart-toggle-btn ${State.chartMode === 'max' ? 'active' : ''}" data-val="max" onclick="App.haptic(); State.chartMode='max'">Max Grade</div>
+                <div class="chart-toggle-btn ${State.chartMode === 'avg' ? 'active' : ''}" data-val="avg" onclick="App.haptic(); State.chartMode='avg'">Volume (Avg)</div>
+            `;
         }
 
-        if (!isMultiMode) {
+        const ctxCanvas = document.getElementById('progressChart');
+        const noDataMsg = document.getElementById('noDataMsg');
+        
+        if (viewLogs.length === 0) {
+            if(ctxCanvas) ctxCanvas.style.display = 'none';
+            if(noDataMsg) noDataMsg.style.display = 'block';
+            return;
+        } else {
+            if(ctxCanvas) ctxCanvas.style.display = 'block';
+            if(noDataMsg) noDataMsg.style.display = 'none';
+        }
+
+        const grouped = {};
+        viewLogs.forEach(l => {
+            const cleanD = getCleanDate(l.Date);
+            if (!cleanD) return;
             
-            const elStatSends = document.getElementById('stat-sends');
-            if (elStatSends) elStatSends.innerText = currentFilteredLogs.length;
+            const d = new Date(cleanD);
+            if (isNaN(d.getTime())) return;
             
-            const outDays = new Set(currentFilteredLogs.filter(l => String(getV(l, 'Type')).includes('Outdoor')).map(l => getCleanDate(getV(l, 'Date')))).size;
-            const elStatOutdoor = document.getElementById('stat-outdoor');
-            if (elStatOutdoor) elStatOutdoor.innerText = activeDisc.includes('Indoor') ? 'N/A' : outDays;
-            
-            let maxScore = 0, peakG = '-';
-            let dayC = {}, indoorCount = 0;
-            currentFilteredLogs.forEach(l => { 
-                const s = Number(getV(l, 'Score'));
-                const style = String(getV(l, 'Style') || "").toLowerCase();
-                const isSend = s && style !== 'worked' && style !== 'toprope' && style !== 'autobelay';
-                
-                if (isSend && s > maxScore) { maxScore = s; peakG = String(getV(l, 'Grade') || ""); } 
-                
-                const dateStr = getCleanDate(getV(l, 'Date'));
-                if (dateStr) { const d = new Date(dateStr); if(!isNaN(d)) { dayC[AppConfig.days[d.getDay()]] = (dayC[AppConfig.days[d.getDay()]] || 0) + 1; } }
-                if (String(getV(l, 'Type') || "").toLowerCase().includes('indoor')) indoorCount++;
+            const monthKey = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+
+            if (!grouped[monthKey]) grouped[monthKey] = [];
+            grouped[monthKey].push(getChartScore(l));
+        });
+
+        const sortedMonths = Object.keys(grouped).sort((a,b) => Number(a) - Number(b)).slice(-12);
+        
+        const chartLabels = sortedMonths.map(ts => {
+            const d = new Date(Number(ts));
+            return `${AppConfig.months[d.getMonth()]} '${d.getFullYear().toString().slice(-2)}`; 
+        });
+        
+        const chartData = sortedMonths.map(ts => {
+            if (State.chartMode === 'max') return Math.max(...grouped[ts]);
+            const sum = grouped[ts].reduce((a,b) => a+b, 0);
+            return Math.round(sum / grouped[ts].length);
+        });
+
+        if (window.mainChart) window.mainChart.destroy();
+        if (ctxCanvas) {
+            const ctx = ctxCanvas.getContext('2d');
+            window.mainChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        data: chartData,
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#10b981',
+                        pointRadius: 5,
+                        pointBorderColor: '#0a0a0a',
+                        pointBorderWidth: 2,
+                        fill: true,
+                        tension: 0.35
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(10,10,10,0.9)',
+                            titleColor: '#888',
+                            bodyColor: '#fff',
+                            bodyFont: { weight: 'bold', size: 14 },
+                            padding: 12,
+                            borderColor: '#262626',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    if(!conf || !conf.scores) return ` ${context.raw} XP`;
+                                    const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - context.raw) < Math.abs(prev - context.raw) ? curr : prev);
+                                    const idx = conf.scores.indexOf(closest);
+                                    return ` ${conf.labels[idx]}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false, drawBorder: false }, ticks: { color: '#737373', font: { size: 10, weight: '600' } } },
+                        y: { 
+                            grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, 
+                            beginAtZero: false,
+                            ticks: { 
+                                color: '#737373', 
+                                font: { size: 10, weight: '700' },
+                                maxTicksLimit: 6,
+                                callback: function(value) {
+                                    if(!conf || !conf.scores) return value;
+                                    const closest = conf.scores.reduce((prev, curr) => Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev);
+                                    const idx = conf.scores.indexOf(closest);
+                                    return conf.labels[idx] || '';
+                                }
+                            } 
+                        }
+                    }
+                }
             });
+        }
+    },
 
-            const peakEl = document.getElementById('stat-peak');
-            if (peakEl) {
-                const cleanPeak = getBaseGrade(peakG);
-                peakEl.innerText = (currentFilteredLogs.length === 0) ? '-' : (activeDisc === 'All' ? 'Mix' : cleanPeak);
-                if (currentFilteredLogs.length > 0 && activeDisc === 'Indoor Bouldering') {
-                    const conf = AppConfig.grades.bouldsIn;
-                    const idx = conf.labels.indexOf(cleanPeak);
-                    peakEl.style.color = (idx > -1 && conf.colors[idx]) ? conf.colors[idx] : '#fff';
-                } else peakEl.style.color = '#fff';
+    renderDashboardLogs: () => {
+        const dStr = String(State.discipline || ""), conf = getScaleConfig(dStr);
+        const viewLogs = State.climbs.filter(l => l && l.Type === dStr && !['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(String(l.Style).toLowerCase())).map(l => ({ ...l, cleanDate: getCleanDate(l.Date) }));
+        
+        const lTT = document.getElementById('listToggleTop'); 
+        if(lTT) lTT.className = `log-toggle-btn ${State.listMode === 'top10' ? 'active' : ''}`;
+        
+        const lTR = document.getElementById('listToggleRecent'); 
+        if(lTR) lTR.className = `log-toggle-btn ${State.listMode === 'recent' ? 'active' : ''}`;
+        
+        let displayLogs = [];
+        const titleEl = document.getElementById('logListTitle');
+        
+        if (State.listMode === 'top10') {
+            if(titleEl) titleEl.innerText = 'Last 60 Days';
+            const sixtyDaysAgo = new Date();
+            sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+            sixtyDaysAgo.setHours(0,0,0,0);
+            displayLogs = viewLogs.filter(l => {
+                const logDate = new Date(l.cleanDate);
+                logDate.setHours(0,0,0,0);
+                return logDate >= sixtyDaysAgo;
+            }).sort((a,b) => getChartScore(b) - getChartScore(a)).slice(0, 10);
+        } else {
+            if(titleEl) titleEl.innerText = 'Recent Logs';
+            displayLogs = viewLogs.sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID)).slice(0, 10);
+        }
+        
+        const xpCont = document.getElementById('xpContainer');
+        if(xpCont) xpCont.classList.toggle('hidden', State.listMode !== 'top10' || displayLogs.length === 0);
+        
+        if (State.listMode === 'top10' && displayLogs.length > 0 && conf) {
+            const avgS = Math.round(displayLogs.reduce((s, l) => s + getChartScore(l), 0) / displayLogs.length);
+            const curIdx = conf.scores.indexOf(conf.scores.slice().reverse().find(s => s <= avgS) || conf.scores[0]);
+            const nextIdx = Math.min(curIdx + 1, conf.scores.length - 1);
+            const pct = Math.min(100, Math.max(0, ((avgS - conf.scores[curIdx]) / (conf.scores[nextIdx] - conf.scores[curIdx])) * 100)) || 0;
+
+            const storedMaxIdx = parseInt(localStorage.getItem(`crag_max_idx_${dStr}`) || '-1');
+            if (curIdx > storedMaxIdx) {
+                localStorage.setItem(`crag_max_idx_${dStr}`, curIdx);
+                const latestLog = displayLogs.sort((a,b) => new Date(b.cleanDate) - new Date(a.cleanDate))[0];
+                if (latestLog) {
+                    localStorage.setItem('crag_levelup_session', latestLog.SessionID);
+                }
             }
 
-            const topDay = Object.keys(dayC).length ? Object.keys(dayC).length > 0 ? Object.keys(dayC).reduce((a, b) => dayC[a] > dayC[b] ? a : b) : '-' : '-';
-            let envLabel = '-';
-            if (currentFilteredLogs.length > 0) {
-                const inRatio = indoorCount / currentFilteredLogs.length;
-                if (inRatio >= 0.8) envLabel = 'Gym Rat';
-                else if (inRatio <= 0.4) envLabel = 'Dirtbag';
-                else envLabel = 'Gumby';
-            }
-
-            const elIdDay = document.getElementById('id-day');
-            if (elIdDay) elIdDay.innerText = topDay;
-            const elIdEnv = document.getElementById('id-safe-space');
-            if (elIdEnv) elIdEnv.innerText = envLabel;
-
-            const currAttr = calcRPG(currentFilteredLogs);
-            const baseAttr = calcRPG(allTimeLogsFiltered);
-
-            let archetype = "The All-Rounder";
-            if (currentFilteredLogs.length > 0) {
-                const archMap = { 'Power': 'The Caveman', 'Endurance': 'The Juggernaut', 'Technique': 'The Technician', 'Fingers': 'The Scalpel', 'Headspace': 'The Assassin', 'Tenacity': 'The Pitbull' };
-                const topAttrs = Object.keys(currAttr).filter(k => currAttr[k] === 100);
-                archetype = topAttrs.length > 1 ? 'The All-Rounder' : archMap[topAttrs[0]];
-            }
-            const elIdArch = document.getElementById('id-arch');
-            if (elIdArch) elIdArch.innerText = archetype;
-
-            // --- GAMIFICATION DASHBOARD RIBBON ---
             const levelUpSessionId = localStorage.getItem('crag_levelup_session');
             let isLevelUpToday = false;
             if (levelUpSessionId) {
-                const todayStr = getCleanDate(new Date());
+                const todayStr = getLocalISO();
                 if (levelUpSessionId.includes(todayStr)) isLevelUpToday = true;
             }
 
-            const topStatsGrid = document.getElementById('standard-stats-grid');
+            const topStatsGrid = document.getElementById('standard-stats-grid') || document.querySelector('.dashboard-grid');
             if (topStatsGrid && isLevelUpToday && !document.getElementById('dash-gold-ribbon')) {
                 topStatsGrid.style.position = 'relative';
                 topStatsGrid.insertAdjacentHTML('beforeend', `
@@ -1324,143 +1332,241 @@ const App = {
                     </div>
                 `);
             }
-
-            Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
             
-            const gradesForPyramid = {};
-            currentFilteredLogs.forEach(l => {
-                const style = String(getV(l, 'Style') || "").toLowerCase();
-                const isSend = Number(getV(l, 'Score')) && style !== 'worked' && style !== 'toprope' && style !== 'autobelay';
-                if (isSend) {
-                    const clean = getBaseGrade(String(getV(l, 'Grade') || ""));
-                    gradesForPyramid[clean] = (gradesForPyramid[clean] || 0) + 1;
-                }
-            });
-
-            const pyrCanvas = document.getElementById('pyramidChart');
-            if (pyrCanvas) {
-                if (activeDisc === 'All' || currentFilteredLogs.length === 0) {
-                    pyrCanvas.parentElement.parentElement.style.display = 'none';
-                } else {
-                    pyrCanvas.parentElement.parentElement.style.display = 'block';
-                    const conf = getScaleConfig(activeDisc);
-                    const sortedGrades = Object.keys(gradesForPyramid).sort((a,b) => conf.labels.indexOf(a) - conf.labels.indexOf(b));
-                    const pyrData = sortedGrades.map(g => gradesForPyramid[g]);
-                    const pyrColors = sortedGrades.map(g => {
-                        const idx = conf.labels.indexOf(g);
-                        return (conf.colors && conf.colors[idx]) ? conf.colors[idx] : 'rgba(16, 185, 129, 0.85)';
-                    });
-
-                    window.charts.pyr = new Chart(pyrCanvas, {
-                        type: 'bar',
-                        data: { labels: sortedGrades, datasets: [{ data: pyrData, backgroundColor: pyrColors, borderRadius: { topRight: 6, bottomRight: 6, topLeft: 0, bottomLeft: 0 }, borderSkipped: false }] },
-                        options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { color: '#a3a3a3', font: { weight: '600' } }, grid: { display: false, drawBorder: false } } } }
-                    });
-                }
+            let colorBase = 'var(--primary)';
+            let colorNext = 'var(--primary)';
+            if (dStr.includes('Bouldering') && conf.colors) {
+                if (conf.colors[curIdx]) colorBase = conf.colors[curIdx];
+                if (conf.colors[nextIdx]) colorNext = conf.colors[nextIdx];
             }
 
-            const radarCanvas = document.getElementById('attributeRadarChart');
-            if (radarCanvas) {
-                const radarLabels = Object.keys(currAttr).map(k => [k.toUpperCase(), currAttr[k].toString()]);
-                window.charts.radar = new Chart(radarCanvas, { 
-                    type: 'radar', 
-                    data: { labels: radarLabels, datasets: [ { label: 'Current Phase', data: Object.values(currAttr), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.4)', pointBackgroundColor: '#10b981', pointRadius: 0, borderWidth: 2, fill: true }, { label: 'All-Time Base', data: Object.values(baseAttr), borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.02)', pointRadius: 0, borderWidth: 2, borderDash: [4, 4], fill: true } ] }, 
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'top', labels: { color: '#a3a3a3', boxWidth: 12, font: {size: 11, weight: '600'} } }, tooltip: { callbacks: { label: function(context) { return ` ${context.dataset.label}: ${context.raw}`; } } } }, scales: { r: { min: 0, max: 100, ticks: { display: false, stepSize: 20 }, grid: { color: 'rgba(255,255,255,0.05)' }, angleLines: { display: false }, pointLabels: { color: '#a3a3a3', font: { size: 10, weight: '700' } } } } } 
-                });
+            const xpBG = document.getElementById('xpBaseGrade'); 
+            if(xpBG) {
+                xpBG.innerText = conf.labels[curIdx];
+                xpBG.style.color = colorBase;
             }
-        } 
-
-        const partnerCounts = {};
-        currentFilteredLogs.forEach(l => {
-            const partnerStr = getV(l, 'Partner');
-            if (partnerStr) {
-                const names = String(partnerStr).split(',').map(n => n.trim()).filter(n => n.length > 0);
-                names.forEach(n => { partnerCounts[n] = (partnerCounts[n] || 0) + 1; });
+            
+            const xpNG = document.getElementById('xpNextGrade'); 
+            if(xpNG) {
+                xpNG.innerText = conf.labels[nextIdx];
+                xpNG.style.color = colorNext;
             }
-        });
 
-        const sortedPartners = Object.keys(partnerCounts).sort((a, b) => partnerCounts[b] - partnerCounts[a]).slice(0, 3);
-        const partnerContainer = document.getElementById('belayer-container');
-
-        if (partnerContainer) {
-            if (sortedPartners.length > 0) {
-                partnerContainer.innerHTML = sortedPartners.map((name, index) => {
-                    const rank = index + 1;
-                    const podiumClass = `rank-${rank}`;
-                    return `
-                        <div class="belayer-podium ${podiumClass}">
-                            <div class="belayer-left">
-                                <div class="belayer-rank-icon">${rank}</div>
-                                <div class="belayer-name">${escapeHTML(name)}</div>
-                            </div>
-                            <div class="belayer-count-badge">${partnerCounts[name]} climbs</div>
-                        </div>
-                    `;
-                }).join('');
-            } else {
-                partnerContainer.innerHTML = '<div class="empty-msg">Not enough belayer data yet.</div>';
+            const xpP = document.getElementById('xpPercent'); 
+            if(xpP) xpP.innerText = `${Math.round(pct)}%`;
+            
+            const xpBF = document.getElementById('xpBarFill'); 
+            if(xpBF) {
+                xpBF.style.width = `${pct}%`;
+                xpBF.style.background = `linear-gradient(90deg, ${colorBase}, ${colorNext})`;
+                xpBF.style.boxShadow = `0 0 15px ${colorNext}60`; 
             }
         }
 
-        const steepnessPeaks = {};
-        const featuresToRender = (activeDisc === 'Outdoor Ice Climbing') ? AppConfig.iceFeatures : AppConfig.steepness;
-        featuresToRender.forEach(st => steepnessPeaks[st] = null);
-        
-        const locSessions = {};
-        const locs = {};
+        const lList = document.getElementById('logList');
+        if (!lList) return;
+        if (displayLogs.length === 0) {
+            lList.innerHTML = '<div class="empty-msg">No logs.</div>';
+            return;
+        }
 
-        currentFilteredLogs.forEach(l => { 
-            const s = Number(getV(l, 'Score'));
-            const style = String(getV(l, 'Style') || "").toLowerCase();
-            const isSend = s && style !== 'worked' && style !== 'toprope' && style !== 'autobelay';
-            const angleStr = String(getV(l, 'Angle') || "");
-            let nameStr = String(getV(l, 'Name') || "");
-            const sessionID = String(getV(l, 'SessionID') || "");
+        let tableHtml = `
+        <div class="table-responsive">
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th class="col-date">Date</th>
+                        <th class="col-route">Route / Gym</th>
+                        <th class="col-grade">Grade</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
 
-            featuresToRender.forEach(st => {
-                if (angleStr.includes(st) && isSend) {
-                    if (!steepnessPeaks[st] || s > Number(getV(steepnessPeaks[st], 'Score'))) steepnessPeaks[st] = l;
-                }
-            });
+        tableHtml += displayLogs.map(l => {
+            const cleanGrade = getBaseGrade(String(l.Grade || ""));
+            const type = String(l.Type || "");
+            const cleanStyleLower = String(l.Style || "").toLowerCase();
+            const displayStyle = AppConfig.styles[cleanStyleLower] || (l.Style ? l.Style : 'Unknown'); 
+            
+            let dotColor = '#737373';
+            if (type === 'Indoor Rope Climbing') dotColor = '#10b981';
+            else if (type === 'Indoor Bouldering') dotColor = '#3b82f6';
+            else if (type === 'Outdoor Rope Climbing') dotColor = '#f97316';
+            else if (type === 'Outdoor Bouldering') dotColor = '#a855f7';
+            else if (type === 'Outdoor Multipitch') dotColor = '#ef4444';
+            else if (type === 'Outdoor Trad Climbing') dotColor = '#d97706';
+            else if (type === 'Outdoor Ice Climbing') dotColor = '#0ea5e9';
 
-            if(nameStr) {
-                if(nameStr.includes('@')) nameStr = nameStr.split('@')[1].trim(); 
-                if (nameStr && sessionID) {
-                    if (!locSessions[nameStr]) locSessions[nameStr] = new Set();
-                    locSessions[nameStr].add(sessionID);
+            let textGradeColor = dotColor;
+            if (type === 'Indoor Bouldering') {
+                const bConf = AppConfig.grades.bouldsIn;
+                const bIdx = bConf.labels.indexOf(cleanGrade);
+                if (bIdx > -1 && bConf.colors[bIdx]) {
+                    textGradeColor = bConf.colors[bIdx];
                 }
             }
-        });
+            const gradeStyle = `font-weight:900; color:${textGradeColor}; text-shadow: 0 0 8px ${textGradeColor}40;`;
 
-        Object.keys(locSessions).forEach(loc => { locs[loc] = locSessions[loc].size; });
+            const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
+            const cleanName = escapeHTML(l.Name ? l.Name.split('@')[0].trim() : "Unknown");
+            const cleanNotes = escapeHTML(l.Notes);
 
-        const renderList = (id, html) => { const el = document.getElementById(id); if(el) el.innerHTML = html || '<div class="empty-msg">No data available for this phase.</div>'; };
+            return `
+            <tr class="table-row" id="dash-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'dash')">
+                <td class="col-date" style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate)}</td>
+                <td class="col-route" style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
+                <td class="col-grade" style="${gradeStyle}">${cleanGrade}</td>
+            </tr>
+            <tr class="details-row" id="dash-details-${l.ClimbID}">
+                <td colspan="3" style="padding:0;">
+                    <div class="details-content">
+                        <div class="details-grid">
+                            <div><div class="d-lbl">Style</div><div class="d-val">${displayStyle}</div></div>
+                            ${type !== 'Outdoor Multipitch' ? `<div><div class="d-lbl">Burns</div><div class="d-val">${l.Burns || 1}</div></div>` : ''}
+                            <div><div class="d-lbl">Rating</div><div class="d-val" style="color:#eab308;">${'★'.repeat(Number(l.Rating) || 0) || '-'}</div></div>
+                            <div><div class="d-lbl">${type.includes('Ice') ? 'Ice Feature' : 'Angle'}</div><div class="d-val">${l.Angle || '-'}</div></div>
+                            <div><div class="d-lbl">${type.includes('Ice') ? 'Ice Cond.' : 'Holds'}</div><div class="d-val">${l.Holds || '-'}</div></div>
+                            <div><div class="d-lbl">Effort</div><div class="d-val">${l.Effort || '-'}</div></div>
+                            ${l.Partner ? `<div><div class="d-lbl">Partner(s)</div><div class="d-val">${l.Partner}</div></div>` : ''}
+                            ${l.Pitches ? `<div><div class="d-lbl">Pitches</div><div class="d-val">${l.Pitches}</div></div>` : ''}
+                            ${l.GearStyle ? `<div><div class="d-lbl">Gear Style</div><div class="d-val">${l.GearStyle}</div></div>` : ''}
+                            ${l.PackWeight ? `<div><div class="d-lbl">Pack Weight</div><div class="d-val">${l.PackWeight}</div></div>` : ''}
+                            ${l.PitchBreakdown ? `<div class="d-notes" style="grid-column: 1 / -1;">Pitches: ${l.PitchBreakdown}</div>` : ''}
+                        </div>
+                        ${cleanNotes ? `<div class="d-notes">"${cleanNotes}"</div>` : ''}
+                        <div class="log-actions">
+                            <button class="log-edit-btn" onclick="App.editClimb('${l.ClimbID}')">Edit Entry</button>
+                            <button class="log-del-btn" onclick="App.deleteClimb('${l.ClimbID}')">Delete</button>
+                        </div>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+
+        tableHtml += `</tbody></table></div>`;
+        lList.innerHTML = tableHtml;
+    },
+    
+    logClimb: () => {
+        App.haptic(); 
+        const isOut = State.discipline.includes('Outdoor');
+        const isBould = State.discipline.includes('Boulder');
         
-        const hof = [...currentFilteredLogs].filter(l => Number(getV(l, 'Rating')) >= 4).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
-        renderList('list-fame', hof.map(l => {
-            const name = String(getV(l, 'Name') || "");
-            const cleanName = escapeHTML(name ? name.split('@')[0].trim() : "Unknown");
-            return `<div class="list-item"><div><div class="list-main">${cleanName}</div><div class="list-sub">${'★'.repeat(Number(getV(l, 'Rating')))}</div></div><div class="list-badge">${getBaseGrade(getV(l, 'Grade'))}</div></div>`
-        }).join(''));
-
-        const limit = [...currentFilteredLogs].filter(l => String(getV(l, 'Effort')||"").includes('Limit')).sort((a,b)=>(Number(getV(b, 'Score'))||0)-(Number(getV(a, 'Score'))||0)).slice(0,5);
-        renderList('list-limit', limit.map(l => {
-            const name = String(getV(l, 'Name') || "");
-            const cleanName = escapeHTML(name ? name.split('@')[0].trim() : "Unknown");
-            return `<div class="list-item"><div><div class="list-main">${cleanName}</div><div class="list-sub">${formatShortDate(getV(l, 'Date'))}</div></div><div class="list-badge" style="background: rgba(239,68,68,0.15); color:#ef4444;">${getBaseGrade(getV(l, 'Grade'))}</div></div>`
-        }).join(''));
-
-        let steepHTML = '';
-        featuresToRender.forEach(st => {
-            const peakLog = steepnessPeaks[st];
-            if(peakLog) steepHTML += `<div class="list-item"><div class="list-main">${st}</div><div class="list-badge" style="background: rgba(59,130,246,0.15); color:#3b82f6;">${getBaseGrade(getV(peakLog, 'Grade'))}</div></div>`;
-            else steepHTML += `<div class="list-item"><div class="list-main" style="color:#555;">${st}</div><div class="list-badge" style="background:transparent; color:#555;">-</div></div>`;
-        });
-        renderList('list-steepness', steepHTML);
-
-        const topLocs = Object.keys(locs).sort((a,b)=>locs[b]-locs[a]).slice(0,5);
-        renderList('list-locations', topLocs.map(loc => `<div class="list-item"><div class="list-main">${escapeHTML(loc)}</div><div class="list-badge">${locs[loc]} Session${locs[loc]>1?'s':''}</div></div>`).join(''));
+        const inName = document.getElementById('input-name');
+        const inCrag = document.getElementById('input-crag');
         
-        Dashboard.renderLogbook();
+        const outN = inName ? inName.value.trim() : '';
+        const outC = inCrag ? inCrag.value.trim() : '';
+        if (isOut && (!outN || !outC)) return;
+        
+        App.isSaving = true; 
+        if (isOut) localStorage.setItem('lastCrag', outC);
+
+        const n = isOut ? `${outN} @ ${outC}` : State.activeGym;
+        const climbDateStr = State.activeDate;
+        let s = State.activeGrade.score;
+        const g = State.activeGrade.text; 
+        const isMulti = State.discipline === 'Outdoor Multipitch';
+        
+        if(['flash', 'allfree'].includes(State.activeStyle)) { s += State.discipline.includes('Rope') || isMulti || State.discipline.includes('Trad') || State.discipline.includes('Ice') ? 10 : 17; } 
+        else if (State.activeStyle === 'onsight') { s += 10; }
+        else if (['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(State.activeStyle)) { s = 0; }
+        
+        const sessionID = isOut ? `${climbDateStr}_Outdoor` : `${climbDateStr}_${State.activeGym.replace(/[^a-zA-Z0-9\s]/g, '').trim()}`;
+        
+        let existingSession = State.sessions.find(ses => ses.SessionID === sessionID);
+        if (!existingSession) {
+            const newS = { SessionID: sessionID, Date: climbDateStr, Location: isOut ? outC : State.activeGym, Focus: "", Fatigue: "", WarmUp: "", Approach: "", Notes: "", _synced: false };
+            State.sessions = [newS, ...State.sessions];
+        } else if (isOut) {
+            let locs = existingSession.Location.split(' / ');
+            if (!locs.includes(outC)) {
+                existingSession.Location = [...locs, outC].join(' / ');
+                existingSession._synced = false;
+                State.sessions = [...State.sessions]; 
+            }
+        }
+
+        const btn = document.getElementById('saveClimbBtn');
+        if (btn) {
+            btn.disabled = true; 
+            btn.innerText = 'Saving...';
+        }
+        
+        const climb = { 
+            ClimbID: App.editingClimbId ? App.editingClimbId : String(Date.now()), 
+            SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Grade: g, Score: s, Style: State.activeStyle, 
+            Burns: State.activeBurns === '-' ? '' : State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE,
+            Rating: State.activeRating || "", Holds: State.activeHolds.join(', '), ClimStyles: State.activeClimbStyles.join(', '),
+            Partner: isBould ? '' : (document.getElementById('input-partner') ? document.getElementById('input-partner').value.trim() : ''),
+            Notes: document.getElementById('input-notes') ? document.getElementById('input-notes').value.trim() : '', _synced: false 
+        };
+
+        if (isMulti) {
+            let totalScore = 0;
+            State.activePitches.forEach(p => {
+                let sConf = AppConfig.grades.ropesOut;
+                let sIdx = sConf.labels.indexOf(p.grade);
+                let pScore = sIdx > -1 ? sConf.scores[sIdx] : sConf.scores[0];
+                if (p.type === 'Follow') pScore = Math.round(pScore * 0.8);
+                totalScore += pScore;
+            });
+            climb.Score = totalScore;
+            climb.Pitches = State.activePitches.length;
+            climb.PitchBreakdown = State.activePitches.map(p => `${p.type === 'Lead' ? 'L' : 'F'}:${p.grade}`).join(', ');
+            
+            climb.GearStyle = State.activeGearStyle;
+            climb.PackWeight = State.activePackWeight;
+        } else {
+            if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
+                climb.HighPoint = State.activeHighPoint;
+            }
+            if (State.discipline.includes('Trad') || State.discipline.includes('Ice')) {
+                climb.GearStyle = State.activeGearStyle;
+                climb.PackWeight = State.activePackWeight;
+            }
+        }
+        
+        const inNotes = document.getElementById('input-notes');
+        if (inNotes) inNotes.value = '';
+        if (isOut && inName) inName.value = '';
+        
+        const inPart = document.getElementById('input-partner');
+        if (inPart) inPart.value = '';
+        
+        if (App.editingClimbId) {
+            State.climbs = State.climbs.map(c => String(c.ClimbID) === String(App.editingClimbId) ? climb : c);
+        } else {
+            State.climbs = [climb, ...State.climbs]; 
+        }
+
+        SyncManager.pushAll(State.sessions.filter(ses => !ses._synced), [climb]); 
+        
+        State.activeRating = 0; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
+        State.activeBurns = ['flash', 'onsight', 'toprope', 'autobelay', 'allfree'].includes(State.activeStyle) ? 1 : (['quick', 'topped'].includes(State.activeStyle) ? 2 : '-');
+        State.activeHighPoint = 50;
+        State.activeGearStyle = '';
+        State.activePackWeight = '';
+        State.activePitches = [{type: 'Lead', grade: State.activeGrade.text}, {type: 'Lead', grade: State.activeGrade.text}];
+        
+        setTimeout(() => {
+            if (btn) {
+                btn.innerHTML = App.editingClimbId ? '✓ Updated!' : '✓ Saved!';
+                if (App.editingClimbId) {
+                    App.editingClimbId = null;
+                    btn.style.background = 'var(--primary)';
+                    btn.style.color = '#000';
+                }
+            }
+            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
+            
+            setTimeout(() => { 
+                App.isSaving = false; 
+                App.validateForm(); 
+                App.renderPartnerPills(); 
+            }, 2000);
+        }, 400); 
     }
 };
+App.init();
