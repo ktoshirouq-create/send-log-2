@@ -1,9 +1,7 @@
 const AppConfig = {
     api: "https://script.google.com/macros/s/AKfycbwMh-T7DB7S06_8DB2GC4dniByVHrRSqbODdLRhjciDOXSDL-V4_vzQtRXee2Wmqp9L/exec",
-    gyms: ["OKS", "Torshov", "Løkka", "Bryn", "Gneiss", "Other"],
     months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-    disciplines: ['Indoor Rope Climbing', 'Indoor Bouldering', 'Outdoor Rope Climbing', 'Outdoor Bouldering', 'Outdoor Multipitch', 'Outdoor Trad Climbing', 'Outdoor Ice Climbing'],
     styles: { 'project': 'Project', 'quick': 'Send', 'flash': 'Flash', 'onsight': 'Onsight', 'toprope': 'Top Rope', 'autobelay': 'Auto Belay', 'worked': 'Worked', 'topped': 'Topped Out', 'allfree': 'All Free', 'bailed': 'Bailed' },
     steepness: ['Slab', 'Vertical', 'Overhang', 'Roof'],
     iceFeatures: ['Pillar', 'Curtain', 'Shield', 'Cauliflower', 'Mixed', 'Alpine'],
@@ -909,6 +907,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const elIdArch = document.getElementById('id-arch');
             if (elIdArch) elIdArch.innerText = archetype;
 
+            // --- GAMIFICATION DASHBOARD RIBBON ---
+            const levelUpSessionId = localStorage.getItem('crag_levelup_session');
+            let isLevelUpToday = false;
+            if (levelUpSessionId) {
+                const todayStr = getCleanDate(new Date());
+                if (levelUpSessionId.includes(todayStr)) isLevelUpToday = true;
+            }
+
+            const topStatsGrid = document.getElementById('standard-stats-grid');
+            if (topStatsGrid && isLevelUpToday && !document.getElementById('dash-gold-ribbon')) {
+                topStatsGrid.style.position = 'relative';
+                topStatsGrid.insertAdjacentHTML('beforeend', `
+                    <div id="dash-gold-ribbon" style="position: absolute; top: -15px; right: -15px; width: 80px; height: 80px; overflow: hidden; border-radius: 0 12px 0 0; z-index: 100; pointer-events: none;">
+                        <div style="position: absolute; top: 18px; right: -28px; width: 120px; background: linear-gradient(135deg, #f59e0b, #fbbf24, #fcd34d); color: #451a03; font-size: 10px; font-weight: 900; text-align: center; padding: 5px 0; transform: rotate(45deg); box-shadow: 0 2px 15px rgba(245,158,11,0.5); text-transform: uppercase; letter-spacing: 1px;">Level Up</div>
+                    </div>
+                `);
+            }
+
             Object.values(window.charts).forEach(c => { if(c) c.destroy(); });
             
             const gradesForPyramid = {};
@@ -1047,6 +1063,4 @@ document.addEventListener('DOMContentLoaded', () => {
         
         Dashboard.renderLogbook();
     }
-    
-    renderDashboard(); 
-});
+};
