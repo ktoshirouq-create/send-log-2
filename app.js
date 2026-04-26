@@ -1150,6 +1150,15 @@ const App = {
     renderDashboard: () => { 
         App.renderDashboardCharts(); 
         App.renderDashboardLogs(); 
+        
+        // Header Gamification Icon Inject
+        const mainTitles = document.querySelectorAll('h1, h2, .header-title, .page-title');
+        mainTitles.forEach(t => {
+            if (t.innerText.trim().includes('Dashboard') && !t.querySelector('.dash-icon')) {
+                const originalText = t.innerText.trim();
+                t.innerHTML = `${originalText} <svg class="dash-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--primary, #10b981)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: text-bottom; margin-left: 8px;"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`;
+            }
+        });
     },
 
     renderDashboardCharts: () => {
@@ -1524,49 +1533,4 @@ const App = {
             }
             if (State.discipline.includes('Trad') || State.discipline.includes('Ice')) {
                 climb.GearStyle = State.activeGearStyle;
-                climb.PackWeight = State.activePackWeight;
-            }
-        }
-        
-        const inNotes = document.getElementById('input-notes');
-        if (inNotes) inNotes.value = '';
-        if (isOut && inName) inName.value = '';
-        
-        const inPart = document.getElementById('input-partner');
-        if (inPart) inPart.value = '';
-        
-        if (App.editingClimbId) {
-            State.climbs = State.climbs.map(c => String(c.ClimbID) === String(App.editingClimbId) ? climb : c);
-        } else {
-            State.climbs = [climb, ...State.climbs]; 
-        }
-
-        SyncManager.pushAll(State.sessions.filter(ses => !ses._synced), [climb]); 
-        
-        State.activeRating = 0; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
-        State.activeBurns = ['flash', 'onsight', 'toprope', 'autobelay', 'allfree'].includes(State.activeStyle) ? 1 : (['quick', 'topped'].includes(State.activeStyle) ? 2 : '-');
-        State.activeHighPoint = 50;
-        State.activeGearStyle = '';
-        State.activePackWeight = '';
-        State.activePitches = [{type: 'Lead', grade: State.activeGrade.text}, {type: 'Lead', grade: State.activeGrade.text}];
-        
-        setTimeout(() => {
-            if (btn) {
-                btn.innerHTML = App.editingClimbId ? '✓ Updated!' : '✓ Saved!';
-                if (App.editingClimbId) {
-                    App.editingClimbId = null;
-                    btn.style.background = 'var(--primary)';
-                    btn.style.color = '#000';
-                }
-            }
-            if (navigator.vibrate) navigator.vibrate([30, 50, 30]); 
-            
-            setTimeout(() => { 
-                App.isSaving = false; 
-                App.validateForm(); 
-                App.renderPartnerPills(); 
-            }, 2000);
-        }, 400); 
-    }
-};
-App.init();
+                climb.PackWeight =
