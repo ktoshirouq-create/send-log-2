@@ -608,7 +608,7 @@ const Dashboard = {
             const focus = session && getV(session, 'Focus') ? getV(session, 'Focus') : '-';
 
             return `
-            <tr class="table-row" id="row-${id}" onclick="Dashboard.toggleRow('${id}')">
+            <tr class="table-row" id="row-${id}" onclick="Dashboard.toggleRow('${id}')" style="border-left: 3px solid ${dotColor};">
                 <td style="color:#a3a3a3; font-weight: 500;">${formatShortDate(getV(l, 'Date'))}</td>
                 <td style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
                 <td style="font-weight:700; color:#fff;">${gradeDisplay}</td>
