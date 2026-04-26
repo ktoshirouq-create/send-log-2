@@ -31,3 +31,25 @@ WORKFLOW RULES (sacred):
 - One change at a time, smoke test between
 - Bump ?v= cache buster on every JS change
 - Commit before each change
+
+- COMPLETED:
+- ✅ shared.js extraction (yesterday)
+- ✅ Discipline left border on climb rows (today)
+
+OPEN:
+1. 🔧 Level-up ribbon redesign or proper disable.
+   PREVIOUS FAIL: Tried 3-block FIND/REPLACE in app.js, broke renderUI.
+   NEXT TIME: Try smallest possible disable — comment out ONLY the 
+   localStorage.setItem('crag_levelup_session', ...) line in 
+   renderDashboardLogs. That stops new ribbons being placed; existing 
+   garbage value stays harmless. Skip touching renderJournal entirely.
+   
+2. ✨ Pagination on session expansion. Sessions with many climbs need 
+   "Load More" button. State already has journalLimit pattern — copy 
+   that approach for per-session climb display.
+
+LESSON FROM TODAY:
+- Two FIND/REPLACE blocks targeting similar lines (both <tr class="table-row" 
+  id="...-row-...">) caused mix-up. When two changes look almost identical, 
+  apply one, sanity-check it landed in the right function, then do the next. 
+  Don't trust Ctrl+F to land you on the right one without verification.
