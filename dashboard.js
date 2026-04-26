@@ -53,8 +53,8 @@ const getScaleConfig = (disc) => {
     if (disc === 'Indoor Bouldering') return AppConfig.grades.bouldsIn;
     if (disc === 'Outdoor Bouldering') return AppConfig.grades.bouldsOut;
     if (disc === 'Outdoor Ice Climbing') return AppConfig.grades.ice;
-    if (disc === 'Outdoor Multipitch' || disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut || AppConfig.grades.ropes;
-    return AppConfig.grades.ropes;
+    if (disc === 'Outdoor Multipitch' || disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut || AppConfig.grades.ropesIn;
+    return AppConfig.grades.ropesIn;
 };
 
 const getChartScore = (l) => {
