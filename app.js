@@ -1015,7 +1015,7 @@ const App = {
                 const cleanNotes = escapeHTML(l.Notes);
 
                 return `
-                <tr class="table-row" id="journal-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'journal')">
+                <tr class="table-row" id="dash-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'dash')" style="border-left: 3px solid ${dotColor};">
                     <td class="col-date" style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate || l.Date)}</td>
                     <td class="col-route" style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
                     <td class="col-grade" style="${gradeStyle}">${cleanGrade}</td>
