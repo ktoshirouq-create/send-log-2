@@ -940,7 +940,8 @@ const App = {
         const climbsBySession = {};
         State.climbs.forEach(c => { if (!climbsBySession[c.SessionID]) climbsBySession[c.SessionID] = []; climbsBySession[c.SessionID].push(c); });
 
-        const levelUpSessionId = localStorage.getItem('crag_levelup_session');
+        // TEMPORARILY DISABLED — level-up logic needs redesign
+        // const levelUpSessionId = localStorage.getItem('crag_levelup_session');
 
         let loadMoreBtn = '';
         if (State.sessions.length > State.journalLimit) {
@@ -1050,12 +1051,16 @@ const App = {
 
             const isIndoorGym = AppConfig.gyms.includes(session.Location);
             
+            // TEMPORARILY DISABLED — level-up ribbon needs redesign
             let ribbonHtml = '';
+            /*
             if (session.SessionID === levelUpSessionId) {
                 ribbonHtml = `
                 <div style="position: absolute; top: -5px; right: -5px; width: 60px; height: 60px; overflow: hidden; border-radius: 0 12px 0 0; z-index: 10;">
                     <div style="position: absolute; top: 13px; right: -25px; width: 90px; background: linear-gradient(135deg, #f59e0b, #fbbf24, #fcd34d); color: #451a03; font-size: 8px; font-weight: 900; text-align: center; padding: 4px 0; transform: rotate(45deg); box-shadow: 0 2px 10px rgba(245,158,11,0.4); text-transform: uppercase; letter-spacing: 0.5px;">Level Up</div>
                 </div>`;
+            }
+            */
             }
 
             return `
@@ -1256,6 +1261,8 @@ const App = {
             const nextIdx = Math.min(curIdx + 1, conf.scores.length - 1);
             const pct = Math.min(100, Math.max(0, ((avgS - conf.scores[curIdx]) / (conf.scores[nextIdx] - conf.scores[curIdx])) * 100)) || 0;
 
+            // TEMPORARILY DISABLED — level-up logic needs redesign (fires on every render, not just real level-ups)
+            /*
             const storedMaxIdx = parseInt(localStorage.getItem(`crag_max_idx_${dStr}`) || '-1');
             if (curIdx > storedMaxIdx) {
                 localStorage.setItem(`crag_max_idx_${dStr}`, curIdx);
@@ -1264,7 +1271,11 @@ const App = {
                     localStorage.setItem('crag_levelup_session', latestLog.SessionID);
                 }
             }
+            */
+            }
 
+          // TEMPORARILY DISABLED — level-up ribbon needs redesign
+            /*
             const levelUpSessionId = localStorage.getItem('crag_levelup_session');
             let isLevelUpToday = false;
             if (levelUpSessionId) {
@@ -1281,6 +1292,7 @@ const App = {
                     </div>
                 `);
             }
+            */
             
             let colorBase = 'var(--primary)';
             let colorNext = 'var(--primary)';
