@@ -1076,7 +1076,7 @@ const App = {
             }
 
             return `
-            <div class="session-card" style="position: relative;">
+            <div class="session-card" style="position: relative; ${cardBgStyle}">
                 ${ribbonHtml}
                 <div class="session-header">
                     <div class="s-date-block"><div class="s-date-main">${dateInfo.main}</div><div class="s-date-sub">${dateInfo.sub}</div></div>
