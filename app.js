@@ -953,6 +953,23 @@ const App = {
             if(children.length === 0) return ''; 
             const dateInfo = getJournalDateObj(session.Date);
             
+            const typeCounts = {};
+            let majorityType = null;
+            let maxCount = 0;
+            [...children].reverse().forEach(c => {
+                const t = c.Type;
+                if (!t) return;
+                typeCounts[t] = (typeCounts[t] || 0) + 1;
+                if (typeCounts[t] > maxCount) {
+                    maxCount = typeCounts[t];
+                    majorityType = t;
+                }
+            });
+            
+            const bgColors = { 'Indoor Rope Climbing': '#10b981', 'Indoor Bouldering': '#3b82f6', 'Outdoor Rope Climbing': '#f97316', 'Outdoor Bouldering': '#a855f7', 'Outdoor Multipitch': '#ef4444', 'Outdoor Trad Climbing': '#d97706', 'Outdoor Ice Climbing': '#0ea5e9' };
+            const sessionColor = majorityType ? bgColors[majorityType] : null;
+            const cardBgStyle = sessionColor ? `background: linear-gradient(145deg, ${sessionColor}15, #101412);` : '';
+            
             let maxSentStr = "-", maxColor = '#fff';
             const sends = children.filter(c => !['worked', 'toprope', 'autobelay', 'project', 'bailed'].includes(String(c.Style).toLowerCase()));
             const projects = children.filter(c => ['worked', 'toprope', 'autobelay', 'project', 'bailed'].includes(String(c.Style).toLowerCase()));
