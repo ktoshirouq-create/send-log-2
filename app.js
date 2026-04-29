@@ -1261,7 +1261,7 @@ const App = {
                 localStorage.setItem(`crag_max_idx_${dStr}`, curIdx);
                 const latestLog = displayLogs.sort((a,b) => new Date(b.cleanDate) - new Date(a.cleanDate))[0];
                 if (latestLog) {
-                    localStorage.setItem('crag_levelup_session', latestLog.SessionID);
+                    // localStorage.setItem('crag_levelup_session', latestLog.SessionID);
                 }
             }
 
