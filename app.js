@@ -1336,13 +1336,18 @@ const App = {
             return;
         }
 
+        let routeHeaderText = 'Route / Gym';
+        if (dStr.includes('Indoor')) routeHeaderText = 'Gym';
+        else if (dStr === 'Outdoor Bouldering') routeHeaderText = 'Boulder';
+        else if (dStr.includes('Outdoor')) routeHeaderText = 'Route';
+
         let tableHtml = `
         <div class="table-responsive">
             <table class="log-table">
                 <thead>
                     <tr>
                         <th class="col-date">Date</th>
-                        <th class="col-route">Route / Gym</th>
+                        <th class="col-route">${routeHeaderText}</th>
                         <th class="col-grade">Grade</th>
                     </tr>
                 </thead>
