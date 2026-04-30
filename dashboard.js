@@ -1021,6 +1021,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const topLocs = Object.keys(locs).sort((a,b)=>locs[b]-locs[a]).slice(0,5);
         renderList('list-locations', topLocs.map(loc => `<div class="list-item"><div class="list-main">${escapeHTML(loc)}</div><div class="list-badge">${locs[loc]} Session${locs[loc]>1?'s':''}</div></div>`).join(''));
         
+        // Dynamic header label for Master Logbook based on active discipline
+        const nameHeader = document.getElementById('logbook-name-header');
+        if (nameHeader) {
+            let headerText = 'Route / Gym';
+            if (activeDisc.includes('Indoor')) headerText = 'Gym';
+            else if (activeDisc === 'Outdoor Bouldering') headerText = 'Boulder';
+            else if (activeDisc.includes('Outdoor')) headerText = 'Route';
+            nameHeader.innerHTML = `${headerText} ↕`;
+        }
+        
         Dashboard.renderLogbook();
     }
     
