@@ -44,7 +44,8 @@ const State = new Proxy({
     activeRPE: 'Solid', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
     activePitches: [{type: 'Lead', grade: initConf.labels[gIdx]}, {type: 'Lead', grade: initConf.labels[gIdx]}], 
     activeGearStyle: '', activePackWeight: '',
-    climbs: safeClimbs, sessions: safeSessions, journalLimit: 5
+    climbs: safeClimbs, sessions: safeSessions, journalLimit: 5,
+    expandedSessions: new Set()
 }, {
     set(target, prop, value) {
         let oldVal = target[prop];
@@ -226,6 +227,15 @@ const App = {
             SyncManager.pushAll([], []); 
             App.toast("Deleted"); 
         } 
+    },
+    toggleSessionExpansion: (sessionId) => {
+        App.haptic();
+        if (State.expandedSessions.has(sessionId)) {
+            State.expandedSessions.delete(sessionId);
+        } else {
+            State.expandedSessions.add(sessionId);
+        }
+        App.renderJournal();
     },
     editClimb: (id) => {
         App.haptic();
@@ -948,9 +958,17 @@ const App = {
         }
 
         jList.innerHTML = visibleSessions.map(session => {
-            const children = climbsBySession[session.SessionID] || [];
-            children.sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID));
-            if(children.length === 0) return ''; 
+            const allChildren = climbsBySession[session.SessionID] || [];
+            allChildren.sort((a,b) => Number(b.ClimbID) - Number(a.ClimbID));
+            if(allChildren.length === 0) return ''; 
+            
+            const isExpanded = State.expandedSessions.has(session.SessionID);
+            const PAGE_SIZE = 5;
+            const children = (allChildren.length > PAGE_SIZE && !isExpanded) 
+                ? allChildren.slice(0, PAGE_SIZE) 
+                : allChildren;
+            const hasMore = allChildren.length > PAGE_SIZE;
+            
             const dateInfo = getJournalDateObj(session.Date);
             
             const typeCounts = {};
@@ -1064,6 +1082,14 @@ const App = {
             }).join('');
 
             childrenHtml += `</tbody></table></div>`;
+            
+            if (hasMore) {
+                if (isExpanded) {
+                    childrenHtml += `<button class="show-more-btn" onclick="App.toggleSessionExpansion('${session.SessionID}')" style="width:100%; padding:12px; margin-top:8px; background:transparent; color:#737373; border:1px dashed #262626; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem; transition:0.2s;">Show less ▴</button>`;
+                } else {
+                    childrenHtml += `<button class="show-more-btn" onclick="App.toggleSessionExpansion('${session.SessionID}')" style="width:100%; padding:12px; margin-top:8px; background:transparent; color:#737373; border:1px dashed #262626; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.85rem; transition:0.2s;">Show all ${allChildren.length} climbs ▾</button>`;
+                }
+            }
 
             const isIndoorGym = AppConfig.gyms.includes(session.Location);
             
