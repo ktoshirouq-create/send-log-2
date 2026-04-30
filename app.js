@@ -989,8 +989,8 @@ const App = {
             const cardBgStyle = sessionColor ? `background: linear-gradient(145deg, ${sessionColor}15, #101412);` : '';
             
             let maxSentStr = "-", maxColor = '#fff';
-            const sends = children.filter(c => !['worked', 'toprope', 'autobelay', 'project', 'bailed'].includes(String(c.Style).toLowerCase()));
-            const projects = children.filter(c => ['worked', 'toprope', 'autobelay', 'project', 'bailed'].includes(String(c.Style).toLowerCase()));
+            const sends = allChildren.filter(c => !['worked', 'toprope', 'autobelay', 'project', 'bailed'].includes(String(c.Style).toLowerCase()));
+            const projects = allChildren.filter(c => ['worked', 'toprope', 'autobelay', 'project', 'bailed'].includes(String(c.Style).toLowerCase()));
             
             if (sends.length > 0) {
                 const maxSend = sends.reduce((max, cur) => Number(cur.Score) > Number(max.Score) ? cur : max);
