@@ -559,7 +559,7 @@ const Dashboard = {
             else if (Dashboard.sortCol === 'Name') { valA = String(getV(a, 'Name')||"").toLowerCase(); valB = String(getV(b, 'Name')||"").toLowerCase(); }
             else if (Dashboard.sortCol === 'Grade') { valA = Number(getV(a, 'Score')) || 0; valB = Number(getV(b, 'Score')) || 0; }
             else if (Dashboard.sortCol === 'Style') { valA = String(getV(a, 'Style')||"").toLowerCase(); valB = String(getV(b, 'Style')||"").toLowerCase(); }
-            else if (Dashboard.sortCol === 'Burns') { valA = Number(getV(a, 'Burns')) || 0; valB = Number(getV(b, 'Burns')) || 0; }
+            
             
             if (valA < valB) return Dashboard.sortAsc ? -1 : 1;
             if (valA > valB) return Dashboard.sortAsc ? 1 : -1;
@@ -567,7 +567,7 @@ const Dashboard = {
         });
 
         if (displayData.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="empty-msg">No logs match your search.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" class="empty-msg">No logs match your search.</td></tr>`;
             return;
         }
 
@@ -613,10 +613,10 @@ const Dashboard = {
                 <td style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
                 <td style="font-weight:700; color:#fff;">${gradeDisplay}</td>
                 <td class="col-style" style="color:#a3a3a3;">${AppConfig.styles[getV(l, 'Style')] || getV(l, 'Style')}</td>
-                <td class="align-right" style="color: #a3a3a3; font-weight: 600;">${getV(l, 'Burns') || 1}</td>
+                
             </tr>
             <tr class="details-row" id="details-${id}">
-                <td colspan="5" style="padding:0;">
+                <td colspan="4" style="padding:0;">
                     <div class="details-content">
                         <div class="details-grid">
                             <div><div class="d-lbl">Rating</div><div class="d-val" style="color:#eab308;">${'★'.repeat(Number(getV(l, 'Rating')) || 0) || '-'}</div></div>
@@ -638,7 +638,7 @@ const Dashboard = {
         if (displayData.length > Dashboard.logLimit) {
             tableHtml += `
             <tr class="table-row" onclick="Dashboard.haptic(); Dashboard.logLimit += 10; Dashboard.renderLogbook();">
-                <td colspan="5" style="text-align:center; font-weight:700; color:#fff; padding:18px; letter-spacing:1px; text-transform:uppercase;">
+                <td colspan="4" style="text-align:center; font-weight:700; color:#fff; padding:18px; letter-spacing:1px; text-transform:uppercase;">
                     Load More Climbs ▾
                 </td>
             </tr>`;
