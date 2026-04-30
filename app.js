@@ -1124,7 +1124,7 @@ const App = {
                 </div>
                 ${session.Notes ? `<div class="s-session-notes">"${session.Notes}"</div>` : ''}
                 
-                <button class="session-accordion-btn" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">View ${children.length} Climbs ▾</button>
+                <button class="session-accordion-btn" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">View ${allChildren.length} Climbs ▾</button>
                 <div class="session-children">${childrenHtml}</div>
             </div>`;
         }).join('') + loadMoreBtn;
