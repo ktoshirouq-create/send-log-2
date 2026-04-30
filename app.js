@@ -45,7 +45,8 @@ const State = new Proxy({
     activePitches: [{type: 'Lead', grade: initConf.labels[gIdx]}, {type: 'Lead', grade: initConf.labels[gIdx]}], 
     activeGearStyle: '', activePackWeight: '',
     climbs: safeClimbs, sessions: safeSessions, journalLimit: 5,
-    expandedSessions: new Set()
+    expandedSessions: new Set(),
+    openAccordions: new Set()
 }, {
     set(target, prop, value) {
         let oldVal = target[prop];
@@ -236,6 +237,16 @@ const App = {
             State.expandedSessions.add(sessionId);
         }
         App.renderJournal();
+    },
+    toggleAccordion: (sessionId) => {
+        App.haptic();
+        if (State.openAccordions.has(sessionId)) {
+            State.openAccordions.delete(sessionId);
+        } else {
+            State.openAccordions.add(sessionId);
+        }
+        App.renderJournal();
+    },
     },
     editClimb: (id) => {
         App.haptic();
@@ -1102,7 +1113,7 @@ const App = {
             }
 
             return `
-            <div class="session-card${isExpanded ? ' expanded' : ''}" style="position: relative; ${cardBgStyle}">
+            <div class="session-card${(isExpanded || State.openAccordions.has(session.SessionID)) ? ' expanded' : ''}" style="position: relative; ${cardBgStyle}">
                 ${ribbonHtml}
                 <div class="session-header">
                     <div class="s-date-block"><div class="s-date-main">${dateInfo.main}</div><div class="s-date-sub">${dateInfo.sub}</div></div>
@@ -1124,7 +1135,7 @@ const App = {
                 </div>
                 ${session.Notes ? `<div class="s-session-notes">"${session.Notes}"</div>` : ''}
                 
-                <button class="session-accordion-btn" onclick="App.haptic(); const p = this.parentElement; p.classList.toggle('expanded');">View ${allChildren.length} Climbs ▾</button>
+                <button class="session-accordion-btn" onclick="App.toggleAccordion('${session.SessionID}')">View ${allChildren.length} Climbs ▾</button>
                 <div class="session-children">${childrenHtml}</div>
             </div>`;
         }).join('') + loadMoreBtn;
