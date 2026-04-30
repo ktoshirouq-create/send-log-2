@@ -247,7 +247,6 @@ const App = {
         }
         App.renderJournal();
     },
-    },
     editClimb: (id) => {
         App.haptic();
         const climb = State.climbs.find(c => String(c.ClimbID) === String(id));
