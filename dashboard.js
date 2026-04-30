@@ -620,6 +620,7 @@ const Dashboard = {
                     <div class="details-content">
                         <div class="details-grid">
                             <div><div class="d-lbl">Rating</div><div class="d-val" style="color:#eab308;">${'★'.repeat(Number(getV(l, 'Rating')) || 0) || '-'}</div></div>
+                            <div><div class="d-lbl">Burns</div><div class="d-val">${getV(l, 'Burns') || 1}</div></div>
                             <div><div class="d-lbl">${type.includes('Ice') ? 'Ice Feature' : 'Angle'}</div><div class="d-val">${getV(l, 'Angle') || '-'}</div></div>
                             <div><div class="d-lbl">${type.includes('Ice') ? 'Ice Cond.' : 'Holds'}</div><div class="d-val">${getV(l, 'Holds') || '-'}</div></div>
                             <div><div class="d-lbl">RPE (Effort)</div><div class="d-val">${getV(l, 'Effort') || '-'}</div></div>
