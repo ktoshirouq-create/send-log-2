@@ -191,6 +191,18 @@
 
         .info-icon { display:inline-block; margin-left:8px; color:var(--primary); font-size:0.9rem; font-weight:800; cursor:pointer; background:rgba(16,185,129,0.15); border-radius:50%; width:20px; height:20px; text-align:center; line-height:20px; vertical-align:middle; transition:0.2s; }
         .info-icon:active { transform:scale(0.9); }
+
+        .grade-conv-note { font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 14px; font-style: italic; line-height: 1.4; }
+        .grade-conv-note .disclaimer { display: block; font-size: 0.68rem; opacity: 0.7; margin-top: 2px; }
+        .grade-conv-table { background: var(--input-bg); border-radius: 12px; max-height: 55vh; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+        .grade-conv-headers { display: grid; grid-template-columns: 70px 1fr; gap: 12px; padding: 10px 16px; font-size: 0.62rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.3px; border-bottom: 1px solid rgba(255,255,255,0.06); background: #131313; position: sticky; top: 0; z-index: 1; }
+        .grade-conv-row { display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .grade-conv-row:last-child { border-bottom: none; }
+        .grade-conv-norway { font-size: 1.05rem; font-weight: 800; color: #fff; }
+        .grade-conv-french-list { display: flex; flex-wrap: wrap; gap: 6px; }
+        .grade-conv-pill { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); color: #d4d4d4; padding: 6px 12px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit; transition: 0.15s; }
+        .grade-conv-pill:active { transform: scale(0.94); }
+        .grade-conv-pill.active { background: var(--primary-fade); color: var(--primary); border-color: rgba(16,185,129,0.4); }
     </style>
 </head>
 <body>
@@ -207,6 +219,14 @@
             <h2 id="insightTitle" style="color:var(--primary); border:none; margin-bottom:15px; font-size:1.2rem;">Insight</h2>
             <p id="insightDesc" style="color:#a3a3a3; font-size:0.95rem; line-height:1.6; font-weight:500; margin:0; white-space:pre-wrap;"></p>
             <button class="btn-main" style="margin-top:24px; padding:14px;" onclick="document.getElementById('insightModal').classList.remove('active'); App.haptic();">Got it</button>
+        </div>
+    </div>
+
+    <div id="gradeConvModal" class="modal-overlay" onclick="if(event.target===this) this.classList.remove('active')">
+        <div class="modal-content" style="padding:24px; max-height:85vh; display:flex; flex-direction:column;">
+            <h2 style="border:none; margin-bottom:6px; color:#fff; font-size:1.4rem;">Grade conversion</h2>
+            <div class="grade-conv-note">Tap a French grade to select it<span class="disclaimer">Approximate — charts vary</span></div>
+            <div class="grade-conv-table" id="gradeConvBody"></div>
         </div>
     </div>
 
@@ -312,7 +332,10 @@
                         <div id="partnerPicker" class="pill-row" style="margin-top: 8px;"></div>
                     </div>
                     
-                    <label id="gradeLabel">Grade</label>
+                    <div style="display:flex; align-items:center; margin:20px 0 10px 0;">
+                        <label id="gradeLabel" style="margin:0;">Grade</label>
+                        <span class="info-icon hidden" id="grade-info" onclick="App.haptic(); App.openGradeConv()">ⓘ</span>
+                    </div>
                     <div id="gradePicker" class="pill-row"></div>
 
                     <label>Style / Result</label>
