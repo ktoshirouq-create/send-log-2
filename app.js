@@ -23,6 +23,21 @@ const getChartScore = (l) => {
     return Number(l.Score) || 0;
 };
 
+const GRADE_CONVERSIONS = [
+    { french: '3',   norway: '3'  }, { french: '4-',  norway: '5-' },
+    { french: '4',   norway: '5'  }, { french: '4+',  norway: '5'  },
+    { french: '4b',  norway: '5'  }, { french: '4c',  norway: '5'  },
+    { french: '5-',  norway: '5+' }, { french: '5a',  norway: '5+' },
+    { french: '5a+', norway: '5+' }, { french: '5b',  norway: '6-' },
+    { french: '5b+', norway: '6-' }, { french: '5c',  norway: '6-' },
+    { french: '5c+', norway: '6'  }, { french: '6a',  norway: '6'  },
+    { french: '6a+', norway: '6'  }, { french: '6b',  norway: '6+' },
+    { french: '6b+', norway: '7-' }, { french: '6c',  norway: '7'  },
+    { french: '6c+', norway: '7'  }, { french: '7a',  norway: '7+' },
+    { french: '7a+', norway: '8-' }, { french: '7b',  norway: '8-' },
+    { french: '7b+', norway: '8'  }, { french: '7c',  norway: '8+' }
+];
+
 let deletedClimbs = JSON.parse(localStorage.getItem('crag_deleted_climbs') || '[]');
 let deletedSessions = JSON.parse(localStorage.getItem('crag_deleted_sessions') || '[]');
 let safeClimbs = JSON.parse(localStorage.getItem('crag_climbs_master') || '[]');
@@ -201,6 +216,37 @@ const App = {
         }
     },
     haptic: () => { if (navigator.vibrate) navigator.vibrate(40); },
+    openGradeConv: () => {
+        const currentGrade = State.activeGrade.text;
+        const conf = getScaleConfig(State.discipline);
+        const validFrench = new Set(conf.labels || []);
+        const filtered = GRADE_CONVERSIONS.filter(c => validFrench.has(c.french));
+        const byNorway = new Map();
+        filtered.forEach(c => {
+            if (!byNorway.has(c.norway)) byNorway.set(c.norway, []);
+            byNorway.get(c.norway).push(c.french);
+        });
+        const rowsHtml = Array.from(byNorway.entries()).map(([norway, list]) => {
+            const pills = list.map(f => `<button class="grade-conv-pill ${f === currentGrade ? 'active' : ''}" onclick="App.pickConvGrade('${f}')">${escapeHTML(f)}</button>`).join('');
+            return `<div class="grade-conv-row"><div class="grade-conv-norway">${escapeHTML(norway)}</div><div class="grade-conv-french-list">${pills}</div></div>`;
+        }).join('');
+        const body = document.getElementById('gradeConvBody');
+        if (body) body.innerHTML = `<div class="grade-conv-headers"><div>Norway</div><div>French</div></div>${rowsHtml}`;
+        const modal = document.getElementById('gradeConvModal');
+        if (modal) modal.classList.add('active');
+        setTimeout(() => {
+            const active = document.querySelector('.grade-conv-pill.active');
+            if (active) active.closest('.grade-conv-row').scrollIntoView({ behavior: 'instant', block: 'center' });
+        }, 50);
+    },
+    pickConvGrade: (f) => {
+        App.haptic();
+        const conf = getScaleConfig(State.discipline);
+        const idx = conf.labels.indexOf(f);
+        if (idx > -1) State.activeGrade = { text: f, score: conf.scores[idx] };
+        const modal = document.getElementById('gradeConvModal');
+        if (modal) modal.classList.remove('active');
+    },
     toast: (msg) => {
         const t = document.getElementById('toast');
         if(t) { t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
@@ -737,6 +783,8 @@ const App = {
         if(inC) inC.placeholder = isBould ? 'Sector, Crag 🇬🇷' : (isMulti ? 'Presten, Lofoten' : (isIce ? 'Rjukan' : 'Flatanger'));
         
         safeText('gradeLabel', isMulti ? 'Crux Grade' : 'Grade');
+        const gradeInfo = document.getElementById('grade-info');
+        if (gradeInfo) gradeInfo.classList.toggle('hidden', !(dStr === 'Outdoor Rope Climbing' || dStr === 'Outdoor Trad Climbing'));
 
         const currentGyms = (dStr === 'Indoor Rope Climbing') ? AppConfig.gyms.filter(g => g !== 'Løkka' && g !== 'Bryn') : AppConfig.gyms;
         safeHTML('gymPicker', buildPills(currentGyms, State.activeGym, "App.haptic(); State.activeGym"));
