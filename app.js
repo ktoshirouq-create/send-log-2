@@ -1550,7 +1550,7 @@ const App = {
         
         const climb = { 
             ClimbID: App.editingClimbId ? App.editingClimbId : String(Date.now()), 
-            SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Route: isOut ? outN : '', Crag: isOut ? outC : '', Gym: isOut ? '' : State.activeGym, Grade: g, Score: s, Style: State.activeStyle, 
+            SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Route: isOut ? outN : '', Crag: isOut ? outC : '', Gym: isOut ? '' : State.activeGym, Grade: g, Score: s, Style: State.activeStyle, 
             Burns: State.activeBurns === '-' ? '' : State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE,
             Rating: State.activeRating || "", Holds: State.activeHolds.join(', '), ClimStyles: State.activeClimbStyles.join(', '),
             Partner: isBould ? '' : (document.getElementById('input-partner') ? document.getElementById('input-partner').value.trim() : ''),
