@@ -308,12 +308,11 @@ const App = {
             const parts = (climb.Name || "").split(' @ ');
             const inName = document.getElementById('input-name');
             const inCrag = document.getElementById('input-crag');
-            if (inName) inName.value = parts[0] ? parts[0].trim() : '';
-            if (inCrag) inCrag.value = parts[1] ? parts[1].trim() : '';
+            if (inName) inName.value = climb.Route || (parts[0] ? parts[0].trim() : '');
+            if (inCrag) inCrag.value = climb.Crag || (parts[1] ? parts[1].trim() : '');
         } else {
-            State.activeGym = climb.Name || 'OKS';
+            State.activeGym = climb.Gym || climb.Name || 'OKS';
         }
-        
         const inPartner = document.getElementById('input-partner');
         if (inPartner) inPartner.value = climb.Partner || '';
 
@@ -1464,11 +1463,11 @@ const App = {
             const gradeStyle = `font-weight:900; color:${textGradeColor}; text-shadow: 0 0 8px ${textGradeColor}40;`;
 
             const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
-            const cleanName = escapeHTML(l.Name ? l.Name.split('@')[0].trim() : "Unknown");
-            const cleanNotes = escapeHTML(l.Notes);
+            const cleanName = escapeHTML(l.Route || l.Gym || (l.Name ? l.Name.split('@')[0].trim() : "Unknown"));
+                const cleanNotes = escapeHTML(l.Notes);
 
-            return `
-            <tr class="table-row" id="dash-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'dash') "style="border-left: 3px solid ${dotColor};">
+                return `
+                <tr class="table-row" id="journal-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'journal')" style="border-left: 3px solid ${dotColor};">
                 <td class="col-date" style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate)}</td>
                 <td class="col-route" style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
                 <td class="col-grade" style="${gradeStyle}">${cleanGrade}</td>
@@ -1551,7 +1550,7 @@ const App = {
         
         const climb = { 
             ClimbID: App.editingClimbId ? App.editingClimbId : String(Date.now()), 
-            SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Grade: g, Score: s, Style: State.activeStyle, 
+            SessionID: sessionID, Date: climbDateStr, Type: State.discipline, Name: n, Route: isOut ? outN : '', Crag: isOut ? outC : '', Gym: isOut ? '' : State.activeGym, Grade: g, Score: s, Style: State.activeStyle, 
             Burns: State.activeBurns === '-' ? '' : State.activeBurns, Angle: State.activeSteepness.join(', '), Effort: State.activeRPE,
             Rating: State.activeRating || "", Holds: State.activeHolds.join(', '), ClimStyles: State.activeClimbStyles.join(', '),
             Partner: isBould ? '' : (document.getElementById('input-partner') ? document.getElementById('input-partner').value.trim() : ''),
