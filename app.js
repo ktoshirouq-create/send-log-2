@@ -1103,11 +1103,11 @@ const App = {
                 const gradeStyle = `font-weight:900; color:${textGradeColor}; text-shadow: 0 0 8px ${textGradeColor}40;`;
 
                 const discDot = `<span class="disc-dot" style="background-color: ${dotColor}; box-shadow: 0 0 8px ${dotColor}60;"></span>`;
-                const cleanName = escapeHTML(l.Name ? l.Name.split('@')[0].trim() : "Unknown");
-                const cleanNotes = escapeHTML(l.Notes);
+                const cleanName = escapeHTML(l.Route || l.Gym || (l.Name ? l.Name.split('@')[0].trim() : "Unknown"));
+            const cleanNotes = escapeHTML(l.Notes);
 
-                return `
-                <tr class="table-row" id="journal-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'journal')" style="border-left: 3px solid ${dotColor};">
+            return `
+            <tr class="table-row" id="dash-row-${l.ClimbID}" onclick="App.toggleRow('${l.ClimbID}', 'dash') "style="border-left: 3px solid ${dotColor};">
                     <td class="col-date" style="color:#a3a3a3; font-weight: 500;">${formatShortDate(l.cleanDate || l.Date)}</td>
                     <td class="col-route" style="font-weight:600; color:#e5e5e5; word-break: break-word;">${discDot}${cleanName}</td>
                     <td class="col-grade" style="${gradeStyle}">${cleanGrade}</td>
