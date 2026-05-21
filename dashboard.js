@@ -724,6 +724,15 @@ document.addEventListener('DOMContentLoaded', () => {
     attachFilters('time-filter', 'time', 'time-tab');
 
     function renderDashboard() {
+        // Rebuild a transient display Name from the clean Route/Crag/Gym columns
+        // for any climb lacking one (post Name-column removal). Not persisted —
+        // purely so the existing @-parsing display/search/grouping keeps working.
+        allLogs.forEach(l => {
+            if (l && !getV(l, 'Name')) {
+                const r = getV(l, 'Route'), c = getV(l, 'Crag'), g = getV(l, 'Gym');
+                l.Name = r ? (c ? `${r} @ ${c}` : r) : (g || '');
+            }
+        });
         Dashboard.setupInsights();
         Dashboard.initWrapUp(allLogs);
         
