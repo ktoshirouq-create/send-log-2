@@ -14,14 +14,13 @@ const getV = (obj, prop) => {
 
 const getChartScore = (l) => {
     const typeStr = String(getV(l, 'Type') || "");
-    const gradeStr = getBaseGrade(getV(l, 'Grade') || "");
-    const sConf = getScaleConfig(typeStr);
-    
-    if (sConf && sConf.labels) {
-        const idx = sConf.labels.indexOf(gradeStr);
+    if (typeStr === 'Outdoor Multipitch') {
+        const sConf = AppConfig.grades.ropesOut;
+        const idx = sConf.labels.indexOf(getBaseGrade(getV(l, 'Grade') || ""));
         if (idx > -1) return sConf.scores[idx];
+        return Number(getV(l, 'Score')) || 0;
     }
-    return Number(getV(l, 'Score')) || 0; 
+    return getScoredValue(getV(l, 'Grade'), getV(l, 'Style'), typeStr);
 };
 
 const calcRPG = (logs) => {
