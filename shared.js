@@ -69,3 +69,21 @@ const getScaleConfig = (disc) => {
     if (disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Multipitch' || disc === 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut;
     return AppConfig.grades.ropesIn;
 };
+
+// Single source of truth for a climb's score.
+// Sends/flashes/onsights = base + bonus. Non-sends = 0.
+// Bonus is discipline-aware: +17 boulder, +10 rope/trad/ice. Send = no bonus.
+// NOTE: multipitch is scored separately (per-pitch sum) — do not route it here.
+const getScoredValue = (grade, style, discipline) => {
+    const styleNorm = String(style || '').toLowerCase();
+    if (['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(styleNorm)) return 0;
+    const scale = getScaleConfig(discipline);
+    if (!scale || !scale.labels) return 0;
+    const idx = scale.labels.indexOf(getBaseGrade(grade));
+    if (idx === -1) return 0;
+    let bonus = 0;
+    if (styleNorm === 'flash' || styleNorm === 'onsight') {
+        bonus = String(discipline).includes('Bouldering') ? 17 : 10;
+    }
+    return scale.scores[idx] + bonus;
+};
