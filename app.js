@@ -19,8 +19,9 @@ const getChartScore = (l) => {
         const sConf = AppConfig.grades.ropesOut;
         const idx = sConf.labels.indexOf(getBaseGrade(l.Grade));
         if (idx > -1) return sConf.scores[idx];
+        return Number(l.Score) || 0;
     }
-    return Number(l.Score) || 0;
+    return getScoredValue(l.Grade, l.Style, l.Type);
 };
 
 const GRADE_CONVERSIONS = [
@@ -1519,13 +1520,9 @@ const App = {
 
         const n = isOut ? `${outN} @ ${outC}` : State.activeGym;
         const climbDateStr = State.activeDate;
-        let s = State.activeGrade.score;
         const g = State.activeGrade.text; 
         const isMulti = State.discipline === 'Outdoor Multipitch';
-        
-        if(['flash', 'allfree'].includes(State.activeStyle)) { s += State.discipline.includes('Rope') || isMulti || State.discipline.includes('Trad') || State.discipline.includes('Ice') ? 10 : 17; } 
-        else if (State.activeStyle === 'onsight') { s += 10; }
-        else if (['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(State.activeStyle)) { s = 0; }
+        let s = getScoredValue(g, State.activeStyle, State.discipline);
         
         const sessionID = isOut ? `${climbDateStr}_Outdoor` : `${climbDateStr}_${State.activeGym.replace(/[^a-zA-Z0-9\s]/g, '').trim()}`;
         
