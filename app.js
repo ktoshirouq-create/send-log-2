@@ -25,18 +25,18 @@ const getChartScore = (l) => {
 };
 
 const GRADE_CONVERSIONS = [
-    { french: '3',   norway: '3'  }, { french: '4-',  norway: '5-' },
-    { french: '4',   norway: '5'  }, { french: '4+',  norway: '5'  },
+    const GRADE_CONVERSIONS = [
+    { french: '3',   norway: '3'  }, { french: '4a',  norway: '4'  },
     { french: '4b',  norway: '5'  }, { french: '4c',  norway: '5'  },
-    { french: '5-',  norway: '5+' }, { french: '5a',  norway: '5+' },
-    { french: '5a+', norway: '5+' }, { french: '5b',  norway: '6-' },
-    { french: '5b+', norway: '6-' }, { french: '5c',  norway: '6-' },
-    { french: '5c+', norway: '6'  }, { french: '6a',  norway: '6'  },
-    { french: '6a+', norway: '6'  }, { french: '6b',  norway: '6+' },
-    { french: '6b+', norway: '7-' }, { french: '6c',  norway: '7'  },
-    { french: '6c+', norway: '7'  }, { french: '7a',  norway: '7+' },
-    { french: '7a+', norway: '8-' }, { french: '7b',  norway: '8-' },
-    { french: '7b+', norway: '8'  }, { french: '7c',  norway: '8+' }
+    { french: '5a',  norway: '5+' }, { french: '5a+', norway: '5+' },
+    { french: '5b',  norway: '6-' }, { french: '5b+', norway: '6-' },
+    { french: '5c',  norway: '6-' }, { french: '5c+', norway: '6'  },
+    { french: '6a',  norway: '6'  }, { french: '6a+', norway: '6'  },
+    { french: '6b',  norway: '6+' }, { french: '6b+', norway: '7-' },
+    { french: '6c',  norway: '7'  }, { french: '6c+', norway: '7'  },
+    { french: '7a',  norway: '7+' }, { french: '7a+', norway: '8-' },
+    { french: '7b',  norway: '8-' }, { french: '7b+', norway: '8'  },
+    { french: '7c',  norway: '8+' }
 ];
 
 let deletedClimbs = JSON.parse(localStorage.getItem('crag_deleted_climbs') || '[]');
