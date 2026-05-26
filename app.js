@@ -106,7 +106,7 @@ const State = new Proxy({
                 if(elN) elN.classList.toggle('active', target.view === v);
             });
             if(target.view === 'journal') App.renderJournal();
-            if(target.view === 'dash') App.renderDashboard();
+            if(target.view === 'dash') { App.renderDashboard(); window.scrollTo(0, 0); }
             setTimeout(() => App.centerActivePills(), 50); 
         } else {
             const softPaintTriggers = [
