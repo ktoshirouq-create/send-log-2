@@ -25,7 +25,6 @@ const getChartScore = (l) => {
 };
 
 const GRADE_CONVERSIONS = [
-    const GRADE_CONVERSIONS = [
     { french: '3',   norway: '3'  }, { french: '4a',  norway: '4'  },
     { french: '4b',  norway: '5'  }, { french: '4c',  norway: '5'  },
     { french: '5a',  norway: '5+' }, { french: '5a+', norway: '5+' },
