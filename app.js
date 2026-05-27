@@ -255,7 +255,8 @@ const App = {
         App.haptic();
         const copy = {
             'capacity': { title: 'Working Capacity', desc: 'Your reliable baseline power. This is calculated by averaging the scores of your Top 10 hardest sends over the last 60 days. It filters out one-off lucky flashes to show the grade you can consistently crush.' },
-            'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' }
+            'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' },
+            'styles': { title: 'Style / Result', desc: 'Onsight — clean lead, first try, zero beta. Counts as a send (with bonus).\n\nFlash — clean lead, first try, you had beta. Counts as a send (with bonus).\n\nSend (Redpoint) — clean lead after practice. Counts as a send.\n\nTop Rope — clean top-rope ascent, no falls or hangs. Doesn\'t count as a lead send.\n\nAuto Belay — clean auto-belay ascent (indoor). Doesn\'t count as a send.\n\nProject — you\'re attempting it but didn\'t complete clean. Track how high you got with the high-point slider.\n\nMultipitch — Topped Out: reached the top. All Free: every pitch climbed free. Bailed: retreated before topping out.\n\nBurns = total attempts including the clean ascent. Flash/Onsight = 1 (implicit). Send default = 2 (sent on second go).' }
         };
         const modal = document.getElementById('insightModal');
         if(copy[type] && modal) {
