@@ -812,7 +812,8 @@ const App = {
             else styles = [['project', 'Project'], ['send', 'Send'], ['flash', 'Flash'], ['toprope', 'Top Rope'], ['autobelay', 'Auto Belay']];
         } else {
             styles = [['project', 'Project'], ['send', 'Send'], ['flash', 'Flash']];
-        }!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = isMulti ? 'topped' : 'send';
+        }
+        if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = isMulti ? 'topped' : 'send';
         
         safeHTML('styleSelector', styles.map(s => {
             return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
