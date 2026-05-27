@@ -807,12 +807,11 @@ const App = {
         if (isMulti) {
             styles = [['topped', 'Topped Out'], ['allfree', 'All Free'], ['bailed', 'Bailed']];
         } else if (isRope || isTrad || isIce) {
-            if (isOut) styles = [['project', 'Project'], ['send', 'Send'], ['flash', 'Flash'], ['onsight', 'Onsight'], ['toprope', 'Top Rope'], ['worked', 'Worked']];
-            else styles = [['project', 'Project'], ['send', 'Send'], ['flash', 'Flash'], ['toprope', 'Top Rope'], ['autobelay', 'Auto Belay'], ['worked', 'Worked']];
+            if (isOut) styles = [['project', 'Project'], ['send', 'Send'], ['flash', 'Flash'], ['onsight', 'Onsight'], ['toprope', 'Top Rope']];
+            else styles = [['project', 'Project'], ['send', 'Send'], ['flash', 'Flash'], ['toprope', 'Top Rope'], ['autobelay', 'Auto Belay']];
         } else {
-            styles = [['project', 'Project'], ['send', 'Send'], ['flash', 'Flash'], ['worked', 'Worked']];
-        }
-        if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = isMulti ? 'topped' : 'send';
+            styles = [['project', 'Project'], ['send', 'Send'], ['flash', 'Flash']];
+        }!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = isMulti ? 'topped' : 'send';
         
         safeHTML('styleSelector', styles.map(s => {
             return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
@@ -946,7 +945,7 @@ const App = {
             if(hpC) hpC.classList.add('hidden');
         } else {
             if(mC) mC.classList.add('hidden');
-            if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
+            if (['worked', 'project'].includes(State.activeStyle)) {
                 if(hpC) hpC.classList.remove('hidden');
             } else {
                 if(hpC) hpC.classList.add('hidden');
