@@ -957,16 +957,9 @@ const App = {
             if(hpC) hpC.classList.add('hidden');
         } else {
             if(mC) mC.classList.add('hidden');
-            if (['worked', 'project'].includes(State.activeStyle)) {
-                if(hpC) hpC.classList.remove('hidden');
-            } else {
-                if(hpC) hpC.classList.add('hidden');
-            }
-            if (['flash', 'onsight'].includes(State.activeStyle)) {
-                if(bC) bC.classList.add('hidden');
-            } else {
-                if(bC) bC.classList.remove('hidden');
-            }
+            const def = STYLE_DEFS[State.activeStyle] || {};
+            if(hpC) hpC.classList.toggle('hidden', !def.showHighPoint);
+            if(bC) bC.classList.toggle('hidden', !!def.hideBurns);
             const bV = document.getElementById('burns-val');
             if(bV) bV.innerText = State.activeBurns;
         }
