@@ -34,6 +34,28 @@ const AppConfig = {
     }
 };
 
+// Single source of truth for per-style behaviour. Read by app.js (form UI, scoring, save)
+// so the rules live in ONE place instead of being duplicated across the codebase.
+//   scored        — does getScoredValue give it points (base + maybe bonus)?
+//   bonus         — flash/onsight get the discipline-aware bonus on top of base
+//   defaultBurns  — what Burns resets to when this style is picked ('-' = N/A)
+//   showHighPoint — show the High Point slider (incomplete attempts only)
+//   hideBurns     — hide the Burns counter (flash/onsight are implicitly 1)
+// NOTE: multipitch (topped/allfree) is scored by pitch breakdown downstream, not by this value.
+const STYLE_DEFS = {
+    onsight:   { label: 'Onsight',    scored: true,  bonus: true,  defaultBurns: 1,   showHighPoint: false, hideBurns: true  },
+    flash:     { label: 'Flash',      scored: true,  bonus: true,  defaultBurns: 1,   showHighPoint: false, hideBurns: true  },
+    send:      { label: 'Send',       scored: true,  bonus: false, defaultBurns: 2,   showHighPoint: false, hideBurns: false },
+    quick:     { label: 'Send',       scored: true,  bonus: false, defaultBurns: 2,   showHighPoint: false, hideBurns: false },
+    toprope:   { label: 'Top Rope',   scored: false, bonus: false, defaultBurns: 1,   showHighPoint: false, hideBurns: false },
+    autobelay: { label: 'Auto Belay', scored: false, bonus: false, defaultBurns: 1,   showHighPoint: false, hideBurns: false },
+    project:   { label: 'Project',    scored: false, bonus: false, defaultBurns: '-', showHighPoint: true,  hideBurns: false },
+    worked:    { label: 'Worked',     scored: false, bonus: false, defaultBurns: '-', showHighPoint: true,  hideBurns: false },
+    topped:    { label: 'Topped Out', scored: true,  bonus: false, defaultBurns: '-', showHighPoint: false, hideBurns: false },
+    allfree:   { label: 'All Free',   scored: true,  bonus: false, defaultBurns: '-', showHighPoint: false, hideBurns: false },
+    bailed:    { label: 'Bailed',     scored: false, bonus: false, defaultBurns: '-', showHighPoint: false, hideBurns: false }
+};
+
 const getBaseGrade = (g) => String(g || "").replace(/[⚡💎🚀🛠️❌🪢🔄\s]/g, '');
 
 const getCleanDate = (dStr) => {
