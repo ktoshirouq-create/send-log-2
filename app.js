@@ -432,6 +432,20 @@ const App = {
             State.activeBurns = newVal < 1 ? '-' : newVal;
         }
     },
+    pickStyle: (key) => {
+        App.haptic();
+        const def = STYLE_DEFS[key];
+        State.activeStyle = key;
+        if (!def) return;
+        const db = def.defaultBurns;
+        // Multi-attempt styles (Send) keep a count you've already entered;
+        // only seed the default from a fresh (1) or unset ('-') state.
+        if (db > 1) {
+            if (State.activeBurns === 1 || State.activeBurns === '-') State.activeBurns = db;
+        } else {
+            State.activeBurns = db;
+        }
+    },
 
     adjPitchCount: (dir) => { 
         App.haptic(); 
@@ -816,11 +830,7 @@ const App = {
         if (!styles.find(s => s[0] === State.activeStyle)) State.activeStyle = isMulti ? 'topped' : 'send';
         
         safeHTML('styleSelector', styles.map(s => {
-            return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.haptic(); State.activeStyle='${s[0]}'; 
-                if(['flash', 'onsight', 'toprope', 'autobelay'].includes('${s[0]}')){ State.activeBurns = 1; }
-                else if('${s[0]}' === 'send' && (State.activeBurns === 1 || State.activeBurns === '-')){ State.activeBurns = 2; }
-                else if(['project', 'worked', 'topped', 'allfree', 'bailed'].includes('${s[0]}')){ State.activeBurns = '-'; }
-            ">${s[1]}</div>`;
+            return `<div class="pill ${State.activeStyle === s[0] ? 'active' : ''}" data-val="${s[0]}" onclick="App.pickStyle('${s[0]}')">${s[1]}</div>`;
         }).join(''));
 
         safeHTML('gearStyleSelector', AppConfig.gearStyles.map(s => `<div class="pill ${State.activeGearStyle === s ? 'active' : ''}" data-val="${s}" onclick="App.haptic(); State.activeGearStyle='${s}';">${s}</div>`).join(''));
