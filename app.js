@@ -1573,7 +1573,7 @@ const App = {
             climb.GearStyle = State.activeGearStyle;
             climb.PackWeight = State.activePackWeight;
         } else {
-            if (['worked', 'toprope', 'project'].includes(State.activeStyle)) {
+            if (STYLE_DEFS[State.activeStyle] && STYLE_DEFS[State.activeStyle].showHighPoint) {
                 climb.HighPoint = State.activeHighPoint;
             }
             if (State.discipline.includes('Trad') || State.discipline.includes('Ice')) {
@@ -1598,7 +1598,7 @@ const App = {
         SyncManager.pushAll(State.sessions.filter(ses => !ses._synced), [climb]); 
         
         State.activeRating = 0; State.activeClimbStyles = []; State.activeHolds = []; State.activeSteepness = []; 
-        State.activeBurns = ['flash', 'onsight', 'toprope', 'autobelay', 'allfree'].includes(State.activeStyle) ? 1 : (['send', 'topped'].includes(State.activeStyle) ? 2 : '-');
+        State.activeBurns = STYLE_DEFS[State.activeStyle] ? STYLE_DEFS[State.activeStyle].defaultBurns : '-';
         State.activeHighPoint = 50;
         State.activeGearStyle = '';
         State.activePackWeight = '';
