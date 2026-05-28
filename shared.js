@@ -98,13 +98,14 @@ const getScaleConfig = (disc) => {
 // NOTE: multipitch is scored separately (per-pitch sum) — do not route it here.
 const getScoredValue = (grade, style, discipline) => {
     const styleNorm = String(style || '').toLowerCase();
-    if (['worked', 'toprope', 'project', 'autobelay', 'bailed'].includes(styleNorm)) return 0;
+    const def = STYLE_DEFS[styleNorm];
+    if (!def || !def.scored) return 0;
     const scale = getScaleConfig(discipline);
     if (!scale || !scale.labels) return 0;
     const idx = scale.labels.indexOf(getBaseGrade(grade));
     if (idx === -1) return 0;
     let bonus = 0;
-    if (styleNorm === 'flash' || styleNorm === 'onsight') {
+    if (def.bonus) {
         bonus = String(discipline).includes('Bouldering') ? 17 : 10;
     }
     return scale.scores[idx] + bonus;
