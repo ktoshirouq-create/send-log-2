@@ -45,8 +45,8 @@ const AppConfig = {
 const STYLE_DEFS = {
     onsight:   { label: 'Onsight',    scored: true,  bonus: true,  defaultBurns: 1,   showHighPoint: false, hideBurns: true  },
     flash:     { label: 'Flash',      scored: true,  bonus: true,  defaultBurns: 1,   showHighPoint: false, hideBurns: true  },
-    send:      { label: 'Send',       scored: true,  bonus: false, defaultBurns: 2,   showHighPoint: false, hideBurns: false },
-    quick:     { label: 'Send',       scored: true,  bonus: false, defaultBurns: 2,   showHighPoint: false, hideBurns: false },
+    send:      { label: 'Send',       scored: true,  bonus: false, defaultBurns: 1,   showHighPoint: false, hideBurns: false },
+    quick:     { label: 'Send',       scored: true,  bonus: false, defaultBurns: 1,   showHighPoint: false, hideBurns: false },
     toprope:   { label: 'Top Rope',   scored: false, bonus: false, defaultBurns: 1,   showHighPoint: false, hideBurns: false },
     autobelay: { label: 'Auto Belay', scored: false, bonus: false, defaultBurns: 1,   showHighPoint: false, hideBurns: false },
     project:   { label: 'Project',    scored: false, bonus: false, defaultBurns: '-', showHighPoint: true,  hideBurns: false },
