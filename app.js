@@ -45,6 +45,7 @@ let safeSessions = JSON.parse(localStorage.getItem('crag_sessions_master') || '[
 
 let initDisc = localStorage.getItem('lastDiscipline') || 'Indoor Rope Climbing';
 let initStyle = localStorage.getItem('lastStyle') || 'send';
+let initBurns = STYLE_DEFS[initStyle] ? STYLE_DEFS[initStyle].defaultBurns : '-';
 let initGym = localStorage.getItem('lastGym') || 'OKS';
 let initConf = getScaleConfig(initDisc);
 
@@ -55,7 +56,7 @@ if (gIdx === -1) gIdx = initConf.labels.length > 8 ? 8 : 0;
 const State = new Proxy({
     view: 'log', discipline: initDisc, 
     activeGrade: { text: initConf.labels[gIdx], score: initConf.scores[gIdx] },
-    activeStyle: initStyle, activeBurns: '-', activeHighPoint: 50, activeDate: getLocalISO(), activeGym: initGym, chartMode: 'max', listMode: 'top10',
+    activeStyle: initStyle, activeBurns: initBurns, activeHighPoint: 50, activeDate: getLocalISO(), activeGym: initGym, chartMode: 'max', listMode: 'top10',
     activeRPE: 'Solid', activeRating: 0, activeSteepness: [], activeClimbStyles: [], activeHolds: [],
     activePitches: [{type: 'Lead', grade: initConf.labels[gIdx]}, {type: 'Lead', grade: initConf.labels[gIdx]}], 
     activeGearStyle: '', activePackWeight: '',
