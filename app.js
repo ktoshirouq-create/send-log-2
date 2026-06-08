@@ -1593,9 +1593,7 @@ const App = {
         const inNotes = document.getElementById('input-notes');
         if (inNotes) inNotes.value = '';
         if (isOut && inName) inName.value = '';
-        
-        const inPart = document.getElementById('input-partner');
-        if (inPart) inPart.value = '';
+        // Belayer persists across climbs in a session (not cleared on save).
         
         if (App.editingClimbId) {
             State.climbs = State.climbs.map(c => String(c.ClimbID) === String(App.editingClimbId) ? climb : c);
