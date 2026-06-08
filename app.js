@@ -498,15 +498,23 @@ const App = {
         const picker = document.getElementById('partnerPicker');
         if (!picker) return;
         
-        let counts = {};
+        let stats = {};
         State.climbs.forEach(c => {
             if (c.Partner) {
-                const names = c.Partner.split(',').map(n => n.trim());
-                names.forEach(n => { if (n) counts[n] = (counts[n] || 0) + 1; });
+                const recency = Number(c.ClimbID) || 0;
+                c.Partner.split(',').map(n => n.trim()).forEach(n => {
+                    if (!n) return;
+                    if (!stats[n]) stats[n] = { count: 0, lastSeen: 0 };
+                    stats[n].count++;
+                    if (recency > stats[n].lastSeen) stats[n].lastSeen = recency;
+                });
             }
         });
         
-        const topPartners = Object.keys(counts).sort((a,b) => counts[b] - counts[a]).slice(0, 5);
+        const topPartners = Object.keys(stats).sort((a, b) => {
+            if (stats[b].lastSeen !== stats[a].lastSeen) return stats[b].lastSeen - stats[a].lastSeen;
+            return stats[b].count - stats[a].count;
+        }).slice(0, 5);
         
         if (topPartners.length === 0) {
             picker.style.display = 'none';
