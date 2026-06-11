@@ -77,7 +77,9 @@ const State = new Proxy({
             const conf = getScaleConfig(value);
             const isOutdoor = value.includes('Outdoor') || value.includes('Multipitch');
             
-            if (conf && conf.labels && !conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
+            if (value === 'Indoor Bouldering') {
+                App.ensureBoulderGrade();
+            } else if (conf && conf.labels && !conf.labels.some(g => String(g).toLowerCase() === String(target.activeGrade.text).toLowerCase())) {
                 target.activeGrade = { text: conf.labels[0], score: conf.scores[0] };
             }
 
@@ -97,6 +99,9 @@ const State = new Proxy({
                 target.activePitches = [{type: 'Lead', grade: target.activeGrade.text}, {type: 'Lead', grade: target.activeGrade.text}];
             }
 
+            App.renderUI();
+        } else if (prop === 'activeGym' && oldVal !== value && target.discipline === 'Indoor Bouldering') {
+            App.ensureBoulderGrade();
             App.renderUI();
         } else if (prop === 'view') {
             ['log', 'journal', 'dash'].forEach(v => {
@@ -206,8 +211,9 @@ const App = {
         if (inputCrag) inputCrag.value = localStorage.getItem('lastCrag') || '';
         
         App.initScrubber();
+        if (State.discipline === 'Indoor Bouldering') App.ensureBoulderGrade();
         App.renderUI();
-        SyncManager.trigger(); 
+        SyncManager.trigger();
         window.addEventListener('online', SyncManager.trigger);
 
         const pendingEditId = localStorage.getItem('crag_edit_climb_id');
@@ -446,6 +452,20 @@ const App = {
         } else {
             State.activeBurns = db;
         }
+    },
+    // In Boulder: keep the selected grade valid for the current gym's circuit.
+    // Keeps an off-ladder grade when editing; else falls back to sticky last, then 6A, then first rung.
+    ensureBoulderGrade: () => {
+        const bConf = AppConfig.grades.bouldsIn;
+        const ladder = boulderLadderForLocation(State.activeGym).map(r => r.grade);
+        if (!ladder.length) return;
+        const cur = State.activeGrade.text;
+        if (App.editingClimbId && bConf.labels.includes(cur) && !ladder.includes(cur)) return;
+        if (ladder.includes(cur)) return;
+        const last = localStorage.getItem('lastGradeText');
+        const pick = (last && ladder.includes(last)) ? last : (ladder.includes('6A') ? '6A' : ladder[0]);
+        const idx = bConf.labels.indexOf(pick);
+        State.activeGrade = { text: pick, score: idx > -1 ? bConf.scores[idx] : 0 };
     },
 
     adjPitchCount: (dir) => { 
@@ -812,7 +832,20 @@ const App = {
         const currentGyms = (dStr === 'Indoor Rope Climbing') ? AppConfig.gyms.filter(g => g !== 'Løkka' && g !== 'Bryn') : AppConfig.gyms;
         safeHTML('gymPicker', buildPills(currentGyms, State.activeGym, "App.haptic(); State.activeGym"));
         
-        if (conf && conf.labels) {
+        if (dStr === 'Indoor Bouldering') {
+            // Per-gym colour circuit: only show the selected gym's ladder.
+            const bConf = AppConfig.grades.bouldsIn;
+            const scoreFor = (grade) => { const bi = bConf.labels.indexOf(grade); return bi > -1 ? bConf.scores[bi] : 0; };
+            const ladderGrades = boulderLadderForLocation(State.activeGym).map(r => r.grade);
+            const cur = State.activeGrade.text;
+            safeHTML('gradePicker', ladderGrades.map(g => {
+                const isActive = String(g) === String(cur);
+                const color = boulderColorForGrade(g, State.activeGym);
+                const borderStr = (color === '#3f3f46' || color === '#121212' || color === '#000000') ? 'border: 1px solid rgba(255,255,255,0.4);' : '';
+                const dotHtml = `<span class="boulder-dot" style="display:inline-block; width:10px; height:10px; border-radius:50%; background-color:${color}; margin-right:8px; ${borderStr}"></span>`;
+                return `<div class="pill ${isActive ? 'active' : ''}" data-val="${g}" onclick="App.haptic(); State.activeGrade={text:'${g}', score:${scoreFor(g)}};" style="transition: all 0.2s ease; display:flex; align-items:center; justify-content:center;">${dotHtml}${g}</div>`;
+            }).join(''));
+        } else if (conf && conf.labels) {
             safeHTML('gradePicker', conf.labels.map((g, i) => {
                 const isActive = String(g) === String(State.activeGrade.text);
                 const color = (conf.colors && conf.colors[i]) ? conf.colors[i] : null;
