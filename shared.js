@@ -28,7 +28,7 @@ const AppConfig = {
     grades: {
         ropesIn: { labels: ["5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
         ropesOut: { labels: ["3","4a","4b","4c","5a","5a+","5b","5b+","5c","5c+","6a","6a+","6b","6b+","6c","6c+","7a","7a+","7b","7b+","7c","7c+","8a","8b","8c","9a"], scores: [300,400,433,467,500,517,533,550,567,583,600,617,633,650,667,683,700,717,733,750,767,783,800,833,867,900], colors: [] },
-        bouldsIn: { labels: ["4","5","6A","6B","6C","7A","7B"], scores: [400,500,600,633,667,700,733], colors: ["#ffffff", "#22c55e", "#3b82f6", "#eab308", "#ef4444", "#3f3f46", "#a855f7"] },
+        bouldsIn: { labels: ["4","4+","5","6A","6B","6C","7A","7B","7B+","7C"], scores: [400,450,500,600,633,667,700,733,750,767], colors: ["#ffffff","#5eead4","#22c55e","#3b82f6","#eab308","#ef4444","#3f3f46","#a855f7","#a1a1aa","#ec4899"] },
         bouldsOut: { labels: ["3","4","5","5+","6A","6A+","6B","6B+","6C","6C+","7A","7A+","7B","7B+","7C"], scores: [300,400,500,550,600,617,633,650,667,683,700,717,733,750,767], colors: [] },
         ice: { labels: ["WI2","WI3","WI4","WI4+","WI5","WI5+","WI6","WI6+","WI7","M4","M5","M6","M7","M8"], scores: [300,450,600,650,700,750,800,850,900,600,650,700,750,800], colors: [] }
     }
@@ -90,6 +90,45 @@ const getScaleConfig = (disc) => {
     if (disc === 'Outdoor Ice Climbing') return AppConfig.grades.ice;
     if (disc === 'Outdoor Rope Climbing' || disc === 'Outdoor Multipitch' || disc === 'Outdoor Trad Climbing') return AppConfig.grades.ropesOut;
     return AppConfig.grades.ropesIn;
+};
+
+/* ===== IN BOULDER per-gym colour circuits =====
+   Canonical ladder + house colours live in AppConfig.grades.bouldsIn.
+   A "circuit" is which subset of that ladder a gym sets — colours per grade
+   are identical across gyms; gyms differ only in which rungs exist. */
+const boulderCircuits = {
+    oks: { name: 'OKS', ladder: [
+        { color: '#ffffff', grade: '4' }, { color: '#5eead4', grade: '4+' }, { color: '#22c55e', grade: '5' },
+        { color: '#3b82f6', grade: '6A' }, { color: '#eab308', grade: '6B' }, { color: '#ef4444', grade: '6C' },
+        { color: '#3f3f46', grade: '7A' }, { color: '#a855f7', grade: '7B' }, { color: '#ec4899', grade: '7C' } ] },
+    klatreverket: { name: 'Klatreverket', ladder: [
+        { color: '#ffffff', grade: '4' }, { color: '#22c55e', grade: '5' }, { color: '#3b82f6', grade: '6A' },
+        { color: '#eab308', grade: '6B' }, { color: '#ef4444', grade: '6C' }, { color: '#3f3f46', grade: '7A' },
+        { color: '#a1a1aa', grade: '7B+' } ] }
+};
+
+const boulderLocationCircuit = {
+    'bryn': 'klatreverket', 'torshov': 'klatreverket', 'løkka': 'klatreverket',
+    'lokka': 'klatreverket', 'drammen': 'klatreverket', 'oks': 'oks', 'gneiss': 'oks'
+};
+
+const circuitForLocation = (loc) => {
+    const key = String(loc || '').toLowerCase().trim();
+    return boulderCircuits[boulderLocationCircuit[key]] || boulderCircuits.oks;
+};
+
+const boulderLadderForLocation = (loc) => circuitForLocation(loc).ladder;
+
+const boulderColorForGrade = (grade, loc) => {
+    const base = getBaseGrade(grade);
+    const ladder = boulderLadderForLocation(loc);
+    const onLadder = ladder.find(r => r.grade === base);
+    if (onLadder) return onLadder.color;
+    // not on this gym's ladder — fall back to the canonical house colour by index
+    const bConf = AppConfig.grades.bouldsIn;
+    const idx = bConf.labels.indexOf(base);
+    if (idx > -1 && bConf.colors[idx]) return bConf.colors[idx];
+    return '#888';
 };
 
 // Single source of truth for a climb's score.
