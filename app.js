@@ -25,17 +25,17 @@ const getChartScore = (l) => {
 };
 
 const GRADE_CONVERSIONS = [
-    { french: '3',   norway: '3'  }, { french: '4a',  norway: '4'  },
-    { french: '4b',  norway: '5'  }, { french: '4c',  norway: '5'  },
-    { french: '5a',  norway: '5+' }, { french: '5a+', norway: '5+' },
-    { french: '5b',  norway: '6-' }, { french: '5b+', norway: '6-' },
-    { french: '5c',  norway: '6-' }, { french: '5c+', norway: '6'  },
-    { french: '6a',  norway: '6'  }, { french: '6a+', norway: '6'  },
-    { french: '6b',  norway: '6+' }, { french: '6b+', norway: '7-' },
-    { french: '6c',  norway: '7'  }, { french: '6c+', norway: '7'  },
-    { french: '7a',  norway: '7+' }, { french: '7a+', norway: '8-' },
-    { french: '7b',  norway: '8-' }, { french: '7b+', norway: '8'  },
-    { french: '7c',  norway: '8+' }
+    { french: '3',   norway: '3'  }, { french: '4',   norway: '4'  },
+    { french: '4+',  norway: '4+' }, { french: '4b',  norway: '4'  },
+    { french: '4c',  norway: '4+' }, { french: '5a',  norway: '5-' },
+    { french: '5a+', norway: '5'  }, { french: '5b',  norway: '5'  },
+    { french: '5b+', norway: '5+' }, { french: '5c',  norway: '5+' },
+    { french: '5c+', norway: '6-' }, { french: '6a',  norway: '6-' },
+    { french: '6a+', norway: '6'  }, { french: '6b',  norway: '6+' },
+    { french: '6b+', norway: '7-' }, { french: '6c',  norway: '7'  },
+    { french: '6c+', norway: '7'  }, { french: '7a',  norway: '7+' },
+    { french: '7a+', norway: '8-' }, { french: '7b',  norway: '8-' },
+    { french: '7b+', norway: '8'  }, { french: '7c',  norway: '8+' }
 ];
 
 let deletedClimbs = JSON.parse(localStorage.getItem('crag_deleted_climbs') || '[]');
@@ -260,10 +260,34 @@ const App = {
     },
     showInsight: (type) => {
         App.haptic();
+        const STYLE_HELP = {
+            onsight:   'Onsight — clean lead, first try, zero beta. Counts as a send (with bonus).',
+            flash:     'Flash — clean lead, first try, you had beta. Counts as a send (with bonus).',
+            send:      'Send (Redpoint) — clean lead after practice. Counts as a send.',
+            toprope:   'Top Rope — clean top-rope ascent, no falls or hangs. Doesn\'t count as a lead send.',
+            autobelay: 'Auto Belay — clean auto-belay ascent (indoor). Doesn\'t count as a send.',
+            project:   'Project — you\'re attempting it but didn\'t complete clean. Track how high you got with the high-point slider.',
+            topped:    'Topped Out — reached the top of the route.',
+            allfree:   'All Free — every pitch climbed free (no aid).',
+            bailed:    'Bailed — retreated before topping out.'
+        };
+        const BURNS_NOTE = 'Burns = total attempts including the clean ascent. Flash/Onsight = 1 (implicit). Send starts at 1 — bump it up for each extra go it took.';
+        // Mirror renderUI's discipline→styles logic so the modal lists only what's selectable now.
+        const dStr = String(State.discipline || '');
+        const isOut = dStr.includes('Outdoor');
+        const isRope = dStr.includes('Rope');
+        const isTrad = dStr === 'Outdoor Trad Climbing';
+        const isIce = dStr === 'Outdoor Ice Climbing';
+        const isMulti = dStr === 'Outdoor Multipitch';
+        let styleKeys;
+        if (isMulti) styleKeys = ['topped', 'allfree', 'bailed'];
+        else if (isRope || isTrad || isIce) styleKeys = isOut ? ['project', 'send', 'flash', 'onsight', 'toprope'] : ['project', 'send', 'flash', 'toprope', 'autobelay'];
+        else styleKeys = ['project', 'send', 'flash'];
+        const stylesDesc = styleKeys.map(k => STYLE_HELP[k]).filter(Boolean).join('\n\n') + (isMulti ? '' : '\n\n' + BURNS_NOTE);
         const copy = {
             'capacity': { title: 'Working Capacity', desc: 'Your reliable baseline power. This is calculated by averaging the scores of your Top 10 hardest sends over the last 60 days. It filters out one-off lucky flashes to show the grade you can consistently crush.' },
             'profile': { title: 'Climber Profile', desc: 'A dynamic breakdown of your climbing style. The shape morphs based on the steepness, hold types, and effort levels of your sends. It compares your current training phase against your all-time baseline to highlight weaknesses.' },
-            'styles': { title: 'Style / Result', desc: 'Onsight — clean lead, first try, zero beta. Counts as a send (with bonus).\n\nFlash — clean lead, first try, you had beta. Counts as a send (with bonus).\n\nSend (Redpoint) — clean lead after practice. Counts as a send.\n\nTop Rope — clean top-rope ascent, no falls or hangs. Doesn\'t count as a lead send.\n\nAuto Belay — clean auto-belay ascent (indoor). Doesn\'t count as a send.\n\nProject — you\'re attempting it but didn\'t complete clean. Track how high you got with the high-point slider.\n\nMultipitch — Topped Out: reached the top. All Free: every pitch climbed free. Bailed: retreated before topping out.\n\nBurns = total attempts including the clean ascent. Flash/Onsight = 1 (implicit). Send default = 2 (sent on second go).' }
+            'styles': { title: 'Style', desc: stylesDesc }
         };
         const modal = document.getElementById('insightModal');
         if(copy[type] && modal) {
@@ -432,11 +456,14 @@ const App = {
     },
     adjBurns: (dir) => { 
         App.haptic(); 
+        const def = STYLE_DEFS[State.activeStyle] || {};
+        const allowDash = def.defaultBurns === '-';  // only Project-type styles can drop to "–"; counted styles floor at 1
         if (State.activeBurns === '-') {
             State.activeBurns = dir > 0 ? 1 : '-';
         } else {
             let newVal = State.activeBurns + dir;
-            State.activeBurns = newVal < 1 ? '-' : newVal;
+            if (newVal < 1) State.activeBurns = allowDash ? '-' : 1;
+            else State.activeBurns = newVal;
         }
     },
     pickStyle: (key) => {
@@ -965,7 +992,7 @@ const App = {
         const isBould = State.discipline.includes('Boulder');
 
         const partnerCont = document.getElementById('partner-container');
-        if (partnerCont) partnerCont.style.display = isBould ? 'none' : 'block';
+        if (partnerCont) partnerCont.style.display = (isBould || State.activeStyle === 'autobelay') ? 'none' : 'block';
 
         const ratingSec = document.getElementById('rating-section');
         const starParent = document.getElementById('starRating');
