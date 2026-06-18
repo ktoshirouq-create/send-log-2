@@ -327,12 +327,7 @@
                         </div>
                     </div>
 
-                    <div id="partner-container">
-                        <label>Partner(s)</label>
-                        <input type="text" id="input-partner" placeholder="Who's on belay?" oninput="App.validateForm()">
-                        <div id="partnerPicker" class="pill-row" style="margin-top: 8px;"></div>
-                    </div>
-                    
+                                      
                     <div style="display:flex; align-items:center; margin:20px 0 10px 0;">
                         <label id="gradeLabel" style="margin:0;">Grade</label>
                         <span class="info-icon hidden" id="grade-info" onclick="App.haptic(); App.openGradeConv()">ⓘ</span>
@@ -340,10 +335,16 @@
                     <div id="gradePicker" class="pill-row"></div>
 
                     <div style="display:flex; align-items:center; margin:20px 0 10px 0;">
-                        <label style="margin:0;">Style / Result</label>
+                        <label style="margin:0;">Style</label>
                         <span class="info-icon" onclick="App.haptic(); App.showInsight('styles')">ⓘ</span>
                     </div>
                     <div class="pill-row" id="styleSelector"></div>
+
+                    <div id="partner-container">
+                        <label>Partner(s)</label>
+                        <input type="text" id="input-partner" placeholder="Who's on belay?" oninput="App.validateForm()">
+                        <div id="partnerPicker" class="pill-row" style="margin-top: 8px;"></div>
+                    </div>
                     
                     <div id="multipitch-container" class="hidden" style="margin-top: 15px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
                         
@@ -477,6 +478,6 @@
     </div>
     
     <script src="shared.js?v=1"></script>     
-    <script src="app.js?v=105"></script>
+    <script src="app.js?v=106"></script>
 </body>
 </html>
